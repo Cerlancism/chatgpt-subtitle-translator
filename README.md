@@ -24,6 +24,9 @@ Reference: <https://github.com/openai/openai-quickstart-node#setup>
   chmod +x cli/translator.mjs
   ```
 - Copy `.example.env` to `.env`
+  ```
+  cp .env.example .env
+  ```
 - Add your [API key](https://platform.openai.com/account/api-keys) to the newly created `.env` file
   - Optional set rate limits: <https://platform.openai.com/docs/guides/rate-limits/overview>
 ## CLI
