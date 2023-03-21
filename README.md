@@ -27,12 +27,14 @@ Reference: <https://github.com/openai/openai-quickstart-node#setup>
 - Add your [API key](https://platform.openai.com/account/api-keys) to the newly created `.env` file
   - Optional set rate limits: <https://platform.openai.com/docs/guides/rate-limits/overview>
 ## CLI
-`cli/translator.mjs --help`
 ```
-Usage: translator [options]
+cli/translator.mjs --help
+```
 
-Translation tool based on ChatGPT API
-```
+`Usage: translator [options]`
+
+`Translation tool based on ChatGPT API`
+
 
 Options:
   - `-f, --from <language>` Source language
@@ -55,12 +57,17 @@ Options:
 
 ## Examples
 ### Plain text  
-`cli/translator.mjs --plain-text "你好"`
+```
+cli/translator.mjs --plain-text "你好"
+```
+Standard Output
 ```
 Hello.
 ```
 ### Emojis
-`cli/translator.mjs --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"`  
+```
+cli/translator.mjs --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
+```  
 Input Argument
 ```
 Chuck Norris can walk with the animals, talk with the animals; grunt and squeak and squawk with the animals... and the animals, without fail, always say 'yessir Mr. Norris'.
@@ -70,18 +77,24 @@ Standard Output
 👨‍🦰💪🚶‍♂️🦜🐒🐘🐅🐆🐎🐖🐄🐑🦏🐊🐢🐍🐿️🐇🐿️❗️🌳💬😲👉🤵👨‍🦰👊=🐕🐑🐐🦌🐘🦏🦍🦧🦓🐅🦌🦌🦌🐆🦍🐘🐘🐗🦓=👍🤵.
 ```
 ### Scrambling
-`cli/translator.mjs --system-instruction "Scramble characters of words keeping only start and end letter" --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"`  
+```
+cli/translator.mjs --system-instruction "Scramble characters of words keeping only start and end letter" --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"
+```  
 Standard Output
 ```
 Cuhk Ciorrsn cna wlkak wtih the ainnmlas, takl wtih the ainnmlas;
 ```
-`cli/translator.mjs --system-instruction "Unscramble characters back to English" --temperature 0 --plain-text "Cuhckor Narisso acn alkwa wthi the aanimls"`
+```
+cli/translator.mjs --system-instruction "Unscramble characters back to English" --temperature 0 --plain-text "Cuhckor Narisso acn alkwa wthi the aanimls"
+```
 ```
 Chuck Norris can walk with the animals, talk with the animals;
 ```
 
 ### Plain text file  
-`cli/translator.mjs --file test/data/test_cn.txt`  
+```
+cli/translator.mjs --file test/data/test_cn.txt
+```  
 Input file: [test/data/test_cn.txt](test/data/test_cn.txt)
 ```
 你好。
@@ -93,7 +106,9 @@ Hello.
 Goodbye!
 ```
 ### SRT file
-`cli/translator.mjs --file test/data/test_ja.srt`  
+```
+cli/translator.mjs --file test/data/test_ja.srt
+```  
 Input file: [test/data/test_ja.srt](test/data/test_ja.srt)
 ```
 1
