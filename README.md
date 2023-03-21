@@ -1,17 +1,28 @@
 # ChatGPT API SRT Subtitle Translator
 ChatGPT has also demonstrated its capabilities as a [robust translator](https://towardsdatascience.com/translate-with-chatgpt-f85609996a7f), capable of handling not just common languages, but also unconventional forms of writing like emojis and word scrambling. However, it may not always produce a deterministic output and adhere to line-to-line correlation, potentially disrupting the timing of subtitles, even when instructed to follow precise instructions and setting the model `temperature` parameter to [`0`](https://cobusgreyling.medium.com/example-code-implementation-considerations-for-gpt-3-5-turbo-chatml-whisper-e61f8703c5db).
 
-This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead, grouping text into batches, resulting in longer translations without excessive token consumption while ensuring a one-to-one match between line input and output.
+This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead, grouping text into batches, resulting in longer translations without excessive [token consumption](https://openai.com/pricing) while ensuring a one-to-one match between line input and output.
 
 ## Features
-- Line-based batching: avoiding token limit, reducing overhead token wastage, maintaining translation context to certain extent
+- Line-based batching: avoiding token limit per request, reducing overhead token wastage, maintaining translation context to certain extent
 - Checking with the free OpenAI Moderation tool: prevent token wastage if the model is highly likely to refuse to translate
-- Request per minute (RPM) rate limits **TODO**: Tokens per minute rate limits (TPM) 
+- Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview) 
+- **TODO**: Tokens per minute rate limits (TPM) 
 - **TODO**: Progress resumption - mitigation for frequent API gateway errors and downtimes
 - **TODO**: Retry translation parts
 
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
+- Node.js version >= 14.6.0 required
+- Clone this repository
+- Install the requirements
+  ```
+  npm install
+  ```
+- Give executable permission
+  ```
+  chmod +x cli/translator.mjs
+  ```
 - Copy `.example.env` to `.env`
 - Add your [API key](https://platform.openai.com/account/api-keys) to the newly created `.env` file
   - Optional set rate limits: <https://platform.openai.com/docs/guides/rate-limits/overview>
@@ -33,7 +44,7 @@ Options:
   - `--initial-prompts <prompts>` Initial prompts for the translation in JSON
   - `--no-use-moderator` Don't use the OpenAI Moderation tool
   - `--no-prefix-line-with-number` Don't prefix lines with numerical indices
-  - `--history-prompt-length <length>` Length of prompt history to retain
+  - `--history-prompt-length <length>` Length of prompt history to retain for next request batch, default: 10
   - `--batch-sizes <sizes>` Batch sizes for translation prompts in JSON Array, eg: `"[10, 100]"`
   - `--temperature <temperature>` Sampling temperature to use, should set a low value below 0.3 to be more deterministic for translation https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
   - `--top_p <top_p>` Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p
@@ -48,24 +59,42 @@ Options:
 ```
 Hello.
 ```
-
 ### Emojis
-`cli/translator.mjs --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"`
-
+`cli/translator.mjs --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"`  
+Input Argument
+```
+Chuck Norris can walk with the animals, talk with the animals; grunt and squeak and squawk with the animals... and the animals, without fail, always say 'yessir Mr. Norris'.
+```
+Standard Output
 ```bash
-# Chuck Norris can walk with the animals, talk with the animals; grunt and squeak and squawk with the animals... and the animals, without fail, always say 'yessir Mr. Norris'.
 👨‍🦰💪🚶‍♂️🦜🐒🐘🐅🐆🐎🐖🐄🐑🦏🐊🐢🐍🐿️🐇🐿️❗️🌳💬😲👉🤵👨‍🦰👊=🐕🐑🐐🦌🐘🦏🦍🦧🦓🐅🦌🦌🦌🐆🦍🐘🐘🐗🦓=👍🤵.
+```
+### Scrambling
+`cli/translator.mjs --system-instruction "Scramble characters of words keeping only start and end letter" --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"`  
+Standard Output
+```
+Cuhk Ciorrsn cna wlkak wtih the ainnmlas, takl wtih the ainnmlas;
+```
+`cli/translator.mjs --system-instruction "Unscramble characters back to English" --temperature 0 --plain-text "Cuhckor Narisso acn alkwa wthi the aanimls"`
+```
+Chuck Norris can walk with the animals, talk with the animals;
 ```
 
 ### Plain text file  
-`cli/translator.mjs --file test/data/test_cn.txt `
+`cli/translator.mjs --file test/data/test_cn.txt`  
+Input file: [test/data/test_cn.txt](test/data/test_cn.txt)
 ```
-Hello, bye.
+你好。
+拜拜！
 ```
-
+Standard Output
+```
+Hello.  
+Goodbye!
+```
 ### SRT file
-`cli/translator.mjs  --file test/data/test_ja.srt`  
-Input file: `test/data/test_ja.srt `
+`cli/translator.mjs --file test/data/test_ja.srt`  
+Input file: [test/data/test_ja.srt](test/data/test_ja.srt)
 ```
 1
 00:00:00,000 --> 00:00:02,000
@@ -80,7 +109,7 @@ Input file: `test/data/test_ja.srt `
 はい、元気です。
 
 ``` 
-Output file: `test/data/test_ja.srt.out_English.srt`
+Output file: [test/data/test_ja.srt.out_English.srt](test/data/test_ja.srt.out_English.srt)
 ```
 1
 00:00:00,000 --> 00:00:02,000
@@ -212,7 +241,7 @@ Yes, it's very nice weather.
 **TODO**: More analysis
 
 5 SRT lines:  
-`test/data/test_ja_small.srt`  
+[test/data/test_ja_small.srt](test/data/test_ja_small.srt)  
 - None (Plain text SRT input output):  
   Tokens: `299`
 - No batching, one line per prompt with (System instruction overhead), including up to 10 historical prompt context:  
@@ -221,7 +250,7 @@ Yes, it's very nice weather.
   Tokens: `276`
 
 30 SRT lines:  
-`test/data/test_ja.srt`
+[test/data/test_ja.srt](test/data/test_ja.srt)
 - None (Plain text SRT input output):  
   Tokens: `1625`
 - No batching, one line per prompt with (System instruction overhead), including up to 10 historical prompt context:  
