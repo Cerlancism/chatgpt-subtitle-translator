@@ -13,7 +13,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
-- Node.js version >= 14.6.0 required
+- Node.js version >= 14.6.0 required. This README assumes `bash` shell environment
 - Clone this repository
 - Install the requirements
   ```
