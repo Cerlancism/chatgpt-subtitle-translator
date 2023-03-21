@@ -1,7 +1,10 @@
 //@ts-check
 
-import { sleep } from "./helpers.js"
+import { sleep } from "./helpers.mjs"
 
+/**
+ * Simple rate limiter
+ */
 export class CooldownContext
 {
     /**
@@ -15,6 +18,8 @@ export class CooldownContext
         this.duration = duration
         this.description = description
 
+        this.baseDelay = 1000
+
         this.requests = []
     }
 
@@ -27,9 +32,10 @@ export class CooldownContext
         // Remove any requests from the requests array that are older than the duration
         const now = Date.now();
         this.requests = this.requests.filter(time => now - time < this.duration);
+        this.rate = this.requests.length
 
         // Check if the number of requests made within the duration has reached the limit
-        if (this.requests.length >= this.limit)
+        if (this.rate >= this.limit)
         {
             // The limit has been reached, so we cannot make another request yet
             const nextRequestTime = this.requests[0] + this.duration;
@@ -41,7 +47,7 @@ export class CooldownContext
         return 0;
     }
 
-    async use()
+    async cool()
     {
         const cooldown = this.cooldown()
 
@@ -49,8 +55,8 @@ export class CooldownContext
         {
             return
         }
-        console.error("Rate limit hit:", this.description, cooldown,`ms`)
+        console.error("[Cooldown]", this.description, cooldown,`ms`)
 
-        await sleep(cooldown + 1000)
+        await sleep(cooldown + this.baseDelay)
     }
 }

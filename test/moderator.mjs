@@ -1,7 +1,7 @@
 //@ts-check
 
 import { inspect } from "util";
-import { openai } from "../src/openai.js";
+import { openai } from "../src/openai.mjs";
 
 const response = await openai.createModeration({
     input: "",
