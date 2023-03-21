@@ -90,6 +90,7 @@ Cuhk Ciorrsn cna wlkak wtih the ainnmlas, takl wtih the ainnmlas;
 ```
 cli/translator.mjs --system-instruction "Unscramble characters back to English" --temperature 0 --plain-text "Cuhckor Narisso acn alkwa wthi the aanimls"
 ```
+Standard Output
 ```
 Chuck Norris can walk with the animals, talk with the animals;
 ```
