@@ -18,7 +18,7 @@ export async function checkModeration(input)
 
         if (moderationData.flagged)
         {
-            console.error("flagged", getModeratorResults(moderationData))
+            console.error("[CheckModeration]", "flagged", getModeratorResults(moderationData))
         }
 
         // console.error("Moderation complete")

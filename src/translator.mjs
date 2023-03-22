@@ -70,6 +70,7 @@ export class Translator
 
         this.workingBatchSizes = [...this.options.batchSizes]
         this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
+        this.moderatorFlags = new Map()
     }
 
     /**
@@ -82,7 +83,6 @@ export class Translator
         {
             if (this.currentBatchSize === this.options.batchSizes[0])
             {
-                this.batchSizeThreshold = undefined
                 return false
             }
             this.workingBatchSizes.unshift(this.workingBatchSizes.pop())
@@ -91,13 +91,19 @@ export class Translator
         {
             if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1])
             {
-                this.batchSizeThreshold = undefined
                 return false
             }
             this.workingBatchSizes.push(this.workingBatchSizes.shift())
         }
         this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
-        this.batchSizeThreshold = Math.floor(Math.max(old, this.currentBatchSize) / Math.min(old, this.currentBatchSize))
+        if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1])
+        {
+            this.batchSizeThreshold = undefined
+        }
+        else
+        {
+            this.batchSizeThreshold = Math.floor(Math.max(old, this.currentBatchSize) / Math.min(old, this.currentBatchSize))
+        }
         console.error("[Translator]", "BatchSize", mode, old, "->", this.currentBatchSize, "SizeThreshold", this.batchSizeThreshold)
         return true
     }
@@ -139,6 +145,7 @@ export class Translator
     async * translateSingle(batch)
     {
         console.error(`[Translator]`, "Single line mode")
+        batch = batch.slice(-this.currentBatchSize)
         for (let x = 0; x < batch.length; x++)
         {
             const input = batch[x]
@@ -149,7 +156,8 @@ export class Translator
                 {
                     const moderationResults = getModeratorResults(moderationData)
                     const moderationDescription = getModeratorDescription(moderationResults)
-                    yield* this.yieldOutput([input], [`[ModeratorFlagged] ${moderationDescription}`])
+                    this.moderatorFlags.set(this.workingProgress.length, moderationResults)
+                    yield* this.yieldOutput([input], [moderationDescription])
                     continue
                 }
             }
@@ -236,21 +244,33 @@ export class Translator
 
     /**
      * @param {string[]} promptSources
-     * @param {string[]} promptTransformes
+     * @param {string[]} promptTransforms
      */
-    * yieldOutput(promptSources, promptTransformes)
+    * yieldOutput(promptSources, promptTransforms)
     {
         for (let index = 0; index < promptSources.length; index++)
         {
             const promptSource = promptSources[index];
-            const promptTransform = promptTransformes[index]
-            const originalSource = this.workingLines[this.workingProgress.length]
-            let outTransform = promptTransformes[index]
+            const promptTransform = promptTransforms[index]
+            const workingIndex = this.workingProgress.length
+            const originalSource = this.workingLines[workingIndex]
+            let outTransform = promptTransform
 
-            if (this.options.prefixLineWithNumber)
+            if (this.moderatorFlags.has(workingIndex))
+            {
+                outTransform = `[Flagged][Moderator] ${originalSource} -> ${outTransform} `
+            }
+            else if (this.options.prefixLineWithNumber)
             {
                 const splits = splitStringByNumberLabel(outTransform)
                 outTransform = splits.text
+                const expectedLabel = workingIndex + 1
+                if (expectedLabel !== splits.number)
+                {
+                    console.warn("[Translator]", "Label mismatch", expectedLabel, splits.number)
+                    this.moderatorFlags.set(workingIndex, { remarks: "Label Mismatch", outIndex: splits.number })
+                    outTransform = `[Flagged][Model] ${originalSource} -> ${outTransform}`
+                }
             }
             this.workingProgress.push({ source: promptSource, transform: promptTransform })
             const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform }
@@ -265,10 +285,26 @@ export class Translator
             return
         }
         const sliced = this.workingProgress.slice(-this.options.historyPromptLength)
+        const offset = this.workingProgress.length - this.options.historyPromptLength
+
+        /**
+         * @param {string} text
+         * @param {number} index
+         */
+        const checkFlaggedMapper = (text, index) =>
+        {
+            const id = index + (offset < 0 ? 0 : offset)
+            if (this.moderatorFlags.has(id))
+            {
+                console.error("[Translator]", "Prompt Flagged", id, text)
+                return "-"
+            }
+            return text
+        }
 
         this.promptContext = /** @type {import('openai').ChatCompletionRequestMessage[]}*/([
-            { role: "user", content: sliced.map(x => x.source).join("\n\n") },
-            { role: "assistant", content: sliced.map(x => x.transform).join("\n\n") }
+            { role: "user", content: sliced.map((x, i) => checkFlaggedMapper(x.source, i)).join("\n\n") },
+            { role: "assistant", content: sliced.map((x, i) => checkFlaggedMapper(x.transform, i)).join("\n\n") }
         ])
     }
 

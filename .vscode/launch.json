@@ -21,7 +21,7 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/cli/translator.mjs",
-            "args": ["--file", "test/data/test_ja.srt", "--temperature", "0.2", "--batch-sizes", "[2, 10]", "--history-prompt-length", "20"]
+            "args": ["--file", "test/data/test_ja.srt", "--system-instruction", "翻译成中文", "--temperature", "1.5", "--batch-sizes", "[2, 10]", "--history-prompt-length", "5"]
             // "args": ["--temperature", "0.1", "--no-use-moderator", "--no-prefix-line-with-number", "--top_p", "1", "--frequency_penalty", "1", "--presence_penalty", "1"]
         }
     ]

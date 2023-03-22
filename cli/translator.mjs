@@ -79,9 +79,10 @@ else if (opts.file)
         const srtArrayWorking = parser.fromSrt(text)
 
         const sourceLines = srtArraySource.map(x => x.text)
+        const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
 
-        const progressFile = `${opts.file}.progress.csv`
-        const outputFile = `${opts.file}.out_${opts.to}.srt`
+        const progressFile = `${opts.file}.progress_${fileTag}.csv`
+        const outputFile = `${opts.file}.out_${fileTag}.srt`
 
         if (checkProgress(progressFile))
         {

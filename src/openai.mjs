@@ -42,7 +42,7 @@ export async function openaiRetryWrapper(func, maxRetries, description)
         }
         else
         {
-            throw `[Error_${description}] ${new Date()} unknown error`
+            throw `[Error_${description}] ${new Date()} unknown error ${error}`
         }
     }, async (retryContext) =>
     {
