@@ -1,14 +1,14 @@
 # ChatGPT API SRT Subtitle Translator
 ChatGPT has also demonstrated its capabilities as a [robust translator](https://towardsdatascience.com/translate-with-chatgpt-f85609996a7f), capable of handling not just common languages, but also unconventional forms of writing like emojis and [word scrambling](https://www.mrc-cbu.cam.ac.uk/people/matt.davis/cmabridge/). However, it may not always produce a deterministic output and adhere to line-to-line correlation, potentially disrupting the timing of subtitles, even when instructed to follow precise instructions and setting the model `temperature` parameter to [`0`](https://cobusgreyling.medium.com/example-code-implementation-considerations-for-gpt-3-5-turbo-chatml-whisper-e61f8703c5db).
 
-This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead, grouping text into batches, resulting in longer translations without excessive [token consumption](https://openai.com/pricing) while ensuring a one-to-one match between line input and output.
+This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead, grouping text into batches, resulting in arbitrary length translations without excessive [token consumption](https://openai.com/pricing) while ensuring a one-to-one match between line input and output.
 
 ## Features
 - Line-based batching: avoiding token limit per request, reducing overhead token wastage, maintaining translation context to certain extent
 - Checking with the free OpenAI Moderation tool: prevent token wastage if the model is highly likely to refuse to translate
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview) 
 - **TODO**: Tokens per minute rate limits (TPM) 
-- **TODO**: Progress resumption - mitigation for frequent API gateway errors and downtimes
+- Progress resumption - mitigation for frequent API gateway errors and downtimes
 - **TODO**: Retry translation parts
 
 ## Setup
@@ -40,23 +40,47 @@ cli/translator.mjs --help
 
 
 Options:
-  - `-f, --from <language>` Source language
-  - `-t, --to <language>` Target language (default: "English")
-  - `-m, --model <model>` https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
-  - `-f, --file <file>` Text file name to use as input, .srt or plain text
-  - `--system-instruction <instruction>` Override the prompt system instruction template (Translate {from} to {to}) with this plain text
-  - `--plain-text <text>` Only translate this input plain text
-  - `--initial-prompts <prompts>` Initial prompts for the translation in JSON
-  - `--no-use-moderator` Don't use the OpenAI Moderation tool
-  - `--no-prefix-line-with-number` Don't prefix lines with numerical indices
-  - `--history-prompt-length <length>` Length of prompt history to retain for next request batch, default: 10
-  - `--batch-sizes <sizes>` Batch sizes for translation prompts in JSON Array, eg: `"[10, 100]"`
-  - `--temperature <temperature>` Sampling temperature to use, should set a low value below 0.3 to be more deterministic for translation https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
-  - `--top_p <top_p>` Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p
-  - `--presence_penalty <presence_penalty>` Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-presence_penalty
-  - `--frequency_penalty <frequency_penalty` Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty
-  - `--logit_bias <logit_bias>` Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias
-  - `--user <user>` A unique identifier representing your end-user
+  - `-f, --from <language>`  
+    Source language (default: "") 
+  - `-t, --to <language>`  
+    Target language (default: "English")
+  - `-f, --file <file>`  
+    Text file name to use as input, .srt or plain text
+  - `--system-instruction <instruction>`  
+    Override the prompt system instruction template `Translate {from} to {to}` with this plain text
+  - `--plain-text <text>`  
+    Only translate this input plain text
+  - `--initial-prompts <prompts>`  
+    Initial prompts for the translation in JSON
+  - `--no-use-moderator`  
+    Don't use the OpenAI API Moderation endpoint
+  - `--no-prefix-line-with-number`  
+    Don't prefix lines with numerical indices
+  - `--history-prompt-length <length>`  
+    Length of prompt history to retain for next request batch (default: 10)
+  - `--batch-sizes <sizes>` 
+    Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10, 100]"`)
+
+    The number of lines to include in each translation prompt, provided that they are estimated to within the token limit. 
+    In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
+    
+    Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
+    However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
+
+Additional Options for ChatAPT:  
+  - `-m, --model <model>`  
+   (default: "gpt-3.5-turbo") https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
+  - `-t, --temperature <temperature>`  
+   Sampling temperature to use, should set a low value below 0.3 to be more deterministic for translation (default: 1) https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
+  - `--top_p <top_p>`  
+    Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p
+  - `--presence_penalty <presence_penalty>`  
+    Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-presence_penalty
+  - `--frequency_penalty <frequency_penalty`  
+    Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty
+  - `--logit_bias <logit_bias>`  
+    Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias
+
 
 ## Examples
 ### Plain text  

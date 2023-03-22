@@ -1,9 +1,8 @@
 //@ts-check
-import { splitStringByNumberLabel } from './subtitle.mjs';
-
 import { coolerAPI, openai, openaiRetryWrapper } from './openai.mjs';
 import { checkModeration, getModeratorDescription, getModeratorResults } from './moderator.mjs';
-import { roundWithPrecision, sleep, wrapQuotes } from './helpers.mjs';
+import { splitStringByNumberLabel } from './subtitle.mjs';
+import { roundWithPrecision, sleep } from './helpers.mjs';
 
 /**
  * @type {TranslatorOptions}
@@ -74,42 +73,6 @@ export class Translator
     }
 
     /**
-     * @param {"increase" | "decrease"} mode
-     */
-    changeBatchSize(mode)
-    {
-        const old = this.currentBatchSize
-        if (mode === "decrease")
-        {
-            if (this.currentBatchSize === this.options.batchSizes[0])
-            {
-                return false
-            }
-            this.workingBatchSizes.unshift(this.workingBatchSizes.pop())
-        }
-        else if (mode === "increase")
-        {
-            if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1])
-            {
-                return false
-            }
-            this.workingBatchSizes.push(this.workingBatchSizes.shift())
-        }
-        this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
-        if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1])
-        {
-            this.batchSizeThreshold = undefined
-        }
-        else
-        {
-            this.batchSizeThreshold = Math.floor(Math.max(old, this.currentBatchSize) / Math.min(old, this.currentBatchSize))
-        }
-        console.error("[Translator]", "BatchSize", mode, old, "->", this.currentBatchSize, "SizeThreshold", this.batchSizeThreshold)
-        return true
-    }
-
-
-    /**
      * @param {string} text
      */
     async translatePrompt(text)
@@ -175,17 +138,13 @@ export class Translator
      */
     async * translateLines(lines)
     {
-        console.error("[Translator]", "System Instruction", this.systemInstruction)
+        console.error("[Translator]", "System Instruction:", this.systemInstruction)
         this.workingLines = lines
         const theEnd = this.end ?? lines.length
 
         for (let index = this.offset, reducedBatchSessions = 0; index < theEnd; index += this.currentBatchSize)
         {
-            let batch = lines.slice(index, index + this.currentBatchSize).map(x => x.replaceAll("\n", " "))
-            if (this.options.prefixLineWithNumber)
-            {
-                batch = batch.map((x, i) => `${index + i + 1}. ${x}`)
-            }
+            let batch = lines.slice(index, index + this.currentBatchSize).map((x, i) => this.preprocessLine(x, i, index))
             const input = batch.join("\n\n")
             if (this.options.useModerator)
             {
@@ -254,29 +213,83 @@ export class Translator
             const promptTransform = promptTransforms[index]
             const workingIndex = this.workingProgress.length
             const originalSource = this.workingLines[workingIndex]
+            let finalTransform = promptTransform
             let outTransform = promptTransform
 
             if (this.moderatorFlags.has(workingIndex))
             {
-                outTransform = `[Flagged][Moderator] ${originalSource} -> ${outTransform} `
+                finalTransform = `[Flagged][Moderator] ${originalSource} -> ${finalTransform} `
             }
             else if (this.options.prefixLineWithNumber)
             {
-                const splits = splitStringByNumberLabel(outTransform)
+                const splits = splitStringByNumberLabel(finalTransform)
+                finalTransform = splits.text
                 outTransform = splits.text
                 const expectedLabel = workingIndex + 1
                 if (expectedLabel !== splits.number)
                 {
                     console.warn("[Translator]", "Label mismatch", expectedLabel, splits.number)
                     this.moderatorFlags.set(workingIndex, { remarks: "Label Mismatch", outIndex: splits.number })
-                    outTransform = `[Flagged][Model] ${originalSource} -> ${outTransform}`
+                    finalTransform = `[Flagged][Model] ${originalSource} -> ${finalTransform}`
                 }
             }
             this.workingProgress.push({ source: promptSource, transform: promptTransform })
-            const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform }
+            const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform, finalTransform }
             yield output
         }
     }
+
+    /**
+     * @param {string} line
+     * @param {number} index
+     * @param {number} offset
+     */
+    preprocessLine(line, index, offset)
+    {
+        line = line.replaceAll("\n", " \\N ")
+        if (this.options.prefixLineWithNumber)
+        {
+            line = `${offset + index + 1}. ${line}`
+        }
+        return line
+    }
+
+    /**
+     * @param {"increase" | "decrease"} mode
+     */
+    changeBatchSize(mode)
+    {
+        const old = this.currentBatchSize
+        if (mode === "decrease")
+        {
+            if (this.currentBatchSize === this.options.batchSizes[0])
+            {
+                return false
+            }
+            this.workingBatchSizes.unshift(this.workingBatchSizes.pop())
+        }
+        else if (mode === "increase")
+        {
+            if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1])
+            {
+                return false
+            }
+            this.workingBatchSizes.push(this.workingBatchSizes.shift())
+        }
+        this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
+        if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1])
+        {
+            this.batchSizeThreshold = undefined
+        }
+        else
+        {
+            this.batchSizeThreshold = Math.floor(Math.max(old, this.currentBatchSize) / Math.min(old, this.currentBatchSize))
+        }
+        console.error("[Translator]", "BatchSize", mode, old, "->", this.currentBatchSize, "SizeThreshold", this.batchSizeThreshold)
+        return true
+    }
+
+
 
     buildContext()
     {
@@ -296,8 +309,8 @@ export class Translator
             const id = index + (offset < 0 ? 0 : offset)
             if (this.moderatorFlags.has(id))
             {
-                console.error("[Translator]", "Prompt Flagged", id, text)
-                return "-"
+                // console.error("[Translator]", "Prompt Flagged", id, text)
+                return this.preprocessLine("-", id, 0)
             }
             return text
         }

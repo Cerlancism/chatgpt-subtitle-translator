@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 //@ts-check
+import fs from 'node:fs'
+import readline from 'readline'
 import { program } from "commander"
 import { Translator } from "../src/translator.mjs"
-import fs from 'node:fs'
 import { parser } from "../src/subtitle.mjs";
 import { wrapQuotes } from "../src/helpers.mjs";
 
 program.description("Translation tool based on ChatGPT API")
-    .option("-f, --from <language>", "Source language")
-    .option("-t, --to <language>", "Target language", "English")
+    .option("--from <language>", "Source language")
+    .option("--to <language>", "Target language", "English")
     .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model")
 
     .option("-f, --file <file>", "Text file name to use as input, .srt or plain text")
-    .option("--system-instruction <instruction>", "Override the prompt system instruction template (Translate {from} to {to}) with this plain text")
+    .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template (Translate {from} to {to}) with this plain text")
     .option("--plain-text <text>", "Only translate this input plain text")
 
     .option("--initial-prompts <prompts>", "Initial prompts for the translation in JSON", JSON.parse)
@@ -20,7 +21,7 @@ program.description("Translation tool based on ChatGPT API")
     .option("--no-prefix-line-with-number", "Don't prefix lines with numerical indices")
     .option("--history-prompt-length <length>", "Length of prompt history to retain", parseInt)
     .option("--batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array, eg: \"[10, 100]\"", JSON.parse)
-    .option("--temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature", parseFloat)
+    .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature", parseFloat)
     // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
     // .option("--stream", "Enable stream mode for partial message deltas")
     // .option("--stop <stop>", "Up to 4 sequences where the API will stop generating further tokens")
@@ -49,7 +50,7 @@ const options = {
         ...(opts.presence_penalty && { presence_penalty: opts.presence_penalty }),
         ...(opts.frequency_penalty && { frequency_penalty: opts.frequency_penalty }),
         ...(opts.logit_bias && { logit_bias: opts.logit_bias }),
-        ...(opts.user && { user: opts.user }),
+        // ...(opts.user && { user: opts.user }),
     },
     ...(opts.initialPrompts && { initialPrompts: opts.initialPrompts }),
     ...(opts.useModerator !== undefined && { useModerator: opts.useModerator }),
@@ -84,18 +85,40 @@ else if (opts.file)
         const progressFile = `${opts.file}.progress_${fileTag}.csv`
         const outputFile = `${opts.file}.out_${fileTag}.srt`
 
-        if (checkProgress(progressFile))
+        if (await checkFileExists(progressFile))
         {
-            // TODO: check progress/resume etc
+            const progress = await getProgress(progressFile)
+
+            if (progress.length === sourceLines.length)
+            {
+                console.error("[CLI]", "Progress already completed")
+                process.exit(1)
+            }
+            console.error("[CLI]", "Resuming from", progress.length)
+            const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
+            for (let index = 0; index < progress.length; index++)
+            {
+                let transform = progress[index]
+                if (transform.startsWith("[Flagged]"))
+                {
+                    translator.moderatorFlags.set(index, transform)
+                }
+                else
+                {
+                    transform = translator.preprocessLine(transform, index, 0)
+                }
+                translator.workingProgress.push({ source: sourceProgress[index], transform })
+            }
+            translator.offset = progress.length
         }
 
         for await (const output of translator.translateLines(sourceLines))
         {
-            const csv = `${output.index}, ${wrapQuotes(output.transform)}\n`
+            const csv = `${output.index}, ${wrapQuotes(output.finalTransform)}\n`
             const srtEntry = srtArrayWorking[output.index - 1]
-            srtEntry.text = output.transform
+            srtEntry.text = output.finalTransform
             const outSrt = parser.toSrt([srtEntry])
-            console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.transform))
+            console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
             await Promise.all([
                 fs.promises.appendFile(progressFile, csv),
                 fs.promises.appendFile(outputFile, outSrt)]
@@ -115,16 +138,61 @@ else if (opts.file)
  */
 async function translatePlainText(text)
 {
-    const response = await translator.translatePrompt(text)
-    translator.printUsage()
-    const output = response.data.choices[0].message.content
-    console.log(output)
+    const lines = text.split(/\r?\n/)
+
+    for await (const output of translator.translateLines(lines))
+    {
+        console.log(output.transform)
+    }
+
+    // translator.printUsage()
+    // const output = response.data.choices[0].message.content
+    // console.log(output)
 }
 
 /**
  * @param {string} progressFile
  */
-async function checkProgress(progressFile)
+async function getProgress(progressFile)
 {
-    return false
+    const content = await fs.promises.readFile(progressFile, "utf-8")
+    const lines = content.split(/\r?\n/)
+    const progress = []
+
+    for (let index = 0; index < lines.length; index++)
+    {
+        const line = lines[index];
+        if (line.trim() === '')
+        {
+            continue
+        }
+        const splits = line.split(",")
+        const id = Number(splits[0])
+        const text = splits[1].trim()
+        const expectedId = index + 1
+        if (id === index + 1)
+        {
+            progress.push(text.substring(1, text.length - 1))
+        }
+        else
+        {
+            throw `Progress csv file not in order. Expected index ${expectedId}, got ${id}, text: ${text}`
+        }
+    }
+    return progress
+}
+
+/**
+ * @param {fs.PathLike} filePath
+ */
+async function checkFileExists(filePath)
+{
+    try
+    {
+        await fs.promises.access(filePath);
+        return true; // file exists
+    } catch (error)
+    {
+        return false // file does not exist
+    }
 }
