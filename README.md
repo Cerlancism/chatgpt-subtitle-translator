@@ -54,7 +54,7 @@ Options:
   - `--system-instruction <instruction>`  
     Override the prompt system instruction template `Translate {from} to {to}` with this plain text, ignoring `--from` and `--to` options
   - `--initial-prompts <prompts>`  
-    Initial prompts for the translation in JSON (default: "[]") 
+    Initial prompts for the translation in JSON (default: `"[]"`) 
   - `--no-use-moderator`  
     Don't use the OpenAI API Moderation endpoint
   - `--no-prefix-line-with-number`  
@@ -72,9 +72,9 @@ Options:
 
 Additional Options for ChatAPT:  
   - `-m, --model <model>`  
-    (default: "gpt-3.5-turbo") https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
+    (default: `"gpt-3.5-turbo"`) https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
   - `-t, --temperature <temperature>`  
-    Sampling temperature to use, should set a low value below 0.3 to be more deterministic for translation (default: 1) https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
+    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`) https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
   - `--top_p <top_p>`  
     Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p
   - `--presence_penalty <presence_penalty>`  
