@@ -14,17 +14,20 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
 - Node.js version >= 14.6.0 required. This README assumes `bash` shell environment
-- Clone this repository
+- Clone this repository and navigate into the directory
+  ```bash
+  git clone https://github.com/Cerlancism/chatgpt-subtitle-translator && cd chatgpt-subtitle-translator
+  ``` 
 - Install the requirements
-  ```
+  ```bash
   npm install
   ```
 - Give executable permission
-  ```
+  ```bash
   chmod +x cli/translator.mjs
   ```
 - Copy `.example.env` to `.env`
-  ```
+  ```bash
   cp .env.example .env
   ```
 - Add your [API key](https://platform.openai.com/account/api-keys) to the newly created `.env` file
@@ -45,13 +48,13 @@ Options:
   - `-t, --to <language>`  
     Target language (default: "English")
   - `-f, --file <file>`  
-    Text file name to use as input, .srt or plain text
-  - `--system-instruction <instruction>`  
-    Override the prompt system instruction template `Translate {from} to {to}` with this plain text
+    Input source text with the content of this file, in `.srt` format or plain text
   - `--plain-text <text>`  
-    Only translate this input plain text
+    Input source text with this plain text argument
+  - `--system-instruction <instruction>`  
+    Override the prompt system instruction template `Translate {from} to {to}` with this plain text, ignoring `--from` and `--to` options
   - `--initial-prompts <prompts>`  
-    Initial prompts for the translation in JSON
+    Initial prompts for the translation in JSON (default: "[]") 
   - `--no-use-moderator`  
     Don't use the OpenAI API Moderation endpoint
   - `--no-prefix-line-with-number`  
@@ -69,9 +72,9 @@ Options:
 
 Additional Options for ChatAPT:  
   - `-m, --model <model>`  
-   (default: "gpt-3.5-turbo") https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
+    (default: "gpt-3.5-turbo") https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
   - `-t, --temperature <temperature>`  
-   Sampling temperature to use, should set a low value below 0.3 to be more deterministic for translation (default: 1) https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
+    Sampling temperature to use, should set a low value below 0.3 to be more deterministic for translation (default: 1) https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
   - `--top_p <top_p>`  
     Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p
   - `--presence_penalty <presence_penalty>`  

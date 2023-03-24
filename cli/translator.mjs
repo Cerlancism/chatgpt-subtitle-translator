@@ -3,24 +3,24 @@
 import fs from 'node:fs'
 import readline from 'readline'
 import { program } from "commander"
-import { Translator } from "../src/translator.mjs"
+import { DefaultOptions, Translator } from "../src/translator.mjs"
 import { parser } from "../src/subtitle.mjs";
 import { wrapQuotes } from "../src/helpers.mjs";
 
 program.description("Translation tool based on ChatGPT API")
     .option("--from <language>", "Source language")
     .option("--to <language>", "Target language", "English")
-    .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model")
+    .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model", DefaultOptions.createChatCompletionRequest.model)
 
     .option("-f, --file <file>", "Text file name to use as input, .srt or plain text")
     .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template (Translate {from} to {to}) with this plain text")
     .option("--plain-text <text>", "Only translate this input plain text")
 
-    .option("--initial-prompts <prompts>", "Initial prompts for the translation in JSON", JSON.parse)
+    .option("--initial-prompts <prompts>", "Initial prompts for the translation in JSON Array", JSON.parse, JSON.stringify(DefaultOptions.initialPrompts))
     .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
     .option("--no-prefix-line-with-number", "Don't prefix lines with numerical indices")
-    .option("--history-prompt-length <length>", "Length of prompt history to retain", parseInt)
-    .option("--batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array, eg: \"[10, 100]\"", JSON.parse)
+    .option("--history-prompt-length <length>", "Length of prompt history to retain", parseInt, DefaultOptions.historyPromptLength)
+    .option("--batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, JSON.stringify(DefaultOptions.batchSizes))
     .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature", parseFloat)
     // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
     // .option("--stream", "Enable stream mode for partial message deltas")
@@ -30,7 +30,7 @@ program.description("Translation tool based on ChatGPT API")
     .option("--presence_penalty <presence_penalty>", "Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-presence_penalty", parseFloat)
     .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty", parseFloat)
     .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias", JSON.parse)
-    .option("--user <user>", "A unique identifier representing your end-user")
+    // .option("--user <user>", "A unique identifier representing your end-user")
     .parse(process.argv);
 
 const opts = (program.opts())
@@ -138,7 +138,7 @@ else if (opts.file)
  */
 async function translatePlainText(text)
 {
-    const lines = text.split(/\r?\n/)
+    const lines = text.split(/\r?\n/) //TODO: remove last empty line
 
     for await (const output of translator.translateLines(lines))
     {

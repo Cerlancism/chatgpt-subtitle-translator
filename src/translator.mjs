@@ -24,7 +24,7 @@ import { roundWithPrecision, sleep } from './helpers.mjs';
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
  */
-const DefaultOptions = {
+export const DefaultOptions = {
     createChatCompletionRequest: {
         model: "gpt-3.5-turbo"
     },
