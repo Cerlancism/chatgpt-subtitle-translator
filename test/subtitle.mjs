@@ -1,7 +1,5 @@
 //@ts-check
-
 import { srtFileToNumberLabledLines, srtToNumberLabledLines, parser, splitStringByNumberLabel, secondsToTimestamp } from "../src/subtitle.mjs";
-import fs from 'fs'
 
 const srtString = "1\n00:00:00,000 --> 00:00:02,000\nHello, world!\n";
 const parsedSrt = parser.fromSrt(srtString)

@@ -1,7 +1,12 @@
 //@ts-check
-
 import { CooldownContext } from "./cooldown.mjs"
 import { openai, openaiRetryWrapper } from "./openai.mjs"
+
+/**
+ * @typedef ModerationResult
+ * @property {string} catergory
+ * @property {number} value
+ */
 
 const cooler = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "Moderator")
 
@@ -26,12 +31,6 @@ export async function checkModeration(input)
         return moderationData
     }, 3, "CheckModeration")
 }
-
-/**
- * @typedef ModerationResult
- * @property {string} catergory
- * @property {number} value
- */
 
 /**
  * @param {import("openai").CreateModerationResponseResultsInner} moderatorOutput

@@ -1,5 +1,4 @@
 //@ts-check
-
 import { CooldownContext } from "../src/cooldown.mjs";
 import { sleep } from "../src/helpers.mjs";
 

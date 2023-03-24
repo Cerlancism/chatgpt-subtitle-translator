@@ -6,6 +6,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 ## Features
 - Line-based batching: avoiding token limit per request, reducing overhead token wastage, maintaining translation context to certain extent
 - Checking with the free OpenAI Moderation tool: prevent token wastage if the model is highly likely to refuse to translate
+- Streaming process output
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview) 
 - **TODO**: Tokens per minute rate limits (TPM) 
 - Progress resumption - mitigation for frequent API gateway errors and downtimes
@@ -73,6 +74,8 @@ Options:
 Additional Options for ChatAPT:  
   - `-m, --model <model>`  
     (default: `"gpt-3.5-turbo"`) https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
+  - `--stream`  
+    Stream progress output to terminal https://platform.openai.com/docs/api-reference/chat/create#chat/create-stream
   - `-t, --temperature <temperature>`  
     Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`) https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
   - `--top_p <top_p>`  
@@ -87,7 +90,7 @@ Additional Options for ChatAPT:
 
 ## Examples
 ### Plain text  
-```
+```bash
 cli/translator.mjs --plain-text "你好"
 ```
 Standard Output
@@ -95,7 +98,7 @@ Standard Output
 Hello.
 ```
 ### Emojis
-```
+```bash
 cli/translator.mjs --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
 ```  
 Input Argument
@@ -103,18 +106,18 @@ Input Argument
 Chuck Norris can walk with the animals, talk with the animals; grunt and squeak and squawk with the animals... and the animals, without fail, always say 'yessir Mr. Norris'.
 ```
 Standard Output
-```bash
+```
 👨‍🦰💪🚶‍♂️🦜🐒🐘🐅🐆🐎🐖🐄🐑🦏🐊🐢🐍🐿️🐇🐿️❗️🌳💬😲👉🤵👨‍🦰👊=🐕🐑🐐🦌🐘🦏🦍🦧🦓🐅🦌🦌🦌🐆🦍🐘🐘🐗🦓=👍🤵.
 ```
 ### Scrambling
-```
+```bash
 cli/translator.mjs --system-instruction "Scramble characters of words keeping only start and end letter" --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"
 ```  
 Standard Output
 ```
 Cuhk Ciorrsn cna wlkak wtih the ainnmlas, takl wtih the ainnmlas;
 ```
-```
+```bash
 cli/translator.mjs --system-instruction "Unscramble characters back to English" --temperature 0 --plain-text "Cuhckor Narisso acn alkwa wthi the aanimls"
 ```
 Standard Output
@@ -123,7 +126,7 @@ Chuck Norris can walk with the animals, talk with the animals;
 ```
 
 ### Plain text file  
-```
+```bash
 cli/translator.mjs --file test/data/test_cn.txt
 ```  
 Input file: [test/data/test_cn.txt](test/data/test_cn.txt)
@@ -137,11 +140,11 @@ Hello.
 Goodbye!
 ```
 ### SRT file
-```
+```bash
 cli/translator.mjs --file test/data/test_ja.srt
 ```  
 Input file: [test/data/test_ja.srt](test/data/test_ja.srt)
-```
+```srt
 1
 00:00:00,000 --> 00:00:02,000
 おはようございます。
@@ -156,7 +159,7 @@ Input file: [test/data/test_ja.srt](test/data/test_ja.srt)
 
 ``` 
 Output file: [test/data/test_ja.srt.out_English.srt](test/data/test_ja.srt.out_English.srt)
-```
+```srt
 1
 00:00:00,000 --> 00:00:02,000
 Good morning.
@@ -210,7 +213,7 @@ Tokens: `130`
 <tr>
 <td valign="top">
 
-```log
+```srt
 1
 00:00:00,000 --> 00:00:02,000
 おはようございます。
@@ -257,7 +260,7 @@ Tokens: `130`
 </td>
 <td valign="top">
 
-```log
+```srt
 1
 00:00:00,000 --> 00:00:02,000
 Good morning.
@@ -290,7 +293,7 @@ Yes, it's very nice weather.
 [test/data/test_ja_small.srt](test/data/test_ja_small.srt)  
 - None (Plain text SRT input output):  
   Tokens: `299`
-- No batching, one line per prompt with (System instruction overhead), including up to 10 historical prompt context:  
+- No batching, with SRT stripping but one line per prompt with System Instruction overhead, including up to 10 historical prompt context:  
   Tokens: `362` 
 - SRT stripping and line batching of 2:  
   Tokens: `276`
@@ -299,7 +302,7 @@ Yes, it's very nice weather.
 [test/data/test_ja.srt](test/data/test_ja.srt)
 - None (Plain text SRT input output):  
   Tokens: `1625`
-- No batching, one line per prompt with (System instruction overhead), including up to 10 historical prompt context:  
+- No batching, with SRT stripping but one line per prompt with System Instruction overhead, including up to 10 historical prompt context:  
   Tokens: `6719` 
 - SRT stripping and line batching of `[5, 10]`, including up to 10 historical prompt context:  
   Tokens: `1036`

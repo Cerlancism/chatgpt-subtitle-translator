@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 //@ts-check
 import fs from 'node:fs'
-import readline from 'readline'
 import { program } from "commander"
-import { DefaultOptions, Translator } from "../src/translator.mjs"
 import { parser } from "../src/subtitle.mjs";
 import { wrapQuotes } from "../src/helpers.mjs";
+import { Translator, DefaultOptions } from "../src/translator.mjs"
 
 program.description("Translation tool based on ChatGPT API")
     .option("--from <language>", "Source language")
@@ -16,14 +15,14 @@ program.description("Translation tool based on ChatGPT API")
     .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template (Translate {from} to {to}) with this plain text")
     .option("--plain-text <text>", "Only translate this input plain text")
 
-    .option("--initial-prompts <prompts>", "Initial prompts for the translation in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
+    .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
     .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
     .option("--no-prefix-line-with-number", "Don't prefix lines with numerical indices")
     .option("--history-prompt-length <length>", "Length of prompt history to retain", parseInt, DefaultOptions.historyPromptLength)
     .option("--batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, DefaultOptions.batchSizes)
     .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature", parseFloat)
+    .option("--stream", "Enable stream mode for partial message deltas")
     // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
-    // .option("--stream", "Enable stream mode for partial message deltas")
     // .option("--stop <stop>", "Up to 4 sequences where the API will stop generating further tokens")
     // .option("--max-tokens <max_tokens>", "The maximum number of tokens to generate in the chat completion", parseInt)
     .option("--top_p <top_p>", "Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p", parseFloat)
@@ -44,7 +43,7 @@ const options = {
         ...(opts.temperature && { temperature: opts.temperature }),
         ...(opts.top_p && { top_p: opts.top_p }),
         // ...(opts.n && { n: opts.n }),
-        // ...(opts.stream && { stream: opts.stream }),
+        ...(opts.stream && { stream: opts.stream }),
         // ...(opts.stop && { stop: opts.stop }),
         // ...(opts.max_tokens && { max_tokens: opts.max_tokens }),
         ...(opts.presence_penalty && { presence_penalty: opts.presence_penalty }),
@@ -91,25 +90,35 @@ else if (opts.file)
 
             if (progress.length === sourceLines.length)
             {
-                console.error("[CLI]", "Progress already completed")
-                process.exit(1)
+                console.error("[CLI]", `Progress already completed ${progressFile}`)
+                console.error("[CLI]", `Overwriting ${progressFile}`)
+                fs.writeFileSync(progressFile, '')
+                console.error("[CLI]", `Overwriting ${outputFile}`)
+                fs.writeFileSync(outputFile, '')
             }
-            console.error("[CLI]", "Resuming from", progress.length)
-            const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
-            for (let index = 0; index < progress.length; index++)
+            else
             {
-                let transform = progress[index]
-                if (transform.startsWith("[Flagged]"))
+                console.error("[CLI]", `Resuming from ${progressFile}`, progress.length)
+                const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
+                for (let index = 0; index < progress.length; index++)
                 {
-                    translator.moderatorFlags.set(index, transform)
+                    let transform = progress[index]
+                    if (transform.startsWith("[Flagged]"))
+                    {
+                        translator.moderatorFlags.set(index, transform)
+                    }
+                    else
+                    {
+                        transform = translator.preprocessLine(transform, index, 0)
+                    }
+                    translator.workingProgress.push({ source: sourceProgress[index], transform })
                 }
-                else
-                {
-                    transform = translator.preprocessLine(transform, index, 0)
-                }
-                translator.workingProgress.push({ source: sourceProgress[index], transform })
+                translator.offset = progress.length
             }
-            translator.offset = progress.length
+        }
+        else
+        {
+            fs.writeFileSync(outputFile, '')
         }
 
         for await (const output of translator.translateLines(sourceLines))
@@ -138,7 +147,12 @@ else if (opts.file)
  */
 async function translatePlainText(text)
 {
-    const lines = text.split(/\r?\n/) //TODO: remove last empty line
+    const lines = text.split(/\r?\n/)
+
+    if (lines[lines.length - 1].length === 0)
+    {
+        lines.pop()
+    }
 
     for await (const output of translator.translateLines(lines))
     {

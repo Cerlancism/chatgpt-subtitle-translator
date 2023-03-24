@@ -1,5 +1,4 @@
 //@ts-check
-
 import { inspect } from "util";
 import { openai } from "../src/openai.mjs";
 

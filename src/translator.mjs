@@ -1,8 +1,20 @@
 //@ts-check
-import { coolerAPI, openai, openaiRetryWrapper } from './openai.mjs';
+import { openai, coolerAPI, openaiRetryWrapper, completeChatStream, numTokensFromMessages } from './openai.mjs';
 import { checkModeration, getModeratorDescription, getModeratorResults } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
+
+const PrmoptTokenCostPer1k = {
+    "gpt-3.5-turbo": 0.002,
+    'gpt-4': 0.03,
+    'gpt-4-32k': 0.06
+}
+
+// const CompletionTokenCostPer1k = {
+//     "gpt-3.5-turbo": 0.002,
+//     'gpt-4': 0.06,
+//     'gpt-4-32k': 0.12
+// }
 
 /**
  * @type {TranslatorOptions}
@@ -10,7 +22,7 @@ import { roundWithPrecision, sleep } from './helpers.mjs';
  * @property {Pick<Partial<import('openai').CreateChatCompletionRequest>, "messages" | "model"> & Omit<import('openai').CreateChatCompletionRequest, "messages" | "model">} createChatCompletionRequest
  * Options to ChatGPT besides the messages, it is recommended to set `temperature: 0` for a (almost) deterministic translation
  * @property {import('openai').ChatCompletionRequestMessage[]} initialPrompts 
- * Initiate the prompt by sending warm-up messages prior to the first translation request
+ * Initiation prompt messages before the translation request messages
  * @property {boolean} useModerator `true` \
  * Verify with the free OpenAI Moderation tool prior to submitting the prompt to ChatGPT model
  * @property {boolean} prefixLineWithNumber `true` \
@@ -52,13 +64,10 @@ export class Translator
 
         this.openaiClient = openai
         this.systemInstruction = `Translate ${this.language.from ? this.language.from + " " : ""}to ${this.language.to}`
-        this.promptContext = this.options.initialPrompts;
-
+        this.promptContext = []
         this.cooler = coolerAPI
 
-        /**
-         * @type {{ source: string; transform: string; }[]}
-         */
+        /** @type {{ source: string; transform: string; }[]} */
         this.workingProgress = []
         this.tokensUsed = 0
         this.tokensWasted = 0
@@ -81,24 +90,58 @@ export class Translator
         const userMessage = { role: "user", content: `${text}` }
         /** @type {import('openai').ChatCompletionRequestMessage[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
-        const messages = [...systemMessage, ...this.promptContext, userMessage]
+        const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
 
         let startTime = 0, endTime = 0
         const response = await openaiRetryWrapper(async () =>
         {
             await this.cooler.cool()
             startTime = Date.now()
-            const result = await openai.createChatCompletion({
+            const promptResponse = await openai.createChatCompletion({
                 messages,
                 ...this.options.createChatCompletionRequest
-            })
-            endTime = Date.now()
-            return result
+            }, this.options.createChatCompletionRequest.stream ? { responseType: "stream" } : undefined)
+
+            if (!this.options.createChatCompletionRequest.stream)
+            {
+                endTime = Date.now()
+                return promptResponse
+            }
+            else
+            {
+                let writeQueue = ''
+                const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) =>
+                {
+                    const hasNewline = data.includes("\n")
+                    if (writeQueue.length === 0 && !hasNewline)
+                    {
+                        process.stdout.write(data)
+                    }
+                    else if (hasNewline)
+                    {
+                        writeQueue += data
+                        writeQueue = writeQueue.replace("\n\n", "\n")
+                    }
+                    else
+                    {
+                        writeQueue += data
+                        process.stdout.write(writeQueue.trim())
+                        writeQueue = ''
+                    }
+                }, () =>
+                {
+                    endTime = Date.now()
+                    process.stdout.write("\n")
+                })
+                const prompt_tokens = numTokensFromMessages(messages)
+                const completion_tokens = numTokensFromMessages([{ content: streamOutput.data.choices[0].message.content }])
+                streamOutput.data.usage = { prompt_tokens, completion_tokens, total_tokens: prompt_tokens + completion_tokens }
+                return streamOutput
+            }
         }, 3, "TranslationPrompt")
 
         this.tokensUsed += getTokens(response)
         this.tokensProcessTimeMs += (endTime - startTime)
-
         return response
     }
 
@@ -289,8 +332,6 @@ export class Translator
         return true
     }
 
-
-
     buildContext()
     {
         if (this.workingProgress.length === 0)
@@ -323,11 +364,16 @@ export class Translator
 
     async printUsage()
     {
+        if (this.options.createChatCompletionRequest.model !== "gpt-3.5-turbo") //TODO: support token usage computation for more models
+        {
+            console.warn("[Translator]", `Cost computer not supported yet for ${this.options.createChatCompletionRequest.model}`)
+        }
         await sleep(10)
+        const tokenCost = PrmoptTokenCostPer1k[this.options.createChatCompletionRequest.model] ?? 0
         console.error(
             `[Translator]`,
-            "Tokens:", this.tokensUsed, "$", roundWithPrecision(0.002 * (this.tokensUsed / 1000), 3),
-            "Wasted:", this.tokensWasted, "$", roundWithPrecision(0.002 * (this.tokensWasted / 1000), 3), (this.tokensWasted / this.tokensUsed).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 }),
+            "Tokens:", this.tokensUsed, "$", roundWithPrecision(tokenCost * (this.tokensUsed / 1000), 3),
+            "Wasted:", this.tokensWasted, "$", roundWithPrecision(tokenCost * (this.tokensWasted / 1000), 3), (this.tokensWasted / this.tokensUsed).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 }),
             "Rate:", roundWithPrecision(this.tokensUsed / (this.tokensProcessTimeMs / 1000 / 60), 2), "TPM", this.cooler.rate, "RPM"
         )
     }
