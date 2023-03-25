@@ -54,7 +54,7 @@ const options = {
     ...(opts.initialPrompts && { initialPrompts: opts.initialPrompts }),
     ...(opts.useModerator !== undefined && { useModerator: opts.useModerator }),
     ...(opts.prefixLineWithNumber !== undefined && { prefixLineWithNumber: opts.prefixLineWithNumber }),
-    ...(opts.historyPromptLength && { historyPromptLength: opts.historyPromptLength }),
+    ...(opts.historyPromptLength !== undefined && { historyPromptLength: opts.historyPromptLength }),
     ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
 };
 
