@@ -14,7 +14,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
-- Node.js version `>= 14.21.3` required. This README assumes `bash` shell environment
+- Node.js version `>= 16.13.0` required. This README assumes `bash` shell environment
 - Clone this repository and navigate into the directory
   ```bash
   git clone https://github.com/Cerlancism/chatgpt-subtitle-translator && cd chatgpt-subtitle-translator
