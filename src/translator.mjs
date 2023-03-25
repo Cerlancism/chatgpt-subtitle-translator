@@ -120,7 +120,7 @@ export class Translator
                     else if (hasNewline)
                     {
                         writeQueue += data
-                        writeQueue = writeQueue.replace("\n\n", "\n")
+                        writeQueue = writeQueue.replaceAll("\n\n", "\n")
                     }
                     else
                     {

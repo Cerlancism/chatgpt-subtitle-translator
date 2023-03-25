@@ -20,7 +20,7 @@
     "srt-parser-2": "^1.2.2"
   },
   "engines": {
-    "node": ">=14.6.0"
+    "node": ">=14.21.3"
   },
   "bin": {
     "chatgpt-subtitle-translator": "./cli/translator.mjs"

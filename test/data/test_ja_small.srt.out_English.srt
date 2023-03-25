@@ -12,9 +12,9 @@ Yes, I'm doing well.
 
 4
 00:00:08,000 --> 00:00:12,000
-It's nice weather today, isn't it?
+The weather is nice today, isn't it?
 
 5
 00:00:12,000 --> 00:00:16,000
-Yes, it's really nice weather.
+Yes, it's very nice weather.
 

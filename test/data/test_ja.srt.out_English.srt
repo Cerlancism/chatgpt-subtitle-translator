@@ -8,7 +8,7 @@ How are you?
 
 3
 00:00:05,000 --> 00:00:07,000
-Yes, I am doing well.
+Yes, I'm fine.
 
 4
 00:00:08,000 --> 00:00:12,000
@@ -16,7 +16,7 @@ The weather is nice today, isn't it?
 
 5
 00:00:12,000 --> 00:00:16,000
-Yes, it's really nice weather.
+Yes, it's very nice weather.
 
 6
 00:00:17,000 --> 00:00:21,000
@@ -24,19 +24,19 @@ What are you doing today?
 
 7
 00:00:21,000 --> 00:00:24,000
-In the afternoon,
+In the afternoon.
 
 8
 00:00:24,000 --> 00:00:26,000
-I'm going to watch a movie
+With friends.
 
 9
 00:00:26,000 --> 00:00:28,000
-with my friends.
+We're going to watch a movie.
 
 10
 00:00:28,000 --> 00:00:30,000
-Sounds great!
+That sounds great.
 
 11
 00:00:30,000 --> 00:00:33,000
@@ -60,7 +60,7 @@ But first, let's have lunch.
 
 16
 00:00:45,000 --> 00:00:47,000
-Yes, it's a good idea.
+Yes, that's a good idea.
 
 17
 00:00:47,000 --> 00:00:49,000
@@ -68,15 +68,15 @@ What would you like to eat?
 
 18
 00:00:49,000 --> 00:00:50,000
-I want to eat sushi.
+I feel like having sushi.
 
 19
 00:00:55,000 --> 00:00:56,000
-Alright then, let's go get some sushi for lunch.
+Yes, let's go get some sushi.
 
 20
 00:00:59,000 --> 00:01:00,000
-Great idea.
+What kind of sushi do you like?
 
 21
 00:01:02,000 --> 00:01:03,000
@@ -88,33 +88,33 @@ I also like sushi.
 
 23
 00:01:06,000 --> 00:01:07,000
-Do you have any recommended places to eat?
+Do you have any recommended sushi restaurants?
 
 24
 00:01:07,000 --> 00:01:08,000
-Yes, there is a place that is really delicious.
+Yes, there is one place that is very delicious.
 
 25
 00:01:09,000 --> 00:01:10,000
-Well,
+It's over there.
 
 26
 00:01:10,000 --> 00:01:11,000
-That place is very delicious.
+Thank you very much.
 
 27
 00:01:11,000 --> 00:01:12,000
-Thank you very much,
+Let's go there.
 
 28
 00:01:12,000 --> 00:01:13,000
-Let's go there then.
+Thank you for the recommendation.
 
 29
 00:01:13,000 --> 00:01:14,000
-Alright, let's go!
+Let's go there then.
 
 30
 00:01:14,000 --> 00:01:17,000
-Sounds good!
+Alright, let's go!
 
