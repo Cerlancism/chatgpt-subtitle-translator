@@ -333,7 +333,7 @@ export class Translator
 
     buildContext()
     {
-        if (this.workingProgress.length === 0)
+        if (this.workingProgress.length === 0 || this.options.historyPromptLength === 0)
         {
             return
         }
