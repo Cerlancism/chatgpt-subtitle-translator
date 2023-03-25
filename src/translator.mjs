@@ -125,7 +125,7 @@ export class Translator
                     else
                     {
                         writeQueue += data
-                        process.stdout.write(writeQueue.trim())
+                        process.stdout.write(writeQueue)
                         writeQueue = ''
                     }
                 }, () =>
@@ -214,7 +214,6 @@ export class Translator
             {
                 this.tokensWasted += getTokens(output)
                 console.error(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
-
                 console.error(`[Translator]`, "batch", batch)
                 console.error(`[Translator]`, "transformed", outputs)
 
