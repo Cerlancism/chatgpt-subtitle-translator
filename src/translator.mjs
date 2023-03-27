@@ -1,20 +1,8 @@
 //@ts-check
-import { openai, coolerAPI, openaiRetryWrapper, completeChatStream, numTokensFromMessages } from './openai.mjs';
+import { openai, coolerAPI, openaiRetryWrapper, completeChatStream, numTokensFromMessages, PrmoptTokenCostPer1k } from './openai.mjs';
 import { checkModeration, getModeratorDescription, getModeratorResults } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
-
-const PrmoptTokenCostPer1k = {
-    "gpt-3.5-turbo": 0.002,
-    'gpt-4': 0.03,
-    'gpt-4-32k': 0.06
-}
-
-// const CompletionTokenCostPer1k = {
-//     "gpt-3.5-turbo": 0.002,
-//     'gpt-4': 0.06,
-//     'gpt-4-32k': 0.12
-// }
 
 /**
  * @type {TranslatorOptions}

@@ -60,6 +60,8 @@ Options:
     Don't use the OpenAI API Moderation endpoint
   - `--no-prefix-line-with-number`  
     Don't prefix lines with numerical indices
+  - **TODO:** `--no-line-matching`  
+    Don't enforce one to one line quantity input output matching
   - `--history-prompt-length <length>`  
     Length of prompt history to retain for next request batch (default: 10)
   - `--batch-sizes <sizes>` 

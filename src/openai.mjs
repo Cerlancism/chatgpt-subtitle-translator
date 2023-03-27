@@ -1,5 +1,6 @@
 //@ts-check
 import * as dotenv from 'dotenv'
+
 dotenv.config()
 
 import { axiosStatic } from './axios.mjs';
@@ -7,6 +8,18 @@ import { Configuration, OpenAIApi } from "openai";
 import { CooldownContext } from './cooldown.mjs';
 import { retryWrapper, sleep } from './helpers.mjs';
 import gp3Encoder from "gpt-3-encoder";
+
+export const PrmoptTokenCostPer1k = {
+    "gpt-3.5-turbo": 0.002,
+    'gpt-4': 0.03,
+    'gpt-4-32k': 0.06
+}
+
+// export const CompletionTokenCostPer1k = {
+//     "gpt-3.5-turbo": 0.002,
+//     'gpt-4': 0.06,
+//     'gpt-4-32k': 0.12
+// }
 
 const configuration = new Configuration({
     apiKey: process.env.OPENAI_API_KEY,

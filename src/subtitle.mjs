@@ -5,34 +5,12 @@ import srtParser2 from "srt-parser-2"
 export const parser = new srtParser2.default();
 
 /**
- * @param {fs.PathOrFileDescriptor} file
- * @returns {string[]}
- */
-export function srtFileToNumberLabledLines(file)
-{
-    const fileText = fs.readFileSync(file, "utf-8").toString()
-    const output = srtToNumberLabledLines(fileText)
-    return output
-}
-
-/**
  * @param {string} text
  * @param {string} label
  */
 export function lineLabeler(text, label)
 {
     return `${label}. ${text}`
-}
-
-/**
- * @param {string} srt
- */
-export function srtToNumberLabledLines(srt)
-{
-    const srtArray = parser.fromSrt(srt);
-    // const output = srtArray.map(x => `${x.id}. ${x.text.replace("\n", " ")}`)
-    const output = srtArray.map((x) => lineLabeler(x.text, x.id))
-    return output
 }
 
 /**
