@@ -101,7 +101,7 @@ Hello.
 ```
 ### Emojis
 ```bash
-cli/translator.mjs --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
+cli/translator.mjs --stream --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
 ```  
 Input Argument
 ```
@@ -113,14 +113,15 @@ Standard Output
 ```
 ### Scrambling
 ```bash
-cli/translator.mjs --system-instruction "Scramble characters of words keeping only start and end letter" --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"
-```  
+cli/translator.mjs --stream --system-instruction "Scramble characters of words while only keeping the start and end letter" --no-prefix-number --no-line-matching --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"
+```
 Standard Output
 ```
-Cuhk Ciorrsn cna wlkak wtih the ainnmlas, takl wtih the ainnmlas;
-```
+Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;
+```  
+### Unscrabling
 ```bash
-cli/translator.mjs --system-instruction "Unscramble characters back to English" --temperature 0 --plain-text "Cuhckor Narisso acn alkwa wthi the aanimls"
+cli/translator.mjs --stream --system-instruction "Unscramble characters back to English" --no-prefix-number --no-line-matching --temperature 0 --plain-text "Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;"
 ```
 Standard Output
 ```
@@ -129,7 +130,7 @@ Chuck Norris can walk with the animals, talk with the animals;
 
 ### Plain text file  
 ```bash
-cli/translator.mjs --file test/data/test_cn.txt
+cli/translator.mjs --stream --temperature 0 --file test/data/test_cn.txt
 ```  
 Input file: [test/data/test_cn.txt](test/data/test_cn.txt)
 ```
@@ -143,9 +144,9 @@ Goodbye!
 ```
 ### SRT file
 ```bash
-cli/translator.mjs --file test/data/test_ja.srt
+cli/translator.mjs --stream --temperature 0 --file test/data/test_ja_small.srt
 ```  
-Input file: [test/data/test_ja.srt](test/data/test_ja.srt)
+Input file: [test/data/test_ja_small.srt](test/data/test_ja_small.srt)
 ```srt
 1
 00:00:00,000 --> 00:00:02,000
@@ -160,7 +161,7 @@ Input file: [test/data/test_ja.srt](test/data/test_ja.srt)
 はい、元気です。
 
 ``` 
-Output file: [test/data/test_ja.srt.out_English.srt](test/data/test_ja.srt.out_English.srt)
+Output file: [test/data/test_ja_small.srt.out_English.srt](test/data/test_ja_small.srt.out_English.srt)
 ```srt
 1
 00:00:00,000 --> 00:00:02,000

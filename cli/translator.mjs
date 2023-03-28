@@ -39,7 +39,7 @@ export function createInstance(args)
         .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty", parseFloat)
         .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias", JSON.parse)
         // .option("--user <user>", "A unique identifier representing your end-user")
-        .parse(args);
+        .parse(args)
 
     const opts = program.opts()
     /**
@@ -178,11 +178,16 @@ async function translatePlainText(translator, text, outfile)
     {
         lines.pop()
     }
-    const postAction = outfile ? (/** @type {string} */ text) => fs.appendFileSync(outfile, text + "\n") : () => { }
     for await (const output of translator.translateLines(lines))
     {
-        console.log(output.transform)
-        postAction(output.transform)
+        if (!translator.options.createChatCompletionRequest.stream)
+        {
+            console.log(output.transform)
+        }
+        if (outfile)
+        {
+            fs.appendFileSync(outfile, output.transform + "\n")
+        }
     }
 }
 
