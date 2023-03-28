@@ -1,185 +1,188 @@
 #!/usr/bin/env node
 //@ts-check
 import fs from 'node:fs'
-import { program, } from "commander"
-import { parser } from "../src/subtitle.mjs";
-import { wrapQuotes } from "../src/helpers.mjs";
-import { Translator, DefaultOptions } from "../src/translator.mjs"
 import path from 'node:path';
-
-program.description("Translation tool based on ChatGPT API")
-    .option("--from <language>", "Source language")
-    .option("--to <language>", "Target language", "English")
-    .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model", DefaultOptions.createChatCompletionRequest.model)
-
-    .option("-f, --file <file>", "Text file name to use as input, .srt or plain text")
-    .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
-    .option("--plain-text <text>", "Only translate this input plain text")
-
-    .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
-    .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
-    .option("--no-prefix-line-with-number", "Don't prefix lines with numerical indices")
-    .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
-    .option("--history-prompt-length <length>", "Length of prompt history to retain", parseInt, DefaultOptions.historyPromptLength)
-    .option("--batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, DefaultOptions.batchSizes)
-    .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature", parseFloat)
-    .option("--stream", "Enable stream mode for partial message deltas")
-    // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
-    // .option("--stop <stop>", "Up to 4 sequences where the API will stop generating further tokens")
-    // .option("--max-tokens <max_tokens>", "The maximum number of tokens to generate in the chat completion", parseInt)
-    .option("--top_p <top_p>", "Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p", parseFloat)
-    .option("--presence_penalty <presence_penalty>", "Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-presence_penalty", parseFloat)
-    .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty", parseFloat)
-    .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias", JSON.parse)
-    // .option("--user <user>", "A unique identifier representing your end-user")
-    .parse(process.argv);
-
-const opts = (program.opts())
+import { pathToFileURL } from 'url'
+import { Command } from "commander"
+import { wrapQuotes } from "../src/helpers.mjs";
+import { parser } from "../src/subtitle.mjs";
+import { Translator, DefaultOptions } from "../src/translator.mjs"
 
 /**
- * @type {Partial<import("../src/translator.mjs").TranslatorOptions>}
+ * @param {readonly string[]} args
  */
-const options = {
-    createChatCompletionRequest: {
-        ...(opts.model && { model: opts.model }),
-        ...(opts.temperature !== undefined && { temperature: opts.temperature }),
-        ...(opts.top_p !== undefined && { top_p: opts.top_p }),
-        // ...(opts.n && { n: opts.n }),
-        ...(opts.stream !== undefined && { stream: opts.stream }),
-        // ...(opts.stop && { stop: opts.stop }),
-        // ...(opts.max_tokens !== undefined && { max_tokens: opts.max_tokens }),
-        ...(opts.presence_penalty !== undefined && { presence_penalty: opts.presence_penalty }),
-        ...(opts.frequency_penalty !== undefined && { frequency_penalty: opts.frequency_penalty }),
-        ...(opts.logit_bias && { logit_bias: opts.logit_bias }),
-        // ...(opts.user && { user: opts.user }),
-    },
-    ...(opts.initialPrompts && { initialPrompts: opts.initialPrompts }),
-    ...(opts.useModerator !== undefined && { useModerator: opts.useModerator }),
-    ...(opts.prefixLineWithNumber !== undefined && { prefixLineWithNumber: opts.prefixLineWithNumber }),
-    ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
-    ...(opts.historyPromptLength !== undefined && { historyPromptLength: opts.historyPromptLength }),
-    ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
-};
-
-const translator = new Translator({ from: opts.from, to: opts.to }, options);
-
-if (opts.systemInstruction)
+export function createInstance(args)
 {
-    translator.systemInstruction = opts.systemInstruction
+    const program = new Command()
+        .description("Translation tool based on ChatGPT API")
+        .option("--from <language>", "Source language")
+        .option("--to <language>", "Target language", "English")
+        .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model", DefaultOptions.createChatCompletionRequest.model)
+
+        .option("-f, --file <file>", "Text file name to use as input, .srt or plain text")
+        .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
+        .option("--plain-text <text>", "Only translate this input plain text")
+
+        .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
+        .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
+        .option("--no-prefix-number", "Don't prefix lines with numerical indices")
+        .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
+        .option("--history-prompt-length <length>", "Length of prompt history to retain", parseInt, DefaultOptions.historyPromptLength)
+        .option("--batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, DefaultOptions.batchSizes)
+        .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature", parseFloat)
+        .option("--stream", "Enable stream mode for partial message deltas")
+        // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
+        // .option("--stop <stop>", "Up to 4 sequences where the API will stop generating further tokens")
+        // .option("--max-tokens <max_tokens>", "The maximum number of tokens to generate in the chat completion", parseInt)
+        .option("--top_p <top_p>", "Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p", parseFloat)
+        .option("--presence_penalty <presence_penalty>", "Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-presence_penalty", parseFloat)
+        .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty", parseFloat)
+        .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias", JSON.parse)
+        // .option("--user <user>", "A unique identifier representing your end-user")
+        .parse(args);
+
+    const opts = program.opts()
+    /**
+     * @type {Partial<import("../src/translator.mjs").TranslatorOptions>}
+     */
+    const options = {
+        createChatCompletionRequest: {
+            ...(opts.model && { model: opts.model }),
+            ...(opts.temperature !== undefined && { temperature: opts.temperature }),
+            ...(opts.top_p !== undefined && { top_p: opts.top_p }),
+            // ...(opts.n && { n: opts.n }),
+            ...(opts.stream !== undefined && { stream: opts.stream }),
+            // ...(opts.stop && { stop: opts.stop }),
+            // ...(opts.max_tokens !== undefined && { max_tokens: opts.max_tokens }),
+            ...(opts.presence_penalty !== undefined && { presence_penalty: opts.presence_penalty }),
+            ...(opts.frequency_penalty !== undefined && { frequency_penalty: opts.frequency_penalty }),
+            ...(opts.logit_bias && { logit_bias: opts.logit_bias }),
+            // ...(opts.user && { user: opts.user }),
+        },
+        ...(opts.initialPrompts && { initialPrompts: opts.initialPrompts }),
+        ...(opts.useModerator !== undefined && { useModerator: opts.useModerator }),
+        ...(opts.prefixNumber !== undefined && { prefixNumber: opts.prefixNumber }),
+        ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
+        ...(opts.historyPromptLength !== undefined && { historyPromptLength: opts.historyPromptLength }),
+        ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
+    };
+
+    return { opts, options }
 }
 
-if (opts.plainText)
+if (import.meta.url === pathToFileURL(process.argv[1]).href)
 {
-    await translatePlainText(opts.plainText)
-}
-else if (opts.file)
-{
-    if (opts.file.endsWith(".srt") && !translator.options.lineMatching)
+    const { opts, options } = createInstance(process.argv)
+    const translator = new Translator({ from: opts.from, to: opts.to }, options);
+
+    if (opts.systemInstruction)
     {
-        console.warn("[CLI]", "Treating SRT file as plain text since --no-line-matching is set")
+        translator.systemInstruction = opts.systemInstruction
     }
-    if (opts.file.endsWith(".srt") && translator.options.lineMatching)
+
+    if (opts.plainText)
     {
-        console.error("[CLI]", "Assume SRT file", opts.file)
-        const text = fs.readFileSync(opts.file, 'utf-8')
-        const srtArraySource = parser.fromSrt(text)
-        const srtArrayWorking = parser.fromSrt(text)
-
-        const sourceLines = srtArraySource.map(x => x.text)
-        const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
-
-        const progressFile = `${opts.file}.progress_${fileTag}.csv`
-        const outputFile = `${opts.file}.out_${fileTag}.srt`
-
-        if (await checkFileExists(progressFile))
+        await translatePlainText(translator, opts.plainText)
+    }
+    else if (opts.file)
+    {
+        if (opts.file.endsWith(".srt") && !translator.options.lineMatching)
         {
-            const progress = await getProgress(progressFile)
+            console.warn("[CLI]", "Treating SRT file as plain text since --no-line-matching is set")
+        }
+        if (opts.file.endsWith(".srt") && translator.options.lineMatching)
+        {
+            console.error("[CLI]", "Assume SRT file", opts.file)
+            const text = fs.readFileSync(opts.file, 'utf-8')
+            const srtArraySource = parser.fromSrt(text)
+            const srtArrayWorking = parser.fromSrt(text)
 
-            if (progress.length === sourceLines.length)
+            const sourceLines = srtArraySource.map(x => x.text)
+            const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
+
+            const progressFile = `${opts.file}.progress_${fileTag}.csv`
+            const outputFile = `${opts.file}.out_${fileTag}.srt`
+
+            if (await checkFileExists(progressFile))
             {
-                console.error("[CLI]", `Progress already completed ${progressFile}`)
-                console.error("[CLI]", `Overwriting ${progressFile}`)
-                fs.writeFileSync(progressFile, '')
-                console.error("[CLI]", `Overwriting ${outputFile}`)
-                fs.writeFileSync(outputFile, '')
+                const progress = await getProgress(progressFile)
+
+                if (progress.length === sourceLines.length)
+                {
+                    console.error("[CLI]", `Progress already completed ${progressFile}`)
+                    console.error("[CLI]", `Overwriting ${progressFile}`)
+                    fs.writeFileSync(progressFile, '')
+                    console.error("[CLI]", `Overwriting ${outputFile}`)
+                    fs.writeFileSync(outputFile, '')
+                }
+                else
+                {
+                    console.error("[CLI]", `Resuming from ${progressFile}`, progress.length)
+                    const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
+                    for (let index = 0; index < progress.length; index++)
+                    {
+                        let transform = progress[index]
+                        if (transform.startsWith("[Flagged]"))
+                        {
+                            translator.moderatorFlags.set(index, transform)
+                        }
+                        else
+                        {
+                            transform = translator.preprocessLine(transform, index, 0)
+                        }
+                        translator.workingProgress.push({ source: sourceProgress[index], transform })
+                    }
+                    translator.offset = progress.length
+                }
             }
             else
             {
-                console.error("[CLI]", `Resuming from ${progressFile}`, progress.length)
-                const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
-                for (let index = 0; index < progress.length; index++)
-                {
-                    let transform = progress[index]
-                    if (transform.startsWith("[Flagged]"))
-                    {
-                        translator.moderatorFlags.set(index, transform)
-                    }
-                    else
-                    {
-                        transform = translator.preprocessLine(transform, index, 0)
-                    }
-                    translator.workingProgress.push({ source: sourceProgress[index], transform })
-                }
-                translator.offset = progress.length
+                fs.writeFileSync(outputFile, '')
+            }
+
+            for await (const output of translator.translateLines(sourceLines))
+            {
+                const csv = `${output.index}, ${wrapQuotes(output.finalTransform)}\n`
+                const srtEntry = srtArrayWorking[output.index - 1]
+                srtEntry.text = output.finalTransform
+                const outSrt = parser.toSrt([srtEntry])
+                console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
+                await Promise.all([
+                    fs.promises.appendFile(progressFile, csv),
+                    fs.promises.appendFile(outputFile, outSrt)
+                ])
             }
         }
         else
         {
+            console.error("[CLI]", "Assume plain text file", opts.file)
+            const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
+            const ext = path.extname(opts.file)
+            const outputFile = `${opts.file}.out_${fileTag}${ext}`
+            const text = fs.readFileSync(opts.file, 'utf-8')
             fs.writeFileSync(outputFile, '')
+            await translatePlainText(translator, text, outputFile)
         }
-
-        for await (const output of translator.translateLines(sourceLines))
-        {
-            const csv = `${output.index}, ${wrapQuotes(output.finalTransform)}\n`
-            const srtEntry = srtArrayWorking[output.index - 1]
-            srtEntry.text = output.finalTransform
-            const outSrt = parser.toSrt([srtEntry])
-            console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
-            await Promise.all([
-                fs.promises.appendFile(progressFile, csv),
-                fs.promises.appendFile(outputFile, outSrt)
-            ])
-        }
-    }
-    else
-    {
-        console.error("[CLI]", "Assume plain text file", opts.file)
-        const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
-        const ext = path.extname(opts.file)
-        const outputFile = `${opts.file}.out_${fileTag}${ext}`
-        const text = fs.readFileSync(opts.file, 'utf-8')
-        fs.writeFileSync(outputFile, '')
-        await translatePlainText(text, outputFile)
     }
 }
 
 /**
+ * @param {Translator} translator
  * @param {string} text
  * @param {import('node:fs').PathLike} [outfile]
  */
-async function translatePlainText(text, outfile)
+async function translatePlainText(translator, text, outfile)
 {
     const lines = text.split(/\r?\n/)
-
     if (lines[lines.length - 1].length === 0)
     {
         lines.pop()
     }
-
-    if (outfile)
+    const postAction = outfile ? (/** @type {string} */ text) => fs.appendFileSync(outfile, text + "\n") : () => { }
+    for await (const output of translator.translateLines(lines))
     {
-        for await (const output of translator.translateLines(lines))
-        {
-            console.log(output.transform)
-            fs.appendFileSync(outfile, output.transform + "\n")
-        }
-    }
-    else
-    {
-        for await (const output of translator.translateLines(lines))
-        {
-            console.log(output.transform)
-        }
+        console.log(output.transform)
+        postAction(output.transform)
     }
 }
 

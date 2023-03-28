@@ -13,7 +13,7 @@ import { roundWithPrecision, sleep } from './helpers.mjs';
  * Initiation prompt messages before the translation request messages
  * @property {boolean} useModerator `true` \
  * Verify with the free OpenAI Moderation tool prior to submitting the prompt to ChatGPT model
- * @property {boolean} prefixLineWithNumber `true` \
+ * @property {boolean} prefixNumber `true` \
  * Label lines with numerical prefixes to improve the one-to-one correlation between line quantities for input and output
  * @property {boolean} lineMatching `true`
  * Enforce one to one line quantity input output matching
@@ -32,7 +32,7 @@ export const DefaultOptions = {
     },
     initialPrompts: [],
     useModerator: true,
-    prefixLineWithNumber: true,
+    prefixNumber: true,
     lineMatching: true,
     historyPromptLength: 10,
     batchSizes: [10, 100]
@@ -253,7 +253,7 @@ export class Translator
             {
                 finalTransform = `[Flagged][Moderator] ${originalSource} -> ${finalTransform} `
             }
-            else if (this.options.prefixLineWithNumber)
+            else if (this.options.prefixNumber)
             {
                 const splits = splitStringByNumberLabel(finalTransform)
                 finalTransform = splits.text
@@ -280,7 +280,7 @@ export class Translator
     preprocessLine(line, index, offset)
     {
         line = line.replaceAll("\n", " \\N ")
-        if (this.options.prefixLineWithNumber)
+        if (this.options.prefixNumber)
         {
             line = `${offset + index + 1}. ${line}`
         }

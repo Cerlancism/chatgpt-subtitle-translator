@@ -58,9 +58,9 @@ Options:
     Initial prompts for the translation in JSON (default: `"[]"`) 
   - `--no-use-moderator`  
     Don't use the OpenAI API Moderation endpoint
-  - `--no-prefix-line-with-number`  
+  - `--no-prefix-number`  
     Don't prefix lines with numerical indices
-  - **TODO:** `--no-line-matching`  
+  - `--no-line-matching`  
     Don't enforce one to one line quantity input output matching
   - `--history-prompt-length <length>`  
     Length of prompt history to retain for next request batch (default: 10)
