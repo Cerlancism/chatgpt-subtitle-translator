@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 //@ts-check
 import fs from 'node:fs'
-import { program } from "commander"
+import { program, } from "commander"
 import { parser } from "../src/subtitle.mjs";
 import { wrapQuotes } from "../src/helpers.mjs";
 import { Translator, DefaultOptions } from "../src/translator.mjs"
+import path from 'node:path';
 
 program.description("Translation tool based on ChatGPT API")
     .option("--from <language>", "Source language")
@@ -12,12 +13,13 @@ program.description("Translation tool based on ChatGPT API")
     .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model", DefaultOptions.createChatCompletionRequest.model)
 
     .option("-f, --file <file>", "Text file name to use as input, .srt or plain text")
-    .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template (Translate {from} to {to}) with this plain text")
+    .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
     .option("--plain-text <text>", "Only translate this input plain text")
 
     .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
     .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
     .option("--no-prefix-line-with-number", "Don't prefix lines with numerical indices")
+    .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
     .option("--history-prompt-length <length>", "Length of prompt history to retain", parseInt, DefaultOptions.historyPromptLength)
     .option("--batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, DefaultOptions.batchSizes)
     .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature", parseFloat)
@@ -54,6 +56,7 @@ const options = {
     ...(opts.initialPrompts && { initialPrompts: opts.initialPrompts }),
     ...(opts.useModerator !== undefined && { useModerator: opts.useModerator }),
     ...(opts.prefixLineWithNumber !== undefined && { prefixLineWithNumber: opts.prefixLineWithNumber }),
+    ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
     ...(opts.historyPromptLength !== undefined && { historyPromptLength: opts.historyPromptLength }),
     ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
 };
@@ -71,7 +74,11 @@ if (opts.plainText)
 }
 else if (opts.file)
 {
-    if (opts.file.endsWith(".srt"))
+    if (opts.file.endsWith(".srt") && !translator.options.lineMatching)
+    {
+        console.warn("[CLI]", "Treating SRT file as plain text since --no-line-matching is set")
+    }
+    if (opts.file.endsWith(".srt") && translator.options.lineMatching)
     {
         console.error("[CLI]", "Assume SRT file", opts.file)
         const text = fs.readFileSync(opts.file, 'utf-8')
@@ -130,22 +137,27 @@ else if (opts.file)
             console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
             await Promise.all([
                 fs.promises.appendFile(progressFile, csv),
-                fs.promises.appendFile(outputFile, outSrt)]
-            )
+                fs.promises.appendFile(outputFile, outSrt)
+            ])
         }
     }
     else
     {
         console.error("[CLI]", "Assume plain text file", opts.file)
+        const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
+        const ext = path.extname(opts.file)
+        const outputFile = `${opts.file}.out_${fileTag}${ext}`
         const text = fs.readFileSync(opts.file, 'utf-8')
-        await translatePlainText(text)
+        fs.writeFileSync(outputFile, '')
+        await translatePlainText(text, outputFile)
     }
 }
 
 /**
  * @param {string} text
+ * @param {import('node:fs').PathLike} [outfile]
  */
-async function translatePlainText(text)
+async function translatePlainText(text, outfile)
 {
     const lines = text.split(/\r?\n/)
 
@@ -154,14 +166,21 @@ async function translatePlainText(text)
         lines.pop()
     }
 
-    for await (const output of translator.translateLines(lines))
+    if (outfile)
     {
-        console.log(output.transform)
+        for await (const output of translator.translateLines(lines))
+        {
+            console.log(output.transform)
+            fs.appendFileSync(outfile, output.transform + "\n")
+        }
     }
-
-    // translator.printUsage()
-    // const output = response.data.choices[0].message.content
-    // console.log(output)
+    else
+    {
+        for await (const output of translator.translateLines(lines))
+        {
+            console.log(output.transform)
+        }
+    }
 }
 
 /**

@@ -32,7 +32,7 @@ Reference: <https://github.com/openai/openai-quickstart-node#setup>
   cp .env.example .env
   ```
 - Add your [API key](https://platform.openai.com/account/api-keys) to the newly created `.env` file
-  - Optional set rate limits: <https://platform.openai.com/docs/guides/rate-limits/overview>
+  - (Optional) Set rate limits: <https://platform.openai.com/docs/guides/rate-limits/overview>
 ## CLI
 ```
 cli/translator.mjs --help
@@ -53,7 +53,7 @@ Options:
   - `--plain-text <text>`  
     Input source text with this plain text argument
   - `--system-instruction <instruction>`  
-    Override the prompt system instruction template `Translate {from} to {to}` with this plain text, ignoring `--from` and `--to` options
+    Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text, ignoring `--from` and `--to` options
   - `--initial-prompts <prompts>`  
     Initial prompts for the translation in JSON (default: `"[]"`) 
   - `--no-use-moderator`  

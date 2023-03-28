@@ -15,6 +15,8 @@ import { roundWithPrecision, sleep } from './helpers.mjs';
  * Verify with the free OpenAI Moderation tool prior to submitting the prompt to ChatGPT model
  * @property {boolean} prefixLineWithNumber `true` \
  * Label lines with numerical prefixes to improve the one-to-one correlation between line quantities for input and output
+ * @property {boolean} lineMatching `true`
+ * Enforce one to one line quantity input output matching
  * @property {number} historyPromptLength `10` \
  * Length of the prompt history to be retained and passed over to the next translation request in order to maintain some context.
  * @property {number[]} batchSizes `[10, 100]` \
@@ -31,6 +33,7 @@ export const DefaultOptions = {
     initialPrompts: [],
     useModerator: true,
     prefixLineWithNumber: true,
+    lineMatching: true,
     historyPromptLength: 10,
     batchSizes: [10, 100]
 }
@@ -198,7 +201,7 @@ export class Translator
             const text = getPromptContent(output)
             let outputs = text.split("\n").filter(x => x.length > 0)
 
-            if (batch.length !== outputs.length)
+            if (this.options.lineMatching && batch.length !== outputs.length)
             {
                 this.tokensWasted += getTokens(output)
                 console.error(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
@@ -237,7 +240,7 @@ export class Translator
      */
     * yieldOutput(promptSources, promptTransforms)
     {
-        for (let index = 0; index < promptSources.length; index++)
+        for (let index = 0; index < promptTransforms.length; index++)
         {
             const promptSource = promptSources[index];
             const promptTransform = promptTransforms[index]
