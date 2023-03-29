@@ -142,7 +142,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href)
 
             for await (const output of translator.translateLines(sourceLines))
             {
-                const csv = `${output.index}, ${wrapQuotes(output.finalTransform)}\n`
+                const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
                 const srtEntry = srtArrayWorking[output.index - 1]
                 srtEntry.text = output.finalTransform
                 const outSrt = parser.toSrt([srtEntry])
