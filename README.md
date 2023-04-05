@@ -50,9 +50,9 @@ Options:
     Target language (default: "English")
   - `-f, --file <file>`  
     Input source text with the content of this file, in `.srt` format or plain text
-  - `--plain-text <text>`  
+  - `-p, --plain-text <text>`  
     Input source text with this plain text argument
-  - `--system-instruction <instruction>`  
+  - `-s, --system-instruction <instruction>`  
     Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text, ignoring `--from` and `--to` options
   - `--initial-prompts <prompts>`  
     Initial prompts for the translation in JSON (default: `"[]"`) 
@@ -62,9 +62,9 @@ Options:
     Don't prefix lines with numerical indices
   - `--no-line-matching`  
     Don't enforce one to one line quantity input output matching
-  - `--history-prompt-length <length>`  
+  - `-l, --history-prompt-length <length>`  
     Length of prompt history to retain for next request batch (default: 10)
-  - `--batch-sizes <sizes>` 
+  - `-b, --batch-sizes <sizes>` 
     Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10, 100]"`)
 
     The number of lines to include in each translation prompt, provided that they are estimated to within the token limit. 
