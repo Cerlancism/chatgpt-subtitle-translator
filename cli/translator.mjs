@@ -211,7 +211,7 @@ async function getProgress(progressFile)
         const id = Number(splits[0])
         const text = splits[1].trim()
         const expectedId = index + 1
-        if (id === index + 1)
+        if (id === expectedId)
         {
             progress.push(text.substring(1, text.length - 1))
         }
