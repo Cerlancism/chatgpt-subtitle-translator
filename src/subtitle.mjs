@@ -65,15 +65,12 @@ export function parseTimeOffset(timeOffset)
             const minutes = parseInt(timeParts[1]);
             const seconds = parseFloat(timeParts[2]);
             timeOffset = (hours * 3600) + (minutes * 60) + seconds;
-            if (negative)
-            {
-                timeOffset = -timeOffset
-            }
         } else
         {
             // invalid time format
             timeOffset = NaN;
         }
+        timeOffset = negative ? -timeOffset : timeOffset
     }
     return timeOffset;
 }

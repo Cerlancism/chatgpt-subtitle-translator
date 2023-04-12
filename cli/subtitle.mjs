@@ -44,7 +44,7 @@ export function offsetFile(file, offset)
 
     const filePath = path.parse(file)
 
-    console.error("offsetting", filePath.ext, filePath.name, offset)
+    console.error("offsetting", filePath.ext, filePath.name, offsetSeconds)
 
     const content = fs.readFileSync(file, 'utf-8')
     const srt = offsetSrt(content, offsetSeconds)
