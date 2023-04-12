@@ -2,7 +2,7 @@
 //@ts-check
 import fs from 'node:fs'
 import path from 'node:path';
-import { pathToFileURL } from 'url'
+import url from 'url'
 import { Command } from "commander"
 import { wrapQuotes } from "../src/helpers.mjs";
 import { parser } from "../src/subtitle.mjs";
@@ -70,7 +70,7 @@ export function createInstance(args)
     return { opts, options }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href)
+if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
 {
     const { opts, options } = createInstance(process.argv)
     const translator = new Translator({ from: opts.from, to: opts.to }, options);

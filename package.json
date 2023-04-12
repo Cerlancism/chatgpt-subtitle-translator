@@ -22,6 +22,7 @@
     "node": ">=16.13.0"
   },
   "bin": {
-    "chatgpt-subtitle-translator": "./cli/translator.mjs"
+    "chatgpt-subtitle-translator": "./cli/translator.mjs",
+    "subtitle-util": "./cli/subtitle.mjs"
   }
 }

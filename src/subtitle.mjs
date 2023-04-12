@@ -36,3 +36,63 @@ export function secondsToTimestamp(seconds)
     const result = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${millisecs.toString().padStart(3, '0')}`
     return result;
 }
+
+/**
+ * @param {string | number} timeOffset
+ */
+export function parseTimeOffset(timeOffset)
+{
+    if (typeof timeOffset === 'string')
+    {
+        let negative = false
+        if (timeOffset.startsWith("-"))
+        {
+            negative = true
+            timeOffset = timeOffset.substring(1)
+        }
+        timeOffset = timeOffset.replace(',', '.'); // replace comma with dot
+        timeOffset = timeOffset.replace(/-/g, ':'); // replace hyphens with colons
+        let timeParts = timeOffset.split(":");
+
+        if (timeParts.length === 1)
+        {
+            // if only seconds given
+            timeOffset = parseFloat(timeParts[0]);
+        } else if (timeParts.length === 3)
+        {
+            // if hours, minutes, and seconds given
+            const hours = parseInt(timeParts[0]);
+            const minutes = parseInt(timeParts[1]);
+            const seconds = parseFloat(timeParts[2]);
+            timeOffset = (hours * 3600) + (minutes * 60) + seconds;
+            if (negative)
+            {
+                timeOffset = -timeOffset
+            }
+        } else
+        {
+            // invalid time format
+            timeOffset = NaN;
+        }
+    }
+    return timeOffset;
+}
+
+/**
+ * @param {string} srtString
+ * @param {number} seconds
+ */
+export function offsetSrt(srtString, seconds)
+{
+    const srt = parser.fromSrt(srtString)
+
+    for (const item of srt)
+    {
+        item.startSeconds += seconds
+        item.startTime = secondsToTimestamp(item.startSeconds)
+        item.endSeconds += seconds
+        item.endTime = secondsToTimestamp(item.endSeconds)
+    }
+
+    return parser.toSrt(srt)
+}
