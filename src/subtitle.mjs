@@ -42,35 +42,38 @@ export function secondsToTimestamp(seconds)
  */
 export function parseTimeOffset(timeOffset)
 {
-    if (typeof timeOffset === 'string')
+    if (typeof timeOffset === "string")
     {
-        let negative = false
+        let negative = false;
         if (timeOffset.startsWith("-"))
         {
-            negative = true
-            timeOffset = timeOffset.substring(1)
+            negative = true;
+            timeOffset = timeOffset.substring(1);
         }
-        timeOffset = timeOffset.replace(',', '.'); // replace comma with dot
-        timeOffset = timeOffset.replace(/-/g, ':'); // replace hyphens with colons
+        timeOffset = timeOffset.replace(",", "."); // replace comma with dot
+        timeOffset = timeOffset.replace(/[-.]/g, ":"); // replace hyphens and dots with colons
         let timeParts = timeOffset.split(":");
+
+        console.log(timeParts)
 
         if (timeParts.length === 1)
         {
             // if only seconds given
             timeOffset = parseFloat(timeParts[0]);
-        } else if (timeParts.length === 3)
+        } else if (timeParts.length === 4)
         {
             // if hours, minutes, and seconds given
             const hours = parseInt(timeParts[0]);
             const minutes = parseInt(timeParts[1]);
-            const seconds = parseFloat(timeParts[2]);
-            timeOffset = (hours * 3600) + (minutes * 60) + seconds;
+            const seconds = parseInt(timeParts[2]);
+            const subseconds = parseFloat(timeParts[3]) / 1000;
+            timeOffset = hours * 3600 + minutes * 60 + seconds + (Math.round(subseconds * 1000) / 1000);
         } else
         {
             // invalid time format
             timeOffset = NaN;
         }
-        timeOffset = negative ? -timeOffset : timeOffset
+        timeOffset = negative ? -timeOffset : timeOffset;
     }
     return timeOffset;
 }
