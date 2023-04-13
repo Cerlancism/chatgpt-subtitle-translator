@@ -17,10 +17,16 @@ export function createInstance(args)
         .argument("<file>", "Target file")
         .argument("<offset>", "Time offset in HH-MM-SS.sss or HH:MM:SS,sss or HH:MM:SS.sss or seconds")
         .action((file, offset) => offsetFile(file, offset))
+    
+    const commandMergeFiles = new Command("merge")
+        .description("Merge subtitle files")
+        .arguments("<files...>")
+        .action((files) => mergeFiles(files))
 
     const program = new Command()
         .description("Subtitle ultilities")
         .addCommand(commandOffsetFile)
+        .addCommand(commandMergeFiles)
         .parse(args)
 
     const opts = program.opts()
@@ -51,6 +57,31 @@ export function offsetFile(file, offset)
 
     fs.renameSync(file, path.join(filePath.dir, filePath.name + ".old" + filePath.ext))
     fs.writeFileSync(file, srt)
+}
+
+/**
+ * 
+ * @param {string[]} files 
+ */
+export function mergeFiles(files)
+{
+    let output = []
+
+    for (const file of files)
+    {
+        const content = fs.readFileSync(file, 'utf-8')
+        const srt = parser.fromSrt(content)
+        for (let index = 0, id = output.length; index < srt.length; index++, id++)
+        {
+            const item = srt[index]
+            item.id = id.toString()
+            output.push(item)
+        }
+    }
+    const outSrt = parser.toSrt(output)
+    const outFilePaths = files.map(x => path.parse(x))
+    const outFileName = outFilePaths.map(x => x.name).join("+") + outFilePaths[0].ext
+    fs.writeFileSync(path.join(outFilePaths[0].dir, outFileName), outSrt)
 }
 
 
