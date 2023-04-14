@@ -17,7 +17,7 @@ export function createInstance(args)
         .argument("<file>", "Target file")
         .argument("<offset>", "Time offset in HH-MM-SS.sss or HH:MM:SS,sss or HH:MM:SS.sss or seconds")
         .action((file, offset) => offsetFile(file, offset))
-    
+
     const commandMergeFiles = new Command("merge")
         .description("Merge subtitle files")
         .arguments("<files...>")
@@ -74,7 +74,7 @@ export function mergeFiles(files)
         for (let index = 0, id = output.length; index < srt.length; index++, id++)
         {
             const item = srt[index]
-            item.id = id.toString()
+            item.id = (id + 1).toString()
             output.push(item)
         }
     }
