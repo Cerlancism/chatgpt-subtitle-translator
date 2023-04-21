@@ -240,10 +240,10 @@ export class Translator
      */
     * yieldOutput(promptSources, promptTransforms)
     {
-        for (let index = 0; index < promptTransforms.length; index++)
+        for (let index = 0; index < promptSources.length; index++)
         {
             const promptSource = promptSources[index];
-            const promptTransform = promptTransforms[index]
+            const promptTransform = promptTransforms[index] ?? ""
             const workingIndex = this.workingProgress.length
             const originalSource = this.workingLines[workingIndex]
             let finalTransform = promptTransform

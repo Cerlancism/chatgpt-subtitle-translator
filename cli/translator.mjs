@@ -86,11 +86,7 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
     }
     else if (opts.file)
     {
-        if (opts.file.endsWith(".srt") && !translator.options.lineMatching)
-        {
-            console.warn("[CLI]", "Treating SRT file as plain text since --no-line-matching is set")
-        }
-        if (opts.file.endsWith(".srt") && translator.options.lineMatching)
+        if (opts.file.endsWith(".srt"))
         {
             console.error("[CLI]", "Assume SRT file", opts.file)
             const text = fs.readFileSync(opts.file, 'utf-8')
