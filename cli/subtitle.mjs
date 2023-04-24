@@ -2,7 +2,7 @@
 //@ts-check
 import url from 'node:url'
 import fs from 'node:fs'
-import { Command, program } from "commander"
+import { Command } from "commander"
 import path from 'node:path'
 import { offsetSrt, parseTimeOffset, parser } from '../src/subtitle.mjs'
 
