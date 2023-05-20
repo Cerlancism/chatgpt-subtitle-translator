@@ -136,17 +136,23 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
                 fs.writeFileSync(outputFile, '')
             }
 
-            for await (const output of translator.translateLines(sourceLines))
+            try
             {
-                const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
-                const srtEntry = srtArrayWorking[output.index - 1]
-                srtEntry.text = output.finalTransform
-                const outSrt = parser.toSrt([srtEntry])
-                console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
-                await Promise.all([
-                    fs.promises.appendFile(progressFile, csv),
-                    fs.promises.appendFile(outputFile, outSrt)
-                ])
+                for await (const output of translator.translateLines(sourceLines))
+                {
+                    const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
+                    const srtEntry = srtArrayWorking[output.index - 1]
+                    srtEntry.text = output.finalTransform
+                    const outSrt = parser.toSrt([srtEntry])
+                    console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
+                    await Promise.all([
+                        fs.promises.appendFile(progressFile, csv),
+                        fs.promises.appendFile(outputFile, outSrt)
+                    ])
+                }
+            } catch (error)
+            {
+                process.exit(1)
             }
         }
         else
@@ -174,17 +180,24 @@ async function translatePlainText(translator, text, outfile)
     {
         lines.pop()
     }
-    for await (const output of translator.translateLines(lines))
+    try
     {
-        if (!translator.options.createChatCompletionRequest.stream)
+        for await (const output of translator.translateLines(lines))
         {
-            console.log(output.transform)
+            if (!translator.options.createChatCompletionRequest.stream)
+            {
+                console.log(output.transform)
+            }
+            if (outfile)
+            {
+                fs.appendFileSync(outfile, output.transform + "\n")
+            }
         }
-        if (outfile)
-        {
-            fs.appendFileSync(outfile, output.transform + "\n")
-        }
+    } catch (error)
+    {
+        process.exit(1)
     }
+
 }
 
 /**

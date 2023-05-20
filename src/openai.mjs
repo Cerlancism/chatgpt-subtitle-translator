@@ -30,6 +30,18 @@ export const openai = new OpenAIApi(configuration);
 export const coolerAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
 export const coolerModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
 
+export class ChatStreamSyntaxError extends SyntaxError
+{
+    /**
+     * @param {string} message
+     * @param {ErrorOptions} cause
+     */
+    constructor(message, cause)
+    {
+        super(message, cause)
+    }
+}
+
 /**
  * Retry the Openai API function until it succeeds or the maximum number of retries is reached
  * @template T
@@ -42,11 +54,11 @@ export async function openaiRetryWrapper(func, maxRetries, description)
     return await retryWrapper(func, maxRetries, async (retryContext) =>
     {
         const error = retryContext.error
+        let delay = 1000 * retryContext.currentTry * retryContext.currentTry
         if (axiosStatic.isAxiosError(error))
         {
             console.error(`[Error_${description}]`, new Date(), "Status", error.response?.status, error.name, error.message, error.response?.data?.error)
 
-            let delay = 1000 * retryContext.currentTry * retryContext.currentTry
             if (error.response?.status === 429 || (error.response?.status >= 500 && error.response?.status <= 599))
             {
                 delay = delay * retryContext.currentTry
@@ -58,14 +70,19 @@ export async function openaiRetryWrapper(func, maxRetries, description)
             console.error(`[Error_${description}]`, "Retries", retryContext.currentTry, "Delay", delay)
             await sleep(delay)
         }
+        else if (error instanceof ChatStreamSyntaxError)
+        {
+            console.error(`[Error_${description}] ${error.message}`, "Retries", retryContext.currentTry, "Delay", delay)
+            await sleep(delay)
+        }
         else
         {
-            throw `[Error_${description}] ${new Date()} unknown error ${error}`
+            throw `[Error_${description}] [openaiRetryWrapper] ${new Date()} unknown error ${error}`
         }
     }, async (retryContext) =>
     {
-        console.error(`[Error_${description}]`, new Date(), retryContext)
-        throw `[Error_${description}] ${retryContext}`
+        console.error(`[Error_${description}] [openaiRetryWrapper] Max Retries Reached`, new Date(), retryContext)
+        throw `[Error_${description}] [openaiRetryWrapper] ${retryContext}`
     })
 }
 
@@ -76,7 +93,7 @@ export async function openaiRetryWrapper(func, maxRetries, description)
 export async function completeChatStream(response, onData = (d) => { }, onEnd = () => { })
 {
     let output = ''
-    return new Promise((resolve, reject) =>
+    return await new Promise((resolve, reject) =>
     {
         response.data.on("data", (/** @type {Buffer} */ data) =>
         {
@@ -107,8 +124,8 @@ export async function completeChatStream(response, onData = (d) => { }, onEnd = 
 
                 } catch (error)
                 {
-                    error.message = `Could not JSON parse stream message: ${error.message}`
-                    reject(error)
+                    const chatStreamError = new ChatStreamSyntaxError(`Could not JSON parse stream message: ${error.message} \npayload:\n${message}\n`, error)
+                    reject(chatStreamError)
                 }
             }
         })
