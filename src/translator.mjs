@@ -356,12 +356,12 @@ export class Translator
     {
         if (this.options.createChatCompletionRequest.model !== "gpt-3.5-turbo") //TODO: support token usage computation for more models
         {
-            console.warn("[Translator]", `Cost computer not supported yet for ${this.options.createChatCompletionRequest.model}`)
+            console.warn("[Translator]", `Cost computation not supported yet for ${this.options.createChatCompletionRequest.model}`)
         }
         await sleep(10)
         const tokenCost = PrmoptTokenCostPer1k[this.options.createChatCompletionRequest.model] ?? 0
         console.error(
-            `[Translator]`,
+            `[Translator] Estimated Usage -`,
             "Tokens:", this.tokensUsed, "$", roundWithPrecision(tokenCost * (this.tokensUsed / 1000), 3),
             "Wasted:", this.tokensWasted, "$", roundWithPrecision(tokenCost * (this.tokensWasted / 1000), 3), (this.tokensWasted / this.tokensUsed).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 }),
             "Rate:", roundWithPrecision(this.tokensUsed / (this.tokensProcessTimeMs / 1000 / 60), 2), "TPM", this.cooler.rate, "RPM"
