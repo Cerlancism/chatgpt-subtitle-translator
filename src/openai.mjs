@@ -3,8 +3,7 @@ import * as dotenv from 'dotenv'
 
 dotenv.config()
 
-import { axiosStatic } from './axios.mjs';
-import { Configuration, OpenAIApi } from "openai";
+import { OpenAI } from "openai";
 import { CooldownContext } from './cooldown.mjs';
 import { retryWrapper, sleep } from './helpers.mjs';
 import gp3Encoder from "gpt-3-encoder";
@@ -21,11 +20,10 @@ export const PrmoptTokenCostPer1k = {
 //     'gpt-4-32k': 0.12
 // }
 
-const configuration = new Configuration({
+export const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
+    maxRetries: 3
 });
-
-export const openai = new OpenAIApi(configuration);
 
 export const coolerAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
 export const coolerModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
@@ -55,11 +53,11 @@ export async function openaiRetryWrapper(func, maxRetries, description)
     {
         const error = retryContext.error
         let delay = 1000 * retryContext.currentTry * retryContext.currentTry
-        if (axiosStatic.isAxiosError(error))
+        if (error instanceof OpenAI.APIError)
         {
-            console.error(`[Error_${description}]`, new Date(), "Status", error.response?.status, error.name, error.message, error.response?.data?.error)
+            console.error(`[Error_${description}]`, new Date(), "Status", error.status, error.name, error.message, error.error)
 
-            if (error.response?.status === 429 || (error.response?.status >= 500 && error.response?.status <= 599))
+            if (error.status === 429 || (error.status >= 500 && error.status <= 599))
             {
                 delay = delay * retryContext.currentTry
             }
@@ -87,53 +85,33 @@ export async function openaiRetryWrapper(func, maxRetries, description)
 }
 
 /**
- * @param {import("axios").AxiosResponse} response
- * @return {Promise<import("axios").AxiosResponse<import("openai").CreateChatCompletionResponse, any>>}
+ * @param {import("openai/streaming").Stream<import("openai").OpenAI.Chat.Completions.ChatCompletionChunk>} response
+ * @returns {Promise<string>}
  */
 export async function completeChatStream(response, onData = (d) => { }, onEnd = () => { })
 {
     let output = ''
-    return await new Promise((resolve, reject) =>
+    return await new Promise(async (resolve, reject) =>
     {
-        response.data.on("data", (/** @type {Buffer} */ data) =>
+        try
         {
-            const lines = data.toString().split('\n').filter(line => line.trim() !== '');
-            for (const line of lines)
+            for await (const part of response)
             {
-                const message = line.replace(/^data: /, '');
-                if (message === '[DONE]')
+                const text = part.choices[0].delta.content
+                if (text)
                 {
-                    response.data = {
-                        choices: [
-                            { message: { role: "assistant", content: output } }
-                        ]
-                    }
-                    onEnd()
-                    resolve(response)
-                    return; // Stream finished
-                }
-                try
-                {
-                    const parsed = JSON.parse(message);
-                    const text = parsed.choices[0]?.delta?.content ?? ""
                     output += text
-                    if (text)
-                    {
-                        onData(text)
-                    }
-
-                } catch (error)
-                {
-                    const chatStreamError = new ChatStreamSyntaxError(`Could not JSON parse stream message: ${error.message} \npayload:\n${message}\n`, error)
-                    reject(chatStreamError)
+                    onData(text)
                 }
             }
-        })
+            onEnd()
+            resolve(output)
 
-        response.data.on("error", (e) =>
+        } catch (error)
         {
-            reject(e)
-        })
+            const chatStreamError = new ChatStreamSyntaxError(`Could not JSON parse stream message: ${error.message}`, error)
+            reject(chatStreamError)
+        }
     })
 }
 

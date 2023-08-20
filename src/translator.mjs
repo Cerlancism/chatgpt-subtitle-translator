@@ -4,12 +4,17 @@ import { checkModeration, getModeratorDescription, getModeratorResults } from '.
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
 
+const chatCompletion = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [{ "role": "user", "content": "Hello!", }],
+});
+
 /**
  * @type {TranslatorOptions}
  * @typedef TranslatorOptions
- * @property {Pick<Partial<import('openai').CreateChatCompletionRequest>, "messages" | "model"> & Omit<import('openai').CreateChatCompletionRequest, "messages" | "model">} createChatCompletionRequest
+ * @property {Pick<Partial<import('openai').OpenAI.Chat.CompletionCreateParams>, "messages" | "model"> & Omit<import('openai').OpenAI.Chat.CompletionCreateParams, "messages" | "model">} createChatCompletionRequest
  * Options to ChatGPT besides the messages, it is recommended to set `temperature: 0` for a (almost) deterministic translation
- * @property {import('openai').ChatCompletionRequestMessage[]} initialPrompts 
+ * @property {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} initialPrompts 
  * Initiation prompt messages before the translation request messages
  * @property {boolean} useModerator `true` \
  * Verify with the free OpenAI Moderation tool prior to submitting the prompt to ChatGPT model
@@ -55,6 +60,7 @@ export class Translator
 
         this.openaiClient = openai
         this.systemInstruction = `Translate ${this.language.from ? this.language.from + " " : ""}to ${this.language.to}`
+        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} */
         this.promptContext = []
         this.cooler = coolerAPI
 
@@ -77,9 +83,9 @@ export class Translator
      */
     async translatePrompt(text)
     {
-        /** @type {import('openai').ChatCompletionRequestMessage} */
+        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage} */
         const userMessage = { role: "user", content: `${text}` }
-        /** @type {import('openai').ChatCompletionRequestMessage[]} */
+        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
 
@@ -88,18 +94,24 @@ export class Translator
         {
             await this.cooler.cool()
             startTime = Date.now()
-            const promptResponse = await openai.createChatCompletion({
-                messages,
-                ...this.options.createChatCompletionRequest
-            }, this.options.createChatCompletionRequest.stream ? { responseType: "stream" } : undefined)
 
             if (!this.options.createChatCompletionRequest.stream)
             {
+                const promptResponse = await openai.chat.completions.create({
+                    messages,
+                    ...this.options.createChatCompletionRequest,
+                    stream: false,
+                })
                 endTime = Date.now()
                 return promptResponse
             }
             else
             {
+                const promptResponse = await openai.chat.completions.create({
+                    messages,
+                    ...this.options.createChatCompletionRequest,
+                    stream: true
+                })
                 let writeQueue = ''
                 const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) =>
                 {
@@ -346,7 +358,7 @@ export class Translator
             return text
         }
 
-        this.promptContext = /** @type {import('openai').ChatCompletionRequestMessage[]}*/([
+        this.promptContext = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/([
             { role: "user", content: sliced.map((x, i) => checkFlaggedMapper(x.source, i)).join("\n\n") },
             { role: "assistant", content: sliced.map((x, i) => checkFlaggedMapper(x.transform, i)).join("\n\n") }
         ])
@@ -370,11 +382,11 @@ export class Translator
 }
 
 /**
- * @param {import("axios").AxiosResponse<import("openai").CreateChatCompletionResponse, any>} response
+ * @param {import("openai").OpenAI.Chat.ChatCompletion} response
  */
 function getTokens(response)
 {
-    return response.data.usage?.total_tokens ?? 0
+    return response.usage?.total_tokens ?? 0
 }
 
 /**

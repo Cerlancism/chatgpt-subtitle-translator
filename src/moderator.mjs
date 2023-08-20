@@ -33,7 +33,7 @@ export async function checkModeration(input)
 }
 
 /**
- * @param {import("openai").CreateModerationResponseResultsInner} moderatorOutput
+ * @param {import("openai").OpenAI.Moderation} moderatorOutput
  */
 export function getModeratorResults(moderatorOutput)
 {
