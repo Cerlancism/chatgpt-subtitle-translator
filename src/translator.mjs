@@ -7,9 +7,9 @@ import { roundWithPrecision, sleep } from './helpers.mjs';
 /**
  * @type {TranslatorOptions}
  * @typedef TranslatorOptions
- * @property {Pick<Partial<import('openai').CreateChatCompletionRequest>, "messages" | "model"> & Omit<import('openai').CreateChatCompletionRequest, "messages" | "model">} createChatCompletionRequest
+ * @property {Pick<Partial<import('openai').OpenAI.Chat.CompletionCreateParams>, "messages" | "model"> & Omit<import('openai').OpenAI.Chat.CompletionCreateParams, "messages" | "model">} createChatCompletionRequest
  * Options to ChatGPT besides the messages, it is recommended to set `temperature: 0` for a (almost) deterministic translation
- * @property {import('openai').ChatCompletionRequestMessage[]} initialPrompts 
+ * @property {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} initialPrompts 
  * Initiation prompt messages before the translation request messages
  * @property {boolean} useModerator `true` \
  * Verify with the free OpenAI Moderation tool prior to submitting the prompt to ChatGPT model
@@ -55,6 +55,7 @@ export class Translator
 
         this.openaiClient = openai
         this.systemInstruction = `Translate ${this.language.from ? this.language.from + " " : ""}to ${this.language.to}`
+        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} */
         this.promptContext = []
         this.cooler = coolerAPI
 
@@ -74,12 +75,13 @@ export class Translator
 
     /**
      * @param {string} text
+     * @returns {Promise<TranslationOutput>}
      */
     async translatePrompt(text)
     {
-        /** @type {import('openai').ChatCompletionRequestMessage} */
+        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage} */
         const userMessage = { role: "user", content: `${text}` }
-        /** @type {import('openai').ChatCompletionRequestMessage[]} */
+        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
 
@@ -88,18 +90,30 @@ export class Translator
         {
             await this.cooler.cool()
             startTime = Date.now()
-            const promptResponse = await openai.createChatCompletion({
-                messages,
-                ...this.options.createChatCompletionRequest
-            }, this.options.createChatCompletionRequest.stream ? { responseType: "stream" } : undefined)
 
             if (!this.options.createChatCompletionRequest.stream)
             {
+                const promptResponse = await openai.chat.completions.create({
+                    messages,
+                    ...this.options.createChatCompletionRequest,
+                    stream: false,
+                })
                 endTime = Date.now()
-                return promptResponse
+                const output = new TranslationOutput(
+                    promptResponse.choices[0].message.content,
+                    promptResponse.usage?.prompt_tokens,
+                    promptResponse.usage?.completion_tokens,
+                    promptResponse.usage?.total_tokens
+                )
+                return output
             }
             else
             {
+                const promptResponse = await openai.chat.completions.create({
+                    messages,
+                    ...this.options.createChatCompletionRequest,
+                    stream: true
+                })
                 let writeQueue = ''
                 const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) =>
                 {
@@ -125,13 +139,17 @@ export class Translator
                     process.stdout.write("\n")
                 })
                 const prompt_tokens = numTokensFromMessages(messages)
-                const completion_tokens = numTokensFromMessages([{ content: streamOutput.data.choices[0].message.content }])
-                streamOutput.data.usage = { prompt_tokens, completion_tokens, total_tokens: prompt_tokens + completion_tokens }
-                return streamOutput
+                const completion_tokens = numTokensFromMessages([{ content: streamOutput }])
+                const output = new TranslationOutput(
+                    streamOutput,
+                    prompt_tokens,
+                    completion_tokens
+                )
+                return output
             }
         }, 3, "TranslationPrompt")
 
-        this.tokensUsed += getTokens(response)
+        this.tokensUsed += response.totalTokens
         this.tokensProcessTimeMs += (endTime - startTime)
         return response
     }
@@ -160,7 +178,7 @@ export class Translator
             }
             this.buildContext()
             const output = await this.translatePrompt(input)
-            const text = getPromptContent(output)
+            const text = output.content
             const writeOut = text.split("\n").join(" ")
             yield* this.yieldOutput([batch[x]], [writeOut])
         }
@@ -198,12 +216,12 @@ export class Translator
             }
             this.buildContext()
             const output = await this.translatePrompt(input)
-            const text = getPromptContent(output)
+            const text = output.content
             let outputs = text.split("\n").filter(x => x.length > 0)
 
             if (this.options.lineMatching && batch.length !== outputs.length)
             {
-                this.tokensWasted += getTokens(output)
+                this.tokensWasted += output.totalTokens
                 console.error(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
                 console.error(`[Translator]`, "batch", batch)
                 console.error(`[Translator]`, "transformed", outputs)
@@ -346,7 +364,7 @@ export class Translator
             return text
         }
 
-        this.promptContext = /** @type {import('openai').ChatCompletionRequestMessage[]}*/([
+        this.promptContext = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/([
             { role: "user", content: sliced.map((x, i) => checkFlaggedMapper(x.source, i)).join("\n\n") },
             { role: "assistant", content: sliced.map((x, i) => checkFlaggedMapper(x.transform, i)).join("\n\n") }
         ])
@@ -369,18 +387,28 @@ export class Translator
     }
 }
 
-/**
- * @param {import("axios").AxiosResponse<import("openai").CreateChatCompletionResponse, any>} response
- */
-function getTokens(response)
+export class TranslationOutput
 {
-    return response.data.usage?.total_tokens ?? 0
-}
+    /**
+     * @param {string} content
+     * @param {number} promptTokens
+     * @param {number} completionTokens
+     * @param {number} [totalTokens]
+     */
+    constructor(content, promptTokens, completionTokens, totalTokens)
+    {
+        this.content = content
+        this.promptTokens = promptTokens ?? 0
+        this.completionTokens = completionTokens ?? 0
+        this._totalTokens = totalTokens
+    }
 
-/**
- * @param {import("axios").AxiosResponse<import("openai").CreateChatCompletionResponse, any>} openaiRes
- */
-function getPromptContent(openaiRes)
-{
-    return openaiRes.data.choices[0].message?.content ?? ""
-}
+    get totalTokens()
+    {
+        if (!this._totalTokens)
+        {
+            this._totalTokens = this.promptTokens + this.completionTokens
+        }
+        return this._totalTokens
+    }
+} 
