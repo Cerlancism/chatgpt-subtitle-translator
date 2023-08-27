@@ -400,15 +400,6 @@ export class TranslationOutput
         this.content = content
         this.promptTokens = promptTokens ?? 0
         this.completionTokens = completionTokens ?? 0
-        this._totalTokens = totalTokens
-    }
-
-    get totalTokens()
-    {
-        if (!this._totalTokens)
-        {
-            this._totalTokens = this.promptTokens + this.completionTokens
-        }
-        return this._totalTokens
+        this.totalTokens = totalTokens ?? (this.promptTokens + this.completionTokens)
     }
 } 
