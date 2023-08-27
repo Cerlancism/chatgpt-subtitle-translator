@@ -1,7 +1,7 @@
 //@ts-check
 import srtParser2 from "srt-parser-2"
 
-export const parser = new srtParser2.default();
+export const parser = new srtParser2();
 
 /**
  * @param {string} text

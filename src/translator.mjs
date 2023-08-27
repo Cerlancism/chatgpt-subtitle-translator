@@ -4,11 +4,6 @@ import { checkModeration, getModeratorDescription, getModeratorResults } from '.
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
 
-const chatCompletion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{ "role": "user", "content": "Hello!", }],
-});
-
 /**
  * @type {TranslatorOptions}
  * @typedef TranslatorOptions
@@ -80,6 +75,7 @@ export class Translator
 
     /**
      * @param {string} text
+     * @returns {Promise<TranslationOutput>}
      */
     async translatePrompt(text)
     {
@@ -103,7 +99,13 @@ export class Translator
                     stream: false,
                 })
                 endTime = Date.now()
-                return promptResponse
+                const output = new TranslationOutput(
+                    promptResponse.choices[0].message.content,
+                    promptResponse.usage?.prompt_tokens,
+                    promptResponse.usage?.completion_tokens,
+                    promptResponse.usage?.total_tokens
+                )
+                return output
             }
             else
             {
@@ -137,13 +139,17 @@ export class Translator
                     process.stdout.write("\n")
                 })
                 const prompt_tokens = numTokensFromMessages(messages)
-                const completion_tokens = numTokensFromMessages([{ content: streamOutput.data.choices[0].message.content }])
-                streamOutput.data.usage = { prompt_tokens, completion_tokens, total_tokens: prompt_tokens + completion_tokens }
-                return streamOutput
+                const completion_tokens = numTokensFromMessages([{ content: streamOutput }])
+                const output = new TranslationOutput(
+                    streamOutput,
+                    prompt_tokens,
+                    completion_tokens
+                )
+                return output
             }
         }, 3, "TranslationPrompt")
 
-        this.tokensUsed += getTokens(response)
+        this.tokensUsed += response.totalTokens
         this.tokensProcessTimeMs += (endTime - startTime)
         return response
     }
@@ -172,7 +178,7 @@ export class Translator
             }
             this.buildContext()
             const output = await this.translatePrompt(input)
-            const text = getPromptContent(output)
+            const text = output.content
             const writeOut = text.split("\n").join(" ")
             yield* this.yieldOutput([batch[x]], [writeOut])
         }
@@ -210,12 +216,12 @@ export class Translator
             }
             this.buildContext()
             const output = await this.translatePrompt(input)
-            const text = getPromptContent(output)
+            const text = output.content
             let outputs = text.split("\n").filter(x => x.length > 0)
 
             if (this.options.lineMatching && batch.length !== outputs.length)
             {
-                this.tokensWasted += getTokens(output)
+                this.tokensWasted += output.totalTokens
                 console.error(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
                 console.error(`[Translator]`, "batch", batch)
                 console.error(`[Translator]`, "transformed", outputs)
@@ -381,18 +387,28 @@ export class Translator
     }
 }
 
-/**
- * @param {import("openai").OpenAI.Chat.ChatCompletion} response
- */
-function getTokens(response)
+export class TranslationOutput
 {
-    return response.usage?.total_tokens ?? 0
-}
+    /**
+     * @param {string} content
+     * @param {number} promptTokens
+     * @param {number} completionTokens
+     * @param {number} [totalTokens]
+     */
+    constructor(content, promptTokens, completionTokens, totalTokens)
+    {
+        this.content = content
+        this.promptTokens = promptTokens ?? 0
+        this.completionTokens = completionTokens ?? 0
+        this._totalTokens = totalTokens
+    }
 
-/**
- * @param {import("axios").AxiosResponse<import("openai").CreateChatCompletionResponse, any>} openaiRes
- */
-function getPromptContent(openaiRes)
-{
-    return openaiRes.data.choices[0].message?.content ?? ""
-}
+    get totalTokens()
+    {
+        if (!this._totalTokens)
+        {
+            this._totalTokens = this.promptTokens + this.completionTokens
+        }
+        return this._totalTokens
+    }
+} 

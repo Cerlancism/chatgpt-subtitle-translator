@@ -18,8 +18,8 @@ export async function checkModeration(input)
     return await openaiRetryWrapper(async () =>
     {
         await cooler.cool()
-        const moderation = await openai.createModeration({ input })
-        const moderationData = moderation.data.results[0]
+        const moderation = await openai.moderations.create({ input })
+        const moderationData = moderation.results[0]
 
         if (moderationData.flagged)
         {
