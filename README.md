@@ -11,6 +11,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 - **TODO**: Tokens per minute rate limits (TPM) 
 - Progress resumption - mitigation for frequent API gateway errors and downtimes
 - **TODO**: Retry translation parts
+- **TODO**: Web UI
 
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
