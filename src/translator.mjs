@@ -7,9 +7,9 @@ import { roundWithPrecision, sleep } from './helpers.mjs';
 /**
  * @type {TranslatorOptions}
  * @typedef TranslatorOptions
- * @property {Pick<Partial<import('openai').OpenAI.Chat.CompletionCreateParams>, "messages" | "model"> & Omit<import('openai').OpenAI.Chat.CompletionCreateParams, "messages" | "model">} createChatCompletionRequest
+ * @property {Pick<Partial<import('openai').OpenAI.Chat.ChatCompletionCreateParams>, "messages" | "model"> & Omit<import('openai').OpenAI.Chat.ChatCompletionCreateParams, "messages" | "model">} createChatCompletionRequest
  * Options to ChatGPT besides the messages, it is recommended to set `temperature: 0` for a (almost) deterministic translation
- * @property {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} initialPrompts 
+ * @property {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} initialPrompts 
  * Initiation prompt messages before the translation request messages
  * @property {boolean} useModerator `true` \
  * Verify with the free OpenAI Moderation tool prior to submitting the prompt to ChatGPT model
@@ -55,7 +55,7 @@ export class Translator
 
         this.openaiClient = openai
         this.systemInstruction = `Translate ${this.language.from ? this.language.from + " " : ""}to ${this.language.to}`
-        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} */
+        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         this.promptContext = []
         this.cooler = coolerAPI
 
@@ -79,9 +79,9 @@ export class Translator
      */
     async translatePrompt(text)
     {
-        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage} */
+        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: `${text}` }
-        /** @type {import('openai').OpenAI.Chat.CreateChatCompletionRequestMessage[]} */
+        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
 
