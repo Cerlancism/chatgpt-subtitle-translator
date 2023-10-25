@@ -164,18 +164,6 @@ export class Translator
         for (let x = 0; x < batch.length; x++)
         {
             const input = batch[x]
-            if (this.options.useModerator)
-            {
-                const moderationData = await checkModeration(input)
-                if (moderationData.flagged)
-                {
-                    const moderationResults = getModeratorResults(moderationData)
-                    const moderationDescription = getModeratorDescription(moderationResults)
-                    this.moderatorFlags.set(this.workingProgress.length, moderationResults)
-                    yield* this.yieldOutput([input], [moderationDescription])
-                    continue
-                }
-            }
             this.buildContext()
             const output = await this.translatePrompt(input)
             const text = output.content
