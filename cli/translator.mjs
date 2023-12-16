@@ -8,11 +8,22 @@ import { wrapQuotes } from "../src/helpers.mjs";
 import { parser } from "../src/subtitle.mjs";
 import { Translator, DefaultOptions } from "../src/translator.mjs"
 
+import { HttpProxyAgent } from 'http-proxy-agent';
+import { openai } from '../src/openai.mjs'
+
 /**
  * @param {readonly string[]} args
  */
 export function createInstance(args)
 {
+    const httpProxyConfig = process.env.http_proxy ?? process.env.HTTP_PROXY
+
+    if (httpProxyConfig)
+    {
+        console.error("[CLI HTTP PROXY]", "Using HTTP Proxy from ENV Detected", httpProxyConfig)
+        openai.httpAgent = new HttpProxyAgent(httpProxyConfig)
+    }
+
     const program = new Command()
         .description("Translation tool based on ChatGPT API")
         .option("--from <language>", "Source language")
