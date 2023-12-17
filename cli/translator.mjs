@@ -21,7 +21,7 @@ export function createInstance(args)
 
     if (httpProxyConfig || httpsProxyConfig)
     {
-        console.error("[CLI HTTP/HTTPS PROXY]", "Using HTTP/HTTP Proxy from ENV Detected", { httpProxyConfig, httpsProxyConfig })
+        console.error("[CLI HTTP/HTTPS PROXY]", "Using HTTP/HTTPS Proxy from ENV Detected", { httpProxyConfig, httpsProxyConfig })
         openai.httpAgent = new ProxyAgent()
     }
 
