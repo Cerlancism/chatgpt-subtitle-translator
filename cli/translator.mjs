@@ -17,10 +17,11 @@ import { openai } from '../src/openai.mjs'
 export function createInstance(args)
 {
     const httpProxyConfig = process.env.http_proxy ?? process.env.HTTP_PROXY
+    const httpsProxyConfig = process.env.https_proxy ?? process.env.HTTPS_PROXY
 
-    if (httpProxyConfig)
+    if (httpProxyConfig || httpsProxyConfig)
     {
-        console.error("[CLI HTTP PROXY]", "Using HTTP Proxy from ENV Detected", httpProxyConfig)
+        console.error("[CLI HTTP/HTTPS PROXY]", "Using HTTP/HTTP Proxy from ENV Detected", { httpProxyConfig, httpsProxyConfig })
         openai.httpAgent = new ProxyAgent()
     }
 
