@@ -8,7 +8,7 @@ import { wrapQuotes } from "../src/helpers.mjs";
 import { parser } from "../src/subtitle.mjs";
 import { Translator, DefaultOptions } from "../src/translator.mjs"
 
-import { HttpProxyAgent } from 'http-proxy-agent';
+import { ProxyAgent } from 'proxy-agent';
 import { openai } from '../src/openai.mjs'
 
 /**
@@ -21,7 +21,7 @@ export function createInstance(args)
     if (httpProxyConfig)
     {
         console.error("[CLI HTTP PROXY]", "Using HTTP Proxy from ENV Detected", httpProxyConfig)
-        openai.httpAgent = new HttpProxyAgent(httpProxyConfig)
+        openai.httpAgent = new ProxyAgent()
     }
 
     const program = new Command()
