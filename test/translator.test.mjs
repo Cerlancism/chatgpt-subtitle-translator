@@ -25,10 +25,7 @@ test('should output subtitles', async () =>
     {
         console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.transform))
         outputsLines.push(output)
-        // Here you can add assertions to check the translation output
-        // For example, assert that the output is not null, or matches expected values
         assert.notStrictEqual(output.transform, null, 'Translation output should not be null');
-        // Add more specific assertions as per your test requirements
     }
 
     assert.strictEqual(srtParsed.length, outputsLines.length, "Translation Lines should be equal");
