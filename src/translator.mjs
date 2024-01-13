@@ -1,5 +1,5 @@
 //@ts-check
-import { openai, coolerAPI, openaiRetryWrapper, completeChatStream, numTokensFromMessages, PrmoptTokenCostPer1k } from './openai.mjs';
+import { openai, coolerAPI, openaiRetryWrapper, completeChatStream, numTokensFromMessages, getPricingModel } from './openai.mjs';
 import { checkModeration, getModeratorDescription, getModeratorResults } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
@@ -61,8 +61,10 @@ export class Translator
 
         /** @type {{ source: string; transform: string; }[]} */
         this.workingProgress = []
-        this.tokensUsed = 0
-        this.tokensWasted = 0
+        this.promptTokensUsed = 0
+        this.promptTokensWasted = 0
+        this.completionTokensUsed = 0
+        this.completionTokensWasted = 0
         this.tokensProcessTimeMs = 0
 
         this.offset = 0
@@ -71,6 +73,8 @@ export class Translator
         this.workingBatchSizes = [...this.options.batchSizes]
         this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
         this.moderatorFlags = new Map()
+
+        this.pricingModel = getPricingModel(this.options.createChatCompletionRequest.model)
     }
 
     /**
@@ -149,7 +153,8 @@ export class Translator
             }
         }, 3, "TranslationPrompt")
 
-        this.tokensUsed += response.totalTokens
+        this.promptTokensUsed += response.promptTokens
+        this.completionTokensUsed += response.completionTokens
         this.tokensProcessTimeMs += (endTime - startTime)
         return response
     }
@@ -209,7 +214,8 @@ export class Translator
 
             if (this.options.lineMatching && batch.length !== outputs.length)
             {
-                this.tokensWasted += output.totalTokens
+                this.promptTokensWasted += output.promptTokens
+                this.completionTokensWasted += output.completionTokens
                 console.error(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
                 console.error(`[Translator]`, "batch", batch)
                 console.error(`[Translator]`, "transformed", outputs)
@@ -360,17 +366,23 @@ export class Translator
 
     async printUsage()
     {
-        if (this.options.createChatCompletionRequest.model !== "gpt-3.5-turbo") //TODO: support token usage computation for more models
+        if (!this.pricingModel)
         {
             console.warn("[Translator]", `Cost computation not supported yet for ${this.options.createChatCompletionRequest.model}`)
         }
         await sleep(10)
-        const tokenCost = PrmoptTokenCostPer1k[this.options.createChatCompletionRequest.model] ?? 0
+
+        const usedTokens = this.promptTokensUsed + this.completionTokensUsed
+        const wastedTokens = this.promptTokensWasted + this.completionTokensWasted
+
+        const usedTokensPricing = roundWithPrecision(this.pricingModel.prompt * (this.promptTokensUsed / 1000) + this.pricingModel.completion * (this.completionTokensUsed / 1000), 3)
+        const wastedTokensPricing = roundWithPrecision(this.pricingModel.prompt * (this.promptTokensWasted / 1000) + this.pricingModel.completion * (this.completionTokensWasted / 1000), 3)
+
         console.error(
             `[Translator] Estimated Usage -`,
-            "Tokens:", this.tokensUsed, "$", roundWithPrecision(tokenCost * (this.tokensUsed / 1000), 3),
-            "Wasted:", this.tokensWasted, "$", roundWithPrecision(tokenCost * (this.tokensWasted / 1000), 3), (this.tokensWasted / this.tokensUsed).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 }),
-            "Rate:", roundWithPrecision(this.tokensUsed / (this.tokensProcessTimeMs / 1000 / 60), 2), "TPM", this.cooler.rate, "RPM"
+            "Tokens:", usedTokens, "$", usedTokensPricing,
+            "Wasted:", wastedTokens, "$", wastedTokensPricing, (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 }),
+            "Rate:", roundWithPrecision(usedTokens / (this.tokensProcessTimeMs / 1000 / 60), 2), "TPM", this.cooler.rate, "RPM"
         )
     }
 }

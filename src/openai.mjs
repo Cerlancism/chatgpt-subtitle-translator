@@ -8,17 +8,41 @@ import { CooldownContext } from './cooldown.mjs';
 import { retryWrapper, sleep } from './helpers.mjs';
 import gp3Encoder from "gpt-3-encoder";
 
-export const PrmoptTokenCostPer1k = {
-    "gpt-3.5-turbo": 0.002,
-    'gpt-4': 0.03,
-    'gpt-4-32k': 0.06
+export const ModelPricing = {
+    "gpt-3.5-turbo": { prompt: 0.002, completion: 0.002 },
+    "gpt-3.5-turbo-1106": { prompt: 0.001, completion: 0.002 },
+    "gpt-4": { prompt: 0.03, completion: 0.06 },
+    "gpt-4-32k": { prompt: 0.06, completion: 0.12 },
+    "gpt-4-1106-preview": { prompt: 0.01, completion: 0.03 },
 }
 
-// export const CompletionTokenCostPer1k = {
-//     "gpt-3.5-turbo": 0.002,
-//     'gpt-4': 0.06,
-//     'gpt-4-32k': 0.12
-// }
+export const ModelPricingAlias = {
+    "gpt-3.5-turbo-0301": "gpt-3.5-turbo",
+    "gpt-3.5-turbo-0613": "gpt-3.5-turbo",
+    "gpt-3.5-turbo-16k": "gpt-3.5-turbo-1106",
+    "gpt-3.5-turbo-16k-0613": "gpt-3.5-turbo-1106",
+    "gpt-4-0613": "gpt-4"
+}
+
+/**
+ * 
+ * @param {string} model 
+ * @returns {{prompt: number, completion: number}}
+ */
+export function getPricingModel(model)
+{
+    let modelPricing = ModelPricing[model]
+
+    if (!modelPricing)
+    {
+        let aliasModel = ModelPricingAlias[model]
+        if (aliasModel)
+        {
+            modelPricing = ModelPricing[aliasModel]
+        }
+    }
+    return modelPricing
+}
 
 export const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
