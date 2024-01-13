@@ -1,6 +1,6 @@
 //@ts-check
 import { openai, coolerAPI, openaiRetryWrapper, completeChatStream, numTokensFromMessages, getPricingModel } from './openai.mjs';
-import { checkModeration, getModeratorDescription, getModeratorResults } from './moderator.mjs';
+import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
 
@@ -364,25 +364,54 @@ export class Translator
         ])
     }
 
-    async printUsage()
+    get usage()
     {
         if (!this.pricingModel)
         {
-            console.warn("[Translator]", `Cost computation not supported yet for ${this.options.createChatCompletionRequest.model}`)
+            return null
         }
-        await sleep(10)
 
         const usedTokens = this.promptTokensUsed + this.completionTokensUsed
         const wastedTokens = this.promptTokensWasted + this.completionTokensWasted
-
         const usedTokensPricing = roundWithPrecision(this.pricingModel.prompt * (this.promptTokensUsed / 1000) + this.pricingModel.completion * (this.completionTokensUsed / 1000), 3)
         const wastedTokensPricing = roundWithPrecision(this.pricingModel.prompt * (this.promptTokensWasted / 1000) + this.pricingModel.completion * (this.completionTokensWasted / 1000), 3)
+        const rate = roundWithPrecision(usedTokens / (this.tokensProcessTimeMs / 1000 / 60), 2)
+        const wastedPercent = (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 })
+        return {
+            usedTokens,
+            wastedTokens,
+            usedTokensPricing,
+            wastedTokensPricing,
+            wastedPercent,
+            rate,
+        }
+    }
+
+    async printUsage()
+    {
+        const usage = this.usage
+        if (!usage)
+        {
+            console.warn("[Translator]", `Cost computation not supported yet for ${this.options.createChatCompletionRequest.model}`)
+            return
+        }
+
+        await sleep(10)
+
+        const {
+            usedTokens,
+            wastedTokens,
+            usedTokensPricing,
+            wastedTokensPricing,
+            wastedPercent,
+            rate,
+        } = usage
 
         console.error(
             `[Translator] Estimated Usage -`,
             "Tokens:", usedTokens, "$", usedTokensPricing,
-            "Wasted:", wastedTokens, "$", wastedTokensPricing, (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 }),
-            "Rate:", roundWithPrecision(usedTokens / (this.tokensProcessTimeMs / 1000 / 60), 2), "TPM", this.cooler.rate, "RPM"
+            "Wasted:", wastedTokens, "$", wastedTokensPricing, wastedPercent,
+            "Rate:", rate, "TPM", this.cooler.rate, "RPM"
         )
     }
 }
