@@ -5,6 +5,7 @@
         "moduleResolution": "NodeNext",
         "lib": [
             "ESNext"
-        ]
+        ],
+        "checkJs": true
     }
 }

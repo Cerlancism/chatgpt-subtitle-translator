@@ -17,7 +17,7 @@ export class CooldownContext
         this.duration = duration
         this.description = description
 
-        this.baseDelay = 1000
+        this.baseDelay = 0
 
         this.requests = []
     }
@@ -34,7 +34,7 @@ export class CooldownContext
         this.rate = this.requests.length
 
         // Check if the number of requests made within the duration has reached the limit
-        if (this.rate >= this.limit)
+        if (this.rate >= this.limit - 1)
         {
             // The limit has been reached, so we cannot make another request yet
             const nextRequestTime = this.requests[0] + this.duration;
@@ -52,10 +52,12 @@ export class CooldownContext
 
         if (cooldown === 0)
         {
-            return
+            return false
         }
         console.error("[Cooldown]", this.description, cooldown,`ms`)
 
         await sleep(cooldown + this.baseDelay)
+
+        return true
     }
 }

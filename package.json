@@ -5,7 +5,7 @@
   "main": "src/translator.mjs",
   "type": "module",
   "scripts": {
-    "test": "node test/translator.mjs"
+    "test": "node --test"
   },
   "author": "Cerlancism",
   "license": "MIT",
