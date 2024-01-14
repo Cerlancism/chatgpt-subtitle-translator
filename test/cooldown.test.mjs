@@ -17,9 +17,10 @@ test('CooldownContext should handle bursts correctly', async () =>
 
     for (let index = 0; index < totalCount; index++)
     {
-        const cooled = await cooler.cool();
         await sleep(10); // simulate some work
         workDone++
+        
+        const cooled = await cooler.cool();
         // Check if the cooldown is respecting the burst count and wait time
         if (cooled)
         {

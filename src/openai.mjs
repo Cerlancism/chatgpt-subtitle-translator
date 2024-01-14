@@ -44,13 +44,13 @@ export function getPricingModel(model)
     return modelPricing
 }
 
-export const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    maxRetries: 3
-});
-
-export const coolerAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
-export const coolerModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
+export function createOpenAIClient(apiKey)
+{
+    return new OpenAI({
+        apiKey,
+        maxRetries: 3
+    });
+}
 
 export class ChatStreamSyntaxError extends SyntaxError
 {

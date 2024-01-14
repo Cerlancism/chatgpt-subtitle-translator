@@ -6,6 +6,12 @@ import assert from 'node:assert';
 import { parser } from '../src/subtitle.mjs';
 import { Translator } from '../src/translator.mjs';
 import { wrapQuotes } from '../src/helpers.mjs';
+import { CooldownContext } from '../src/cooldown.mjs';
+import { createOpenAIClient } from '../src/openai.mjs';
+
+const openai = createOpenAIClient(process.env.OPENAI_API_KEY)
+const coolerChatGPTAPI = new CooldownContext(2, 2000, "ChatGPTAPI")
+const coolerOpenAIModerator = new CooldownContext(2, 2000, "OpenAIModerator")
 
 test('should output subtitles', async () =>
 {
@@ -13,6 +19,13 @@ test('should output subtitles', async () =>
     const srtParsed = parser.fromSrt(fileContent).map(x => x.text);
 
     const translator = new Translator({ from: "Japanese", to: "Chinese zh-cn" }, {
+        cooler: coolerChatGPTAPI,
+        openai,
+        moderationService: {
+            cooler: coolerOpenAIModerator,
+            openai,
+        }
+    }, {
         createChatCompletionRequest: {
             temperature: 0
         },

@@ -1,7 +1,9 @@
 import test from "node:test"
 import assert from "node:assert";
 
-import { openai } from "../src/openai.mjs";
+import { createOpenAIClient } from "../src/openai.mjs";
+
+const openai = createOpenAIClient(process.env.OPENAI_API_KEY)
 
 test("should list available openai models", async () =>
 {

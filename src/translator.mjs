@@ -1,8 +1,16 @@
 //@ts-check
-import { openai, coolerAPI, openaiRetryWrapper, completeChatStream, numTokensFromMessages, getPricingModel } from './openai.mjs';
+import { openaiRetryWrapper, completeChatStream, numTokensFromMessages, getPricingModel } from './openai.mjs';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
+import { CooldownContext } from './cooldown.mjs';
+
+/**
+ * @typedef TranslationServiceContext
+ * @property {import("openai").OpenAI} openai
+ * @property {CooldownContext} [cooler]
+ * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService]
+ */
 
 /**
  * @type {TranslatorOptions}
@@ -44,20 +52,19 @@ export class Translator
 {
     /**
      * @param {{from?: string, to: string}} language
+     * @param {TranslationServiceContext} services
      * @param {Partial<TranslatorOptions>} [options]
      */
-    constructor(language, options)
+    constructor(language, services, options)
     {
         options.createChatCompletionRequest = { ...DefaultOptions.createChatCompletionRequest, ...options.createChatCompletionRequest }
 
         this.language = language
+        this.services = services
         this.options = /** @type {TranslatorOptions & {createChatCompletionRequest: {model: string}}} */ ({ ...DefaultOptions, ...options })
-
-        this.openaiClient = openai
         this.systemInstruction = `Translate ${this.language.from ? this.language.from + " " : ""}to ${this.language.to}`
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         this.promptContext = []
-        this.cooler = coolerAPI
 
         /** @type {{ source: string; transform: string; }[]} */
         this.workingProgress = []
@@ -92,12 +99,12 @@ export class Translator
         let startTime = 0, endTime = 0
         const response = await openaiRetryWrapper(async () =>
         {
-            await this.cooler.cool()
+            await this.services.cooler.cool()
             startTime = Date.now()
 
             if (!this.options.createChatCompletionRequest.stream)
             {
-                const promptResponse = await openai.chat.completions.create({
+                const promptResponse = await this.services.openai.chat.completions.create({
                     messages,
                     ...this.options.createChatCompletionRequest,
                     stream: false,
@@ -113,7 +120,7 @@ export class Translator
             }
             else
             {
-                const promptResponse = await openai.chat.completions.create({
+                const promptResponse = await this.services.openai.chat.completions.create({
                     messages,
                     ...this.options.createChatCompletionRequest,
                     stream: true
@@ -191,9 +198,15 @@ export class Translator
         {
             let batch = lines.slice(index, index + this.currentBatchSize).map((x, i) => this.preprocessLine(x, i, index))
             const input = batch.join("\n\n")
-            if (this.options.useModerator)
+
+            if (this.options.useModerator && !this.services.moderationService)
             {
-                const moderationData = await checkModeration(input)
+                console.warn("[Translator]", "Moderation service requested but not configured, no moderation applied")
+            }
+
+            if (this.options.useModerator && this.services.moderationService)
+            {
+                const moderationData = await checkModeration(input, this.services.moderationService)
                 if (moderationData.flagged)
                 {
                     if (!this.changeBatchSize('decrease')) // Already at smallest batch size
@@ -411,7 +424,7 @@ export class Translator
             `[Translator] Estimated Usage -`,
             "Tokens:", usedTokens, "$", usedTokensPricing,
             "Wasted:", wastedTokens, "$", wastedTokensPricing, wastedPercent,
-            "Rate:", rate, "TPM", this.cooler.rate, "RPM"
+            "Rate:", rate, "TPM", this.services.cooler.rate, "RPM"
         )
     }
 }

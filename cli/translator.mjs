@@ -9,7 +9,12 @@ import { parser } from "../src/subtitle.mjs";
 import { Translator, DefaultOptions } from "../src/translator.mjs"
 
 import { ProxyAgent } from 'proxy-agent';
-import { openai } from '../src/openai.mjs'
+import { createOpenAIClient } from '../src/openai.mjs'
+import { CooldownContext } from '../src/cooldown.mjs';
+
+const openai = createOpenAIClient(process.env.OPENAI_API_KEY)
+const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
+const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
 
 /**
  * @param {readonly string[]} args
@@ -85,7 +90,20 @@ export function createInstance(args)
 if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
 {
     const { opts, options } = createInstance(process.argv)
-    const translator = new Translator({ from: opts.from, to: opts.to }, options);
+
+    /**
+     * @type {import('../src/translator.mjs').TranslationServiceContext}
+     */
+    const services = {
+        openai,
+        cooler: coolerChatGPTAPI,
+        moderationService: {
+            openai,
+            cooler: coolerOpenAIModerator
+        }
+    }
+
+    const translator = new Translator({ from: opts.from, to: opts.to }, services, options);
 
     if (opts.systemInstruction)
     {
