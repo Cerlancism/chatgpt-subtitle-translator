@@ -1,6 +1,6 @@
 import { OpenAI } from "openai";
 import { retryWrapper, sleep } from './helpers.mjs';
-import gp3Encoder from "gpt-3-encoder";
+import gp3Encoder from "@nem035/gpt-3-encoder";
 
 export const ModelPricing = {
     "gpt-3.5-turbo": { prompt: 0.002, completion: 0.002 },

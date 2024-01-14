@@ -1,5 +1,3 @@
-//@ts-check
-
 import { CooldownContext } from "./cooldown.mjs"
 import { openaiRetryWrapper } from "./openai.mjs"
 

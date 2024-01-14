@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-//@ts-check
 import url from 'node:url'
 import fs from 'node:fs'
 import { Command } from "commander"

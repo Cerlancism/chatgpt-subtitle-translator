@@ -1,4 +1,3 @@
-//@ts-check
 import { openaiRetryWrapper, completeChatStream, numTokensFromMessages, getPricingModel } from './openai.mjs';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
