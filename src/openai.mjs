@@ -86,7 +86,7 @@ export async function openaiRetryWrapper(func, maxRetries, description)
             }
             else
             {
-                process.exit(1)
+                throw `[Error_${description}] ${new Date()} ${error.message}`
             }
             console.error(`[Error_${description}]`, "Retries", retryContext.currentTry, "Delay", delay)
             await sleep(delay)

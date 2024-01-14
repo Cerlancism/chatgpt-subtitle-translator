@@ -8,6 +8,8 @@ import { CooldownContext } from './cooldown.mjs';
  * @typedef TranslationServiceContext
  * @property {import("openai").OpenAI} openai
  * @property {CooldownContext} [cooler]
+ * @property {(data: string) => void} [onStreamChunk]
+ * @property {() => void} [onStreamEnd]
  * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService]
  */
 
@@ -130,7 +132,8 @@ export class Translator
                     const hasNewline = data.includes("\n")
                     if (writeQueue.length === 0 && !hasNewline)
                     {
-                        process.stdout.write(data)
+                        // process.stdout.write(data)
+                        this.services?.onStreamChunk(data)
                     }
                     else if (hasNewline)
                     {
@@ -140,13 +143,15 @@ export class Translator
                     else
                     {
                         writeQueue += data
-                        process.stdout.write(writeQueue)
+                        // process.stdout.write(writeQueue)
+                        this.services?.onStreamChunk(writeQueue)
                         writeQueue = ''
                     }
                 }, () =>
                 {
                     endTime = Date.now()
-                    process.stdout.write("\n")
+                    // process.stdout.write("\n")
+                    this.services?.onStreamEnd()
                 })
                 const prompt_tokens = numTokensFromMessages(messages)
                 const completion_tokens = numTokensFromMessages([{ content: streamOutput }])

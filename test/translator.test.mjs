@@ -22,13 +22,16 @@ test('should output subtitles', async () =>
     const translator = new Translator({ from: "Japanese", to: "Chinese zh-cn" }, {
         cooler: coolerChatGPTAPI,
         openai,
+        onStreamChunk: (data) => process.stdout.write(data),
+        onStreamEnd: () => process.stdout.write("\n"),
         moderationService: {
             cooler: coolerOpenAIModerator,
             openai,
         }
     }, {
         createChatCompletionRequest: {
-            temperature: 0
+            temperature: 0,
+            stream: true
         },
         batchSizes: [2, 3],
     });

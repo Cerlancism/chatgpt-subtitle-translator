@@ -98,6 +98,8 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
     const services = {
         openai,
         cooler: coolerChatGPTAPI,
+        onStreamChunk: (data) => process.stdout.write(data),
+        onStreamEnd: () => process.stdout.write("\n"),
         moderationService: {
             openai,
             cooler: coolerOpenAIModerator
