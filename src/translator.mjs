@@ -98,7 +98,7 @@ export class Translator
         let startTime = 0, endTime = 0
         const response = await openaiRetryWrapper(async () =>
         {
-            await this.services.cooler.cool()
+            await this.services.cooler?.cool()
             startTime = Date.now()
 
             if (!this.options.createChatCompletionRequest.stream)
