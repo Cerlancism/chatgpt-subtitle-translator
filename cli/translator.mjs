@@ -3,15 +3,17 @@
 import fs from 'node:fs'
 import path from 'node:path';
 import url from 'url'
-import { Command } from "commander"
-import { wrapQuotes } from "../src/helpers.mjs";
-import { parser } from "../src/subtitle.mjs";
-import { Translator, DefaultOptions } from "../src/translator.mjs"
 
+import { Command } from "commander"
 import { ProxyAgent } from 'proxy-agent';
+
+import { Translator, DefaultOptions } from "../src/translator.mjs"
 import { createOpenAIClient } from '../src/openai.mjs'
 import { CooldownContext } from '../src/cooldown.mjs';
+import { wrapQuotes } from "../src/helpers.mjs";
+import { parser } from "../src/subtitle.mjs";
 
+import 'dotenv/config'
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY)
 const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")

@@ -444,4 +444,4 @@ export class TranslationOutput
         this.completionTokens = completionTokens ?? 0
         this.totalTokens = totalTokens ?? (this.promptTokens + this.completionTokens)
     }
-} 
+}

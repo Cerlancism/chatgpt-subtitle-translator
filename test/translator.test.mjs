@@ -9,6 +9,7 @@ import { wrapQuotes } from '../src/helpers.mjs';
 import { CooldownContext } from '../src/cooldown.mjs';
 import { createOpenAIClient } from '../src/openai.mjs';
 
+import 'dotenv/config'
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY)
 const coolerChatGPTAPI = new CooldownContext(2, 2000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(2, 2000, "OpenAIModerator")

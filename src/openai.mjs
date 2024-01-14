@@ -1,10 +1,4 @@
-//@ts-check
-import * as dotenv from 'dotenv'
-
-dotenv.config()
-
 import { OpenAI } from "openai";
-import { CooldownContext } from './cooldown.mjs';
 import { retryWrapper, sleep } from './helpers.mjs';
 import gp3Encoder from "gpt-3-encoder";
 
