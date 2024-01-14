@@ -3,15 +3,17 @@ ChatGPT has also demonstrated its capabilities as a [robust translator](https://
 
 This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead, grouping text into batches, resulting in arbitrary length translations without excessive [token consumption](https://openai.com/pricing) while ensuring a one-to-one match between line input and output.
 
+## Web Interface: <https://cerlancism.github.io/chatgpt-subtitle-translator>
+
 ## Features
+- **New work in progress**: Web UI
 - Line-based batching: avoiding token limit per request, reducing overhead token wastage, maintaining translation context to certain extent
 - Checking with the free OpenAI Moderation tool: prevent token wastage if the model is highly likely to refuse to translate
 - Streaming process output
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview) 
 - **TODO**: Tokens per minute rate limits (TPM) 
-- Progress resumption - mitigation for frequent API gateway errors and downtimes
+- Progress resumption (CLI  Only) - mitigation for frequent API gateway errors and downtimes
 - **TODO**: Retry translation parts
-- **TODO**: Web UI
 
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
