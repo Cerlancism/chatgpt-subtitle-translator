@@ -53,7 +53,7 @@ export function TranslatorApplication() {
     const outputWorkingProgress = parser.fromSrt(srtInputText)
     const currentOutputs = []
     const openai = createOpenAIClient(APIvalue, true)
-    const translator = new Translator({ to: "English" }, {
+    const translator = new Translator({ from: fromLanguage, to: toLanguage }, {
       openai,
       onStreamChunk: (data) => {
         currentStream += data
