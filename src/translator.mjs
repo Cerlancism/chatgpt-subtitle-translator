@@ -423,7 +423,7 @@ export class Translator
             `[Translator] Estimated Usage -`,
             "Tokens:", usedTokens, "$", usedTokensPricing,
             "Wasted:", wastedTokens, "$", wastedTokensPricing, wastedPercent,
-            "Rate:", rate, "TPM", this.services.cooler.rate, "RPM"
+            "Rate:", rate, "TPM", this.services.cooler?.rate, "RPM"
         )
     }
 }
