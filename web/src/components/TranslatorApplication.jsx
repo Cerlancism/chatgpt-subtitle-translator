@@ -15,10 +15,24 @@ import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
 
-const sampleSrtParsed = parser.fromSrt(sampleSrt)
+function downloadString(text, fileType, fileName) {
+  var blob = new Blob([text], { type: fileType });
+
+  var a = document.createElement('a');
+  a.download = fileName;
+  a.href = URL.createObjectURL(blob);
+  a.dataset.downloadurl = [fileType, a.download, a.href].join(':');
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+}
 
 export function TranslatorApplication() {
-  const [inputs, setInputs] = useState(sampleSrtParsed.map(x => x.text))
+  const [srtInputText, setSrtInputText] = useState(sampleSrt)
+  const [srtOutputText, setSrtOutputText] = useState(sampleSrt)
+  const [inputs, setInputs] = useState(parser.fromSrt(sampleSrt).map(x => x.text))
   const [outputs, setOutput] = useState([])
   const [isVisible, setIsVisible] = useState(false);
   const toggleVisibility = () => setIsVisible(!isVisible);
@@ -36,7 +50,7 @@ export function TranslatorApplication() {
     e.preventDefault()
     setOutput([])
     let currentStream = ""
-    const sourceInputWorkingCopy = inputs.slice()
+    const outputWorkingProgress = parser.fromSrt(srtInputText)
     const currentOutputs = []
     const openai = createOpenAIClient(APIvalue, true)
     const translator = new Translator({ to: "English" }, {
@@ -54,16 +68,17 @@ export function TranslatorApplication() {
         temperature: 0,
         stream: true
       },
-      batchSizes: [5,10]
     })
 
     try {
       for await (const output of translator.translateLines(inputs)) {
         currentOutputs.push(output.finalTransform)
+        const srtEntry = outputWorkingProgress[output.index - 1]
+        srtEntry.text = output.finalTransform
         setOutput([...currentOutputs])
       }
-
-      console.log({sourceInputWorkingCopy})
+      console.log({ sourceInputWorkingCopy: outputWorkingProgress })
+      setSrtOutputText(parser.toSrt(outputWorkingProgress))
     } catch (error) {
       console.error(error)
       alert(error?.message ?? error)
@@ -135,6 +150,7 @@ export function TranslatorApplication() {
                 try {
                   const text = await file.text()
                   const parsed = parser.fromSrt(text)
+                  setSrtInputText(text)
                   setInputs(parsed.map(x => x.text))
                 } catch (error) {
                   alert(error.message ?? error)
@@ -144,7 +160,10 @@ export function TranslatorApplication() {
                 Start
               </Button>
 
-              <Button color="primary">
+              <Button color="primary" onClick={() => {
+                // console.log(srtOutputText)
+                downloadString(srtOutputText, "text/plain", "export.srt")
+              }}>
                 Export SRT
               </Button>
             </div>
