@@ -126,6 +126,9 @@ export class Translator
                     ...this.options.createChatCompletionRequest,
                     stream: true
                 })
+
+                this.streamController = promptResponse.controller
+
                 let writeQueue = ''
                 const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) =>
                 {
