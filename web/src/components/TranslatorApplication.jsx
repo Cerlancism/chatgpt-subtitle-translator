@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react'
-import { Accordion, AccordionItem, Button, Input, input } from "@nextui-org/react";
+import { Accordion, AccordionItem, Button, Input } from "@nextui-org/react";
 
 import { EyeSlashFilledIcon } from './EyeSlashFilledIcon';
 import { EyeFilledIcon } from './EyeFilledIcon';
@@ -12,7 +12,6 @@ import { sampleSrt } from '@/data/sample';
 import { Translator } from "chatgpt-subtitle-translator"
 import { parser } from 'chatgpt-subtitle-translator/src/subtitle.mjs';
 import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
-import { sleep } from '../../../src/helpers.mjs';
 import { downloadString } from '@/utils/download';
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
@@ -27,7 +26,7 @@ export function TranslatorApplication() {
   const [inputs, setInputs] = useState(parser.fromSrt(sampleSrt).map(x => x.text))
   const [outputs, setOutput] = useState([])
   const [streamOutput, setStreamOutput] = useState("")
-  const [translatorRunningState, setTranslatorRunningRef] = useState(false)
+  const [translatorRunningState, setTranslatorRunningState] = useState(false)
 
   /** @type {React.MutableRefObject<Translator>} */
   const translatorRef = useRef(null)
@@ -43,7 +42,7 @@ export function TranslatorApplication() {
 
   async function generate(e) {
     e.preventDefault()
-    setTranslatorRunningRef(true)
+    setTranslatorRunningState(true)
     console.log("[User Interface]", "Begin Generation")
     translatorRunningRef.current = true
     setOutput([])
@@ -87,7 +86,7 @@ export function TranslatorApplication() {
     }
     translatorRunningRef.current = false
     translatorRef.current = null
-    setTranslatorRunningRef(false)
+    setTranslatorRunningState(false)
   }
 
   async function stopGeneration() {
