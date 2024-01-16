@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Accordion, AccordionItem, Button, Input, input } from "@nextui-org/react";
 
 import { EyeSlashFilledIcon } from './EyeSlashFilledIcon';
@@ -12,34 +12,29 @@ import { sampleSrt } from '@/data/sample';
 import { Translator } from "chatgpt-subtitle-translator"
 import { parser } from 'chatgpt-subtitle-translator/src/subtitle.mjs';
 import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
+import { sleep } from '../../../src/helpers.mjs';
+import { downloadString } from '@/utils/download';
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
 
-function downloadString(text, fileType, fileName) {
-  var blob = new Blob([text], { type: fileType });
-
-  var a = document.createElement('a');
-  a.download = fileName;
-  a.href = URL.createObjectURL(blob);
-  a.dataset.downloadurl = [fileType, a.download, a.href].join(':');
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
-}
-
 export function TranslatorApplication() {
+  const [isVisible, setIsConfigurationVisible] = useState(false);
+  const [APIvalue, setAPIValue] = useState("");
+  const [fromLanguage, setFromLanguage] = useState("")
+  const [toLanguage, setToLanguage] = useState("English")
   const [srtInputText, setSrtInputText] = useState(sampleSrt)
   const [srtOutputText, setSrtOutputText] = useState(sampleSrt)
   const [inputs, setInputs] = useState(parser.fromSrt(sampleSrt).map(x => x.text))
   const [outputs, setOutput] = useState([])
-  const [isVisible, setIsVisible] = useState(false);
-  const toggleVisibility = () => setIsVisible(!isVisible);
-  const [APIvalue, setAPIValue] = useState("");
-  const [fromLanguage, setFromLanguage] = useState("")
-  const [toLanguage, setToLanguage] = useState("English")
   const [streamOutput, setStreamOutput] = useState("")
+  const [translatorRunningState, setTranslatorRunningRef] = useState(false)
+
+  /** @type {React.MutableRefObject<Translator>} */
+  const translatorRef = useRef(null)
+
+  const translatorRunningRef = useRef(false)
+
+  const toggleConfigurationVisibility = () => setIsConfigurationVisible(!isVisible);
 
   function setAPIKey(value) {
     localStorage.setItem(OPENAI_API_KEY, value)
@@ -48,12 +43,15 @@ export function TranslatorApplication() {
 
   async function generate(e) {
     e.preventDefault()
+    setTranslatorRunningRef(true)
+    console.log("[User Interface]", "Begin Generation")
+    translatorRunningRef.current = true
     setOutput([])
     let currentStream = ""
     const outputWorkingProgress = parser.fromSrt(srtInputText)
     const currentOutputs = []
     const openai = createOpenAIClient(APIvalue, true)
-    const translator = new Translator({ from: fromLanguage, to: toLanguage }, {
+    translatorRef.current = new Translator({ from: fromLanguage, to: toLanguage }, {
       openai,
       onStreamChunk: (data) => {
         currentStream += data
@@ -69,9 +67,13 @@ export function TranslatorApplication() {
         stream: true
       },
     })
-
     try {
-      for await (const output of translator.translateLines(inputs)) {
+      for await (const output of translatorRef.current.translateLines(inputs)) {
+        if (!translatorRunningRef.current) {
+          console.error("[User Interface]", "Aborted")
+          setStreamOutput("")
+          break
+        }
         currentOutputs.push(output.finalTransform)
         const srtEntry = outputWorkingProgress[output.index - 1]
         srtEntry.text = output.finalTransform
@@ -83,7 +85,17 @@ export function TranslatorApplication() {
       console.error(error)
       alert(error?.message ?? error)
     }
+    translatorRunningRef.current = false
+    translatorRef.current = null
+    setTranslatorRunningRef(false)
+  }
 
+  async function stopGeneration() {
+    console.error("[User Interface]", "Aborting")
+    if (translatorRef.current) {
+      translatorRunningRef.current = false
+      translatorRef.current.abort()
+    }
   }
 
   useEffect(() => {
@@ -92,10 +104,10 @@ export function TranslatorApplication() {
 
   return (
     <>
-      <main className='light'>
+      <div className='w-full'>
         <form onSubmit={(e) => generate(e)}>
           <div className='p-4 flex flex-wrap justify-between w-full gap-4'>
-            <Accordion className='border-1 md:w-9/12' variant="bordered" defaultExpandedKeys={["1"]}>
+            <Accordion className='border-1 md:w-9/12' variant="bordered" defaultSelectedKeys="all">
               <AccordionItem key="1" isCompact aria-label="Configuration" title="Configuration">
                 <div className='flex flex-wrap justify-between w-full gap-4 mb-2 p-4'>
                   <Input
@@ -110,7 +122,7 @@ export function TranslatorApplication() {
                     variant="flat"
                     description="API Key is stored locally in browser"
                     endContent={
-                      <button className="focus:outline-none" type="button" onClick={toggleVisibility}>
+                      <button className="focus:outline-none" type="button" onClick={toggleConfigurationVisibility}>
                         {isVisible ? (
                           <EyeSlashFilledIcon className="text-2xl text-default-400 pointer-events-none" />
                         ) : (
@@ -125,8 +137,8 @@ export function TranslatorApplication() {
                       className='w-full md:w-6/12'
                       size='sm'
                       type="text"
-                      label="From"
-                      placeholder="From Language"
+                      label="From Language"
+                      placeholder="Auto"
                       value={fromLanguage}
                       onValueChange={setFromLanguage}
                     />
@@ -134,12 +146,11 @@ export function TranslatorApplication() {
                       className='w-full md:w-6/12'
                       size='sm'
                       type="text"
-                      label="To"
+                      label="To Language"
                       value={toLanguage}
                       onValueChange={setToLanguage}
                     />
                   </div>
-
                 </div>
               </AccordionItem>
             </Accordion>
@@ -156,9 +167,17 @@ export function TranslatorApplication() {
                   alert(error.message ?? error)
                 }
               }} />
-              <Button type='submit' color="primary" isDisabled={!APIvalue}>
-                Start
-              </Button>
+              {!translatorRunningState && (
+                <Button type='submit' color="primary" isDisabled={!APIvalue || translatorRunningState}>
+                  Start
+                </Button>
+              )}
+
+              {translatorRunningState && (
+                <Button color="danger" onClick={() => stopGeneration()}>
+                  Stop
+                </Button>
+              )}
 
               <Button color="primary" onClick={() => {
                 // console.log(srtOutputText)
@@ -169,6 +188,7 @@ export function TranslatorApplication() {
             </div>
           </div>
         </form>
+
         <div className="lg:flex lg:gap-4 px-4">
           <div className="lg:w-1/2 py-4">
             <SubtitleCard text={"Input"}>
@@ -202,11 +222,10 @@ export function TranslatorApplication() {
                   {streamOutput}
                 </pre>
               </ol>
-
             </SubtitleCard>
           </div>
         </div>
-      </main>
+      </div>
     </>
   )
 }

@@ -83,6 +83,7 @@ export class Translator
         this.moderatorFlags = new Map()
 
         this.pricingModel = getPricingModel(this.options.createChatCompletionRequest.model)
+        this.aborted = false
     }
 
     /**
@@ -198,6 +199,7 @@ export class Translator
     async * translateLines(lines)
     {
         console.error("[Translator]", "System Instruction:", this.systemInstruction)
+        this.aborted = false
         this.workingLines = lines
         const theEnd = this.end ?? lines.length
 
@@ -229,6 +231,13 @@ export class Translator
             }
             this.buildContext()
             const output = await this.translatePrompt(input)
+
+            if (this.aborted)
+            {
+                console.error("[Translator]", "Aborted")
+                return
+            }
+
             const text = output.content
             let outputs = text.split("\n").filter(x => x.length > 0)
 
@@ -433,6 +442,13 @@ export class Translator
             "Wasted:", wastedTokens, "$", wastedTokensPricing, wastedPercent,
             "Rate:", rate, "TPM", this.services.cooler?.rate, "RPM"
         )
+    }
+
+    abort()
+    {
+        console.error("[Translator]", "Aborting")
+        this.streamController?.abort()
+        this.aborted = true
     }
 }
 
