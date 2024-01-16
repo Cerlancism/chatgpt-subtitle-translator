@@ -17,8 +17,8 @@ import { downloadString } from '@/utils/download';
 const OPENAI_API_KEY = "OPENAI_API_KEY"
 
 export function TranslatorApplication() {
-  const [isVisible, setIsConfigurationVisible] = useState(false);
   const [APIvalue, setAPIValue] = useState("");
+  const [isAPIInputVisible, setIsAPIInputVisible] = useState(false);
   const [fromLanguage, setFromLanguage] = useState("")
   const [toLanguage, setToLanguage] = useState("English")
   const [srtInputText, setSrtInputText] = useState(sampleSrt)
@@ -33,7 +33,7 @@ export function TranslatorApplication() {
 
   const translatorRunningRef = useRef(false)
 
-  const toggleConfigurationVisibility = () => setIsConfigurationVisible(!isVisible);
+  const toggleAPIInputVisibility = () => setIsAPIInputVisible(!isAPIInputVisible);
 
   function setAPIKey(value) {
     localStorage.setItem(OPENAI_API_KEY, value)
@@ -121,15 +121,15 @@ export function TranslatorApplication() {
                     variant="flat"
                     description="API Key is stored locally in browser"
                     endContent={
-                      <button className="focus:outline-none" type="button" onClick={toggleConfigurationVisibility}>
-                        {isVisible ? (
+                      <button className="focus:outline-none" type="button" onClick={toggleAPIInputVisibility}>
+                        {isAPIInputVisible ? (
                           <EyeSlashFilledIcon className="text-2xl text-default-400 pointer-events-none" />
                         ) : (
                           <EyeFilledIcon className="text-2xl text-default-400 pointer-events-none" />
                         )}
                       </button>
                     }
-                    type={isVisible ? "text" : "password"}
+                    type={isAPIInputVisible ? "text" : "password"}
                   />
                   <div className='flex w-full gap-4'>
                     <Input
