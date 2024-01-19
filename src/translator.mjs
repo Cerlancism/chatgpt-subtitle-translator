@@ -137,7 +137,7 @@ export class Translator
                     if (writeQueue.length === 0 && !hasNewline)
                     {
                         // process.stdout.write(data)
-                        this.services?.onStreamChunk(data)
+                        this.services.onStreamChunk?.(data)
                     }
                     else if (hasNewline)
                     {
@@ -148,14 +148,14 @@ export class Translator
                     {
                         writeQueue += data
                         // process.stdout.write(writeQueue)
-                        this.services?.onStreamChunk(writeQueue)
+                        this.services.onStreamChunk?.(writeQueue)
                         writeQueue = ''
                     }
                 }, () =>
                 {
                     endTime = Date.now()
                     // process.stdout.write("\n")
-                    this.services?.onStreamEnd()
+                    this.services.onStreamEnd?.()
                 })
                 const prompt_tokens = numTokensFromMessages(messages)
                 const completion_tokens = numTokensFromMessages([{ content: streamOutput }])
