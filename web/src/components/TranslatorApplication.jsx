@@ -28,6 +28,9 @@ export function TranslatorApplication() {
   const [streamOutput, setStreamOutput] = useState("")
   const [translatorRunningState, setTranslatorRunningState] = useState(false)
 
+  /** @type {React.MutableRefObject<HTMLInputElement>} */
+  const configSection = useRef()
+
   /** @type {React.MutableRefObject<Translator>} */
   const translatorRef = useRef(null)
 
@@ -106,12 +109,13 @@ export function TranslatorApplication() {
       <div className='w-full'>
         <form onSubmit={(e) => generate(e)}>
           <div className='p-4 flex flex-wrap justify-between w-full gap-4'>
-            <Accordion className='border-1 md:w-9/12' variant="bordered" defaultSelectedKeys="all">
+            <Accordion className='border-1 w-full' variant="bordered" defaultSelectedKeys="all">
               <AccordionItem key="1" isCompact aria-label="Configuration" title="Configuration">
                 <div className='flex flex-wrap justify-between w-full gap-4 mb-2 p-4'>
                   <Input
                     className="w-full"
                     size='sm'
+                    ref={configSection}
                     autoFocus={true}
                     value={APIvalue}
                     onValueChange={(value) => setAPIKey(value)}
@@ -154,8 +158,8 @@ export function TranslatorApplication() {
               </AccordionItem>
             </Accordion>
 
-            <div className='flex gap-4 mt-auto'>
-              <FileUploadButton label={"Load SRT"} onFileSelect={async (file) => {
+            <div className='w-full justify-between md:justify-center flex flex-wrap gap-1 sm:gap-4 mt-auto'>
+              <FileUploadButton label={"Import SRT"} onFileSelect={async (file) => {
                 // console.log("File", file);
                 try {
                   const text = await file.text()
@@ -189,7 +193,7 @@ export function TranslatorApplication() {
         </form>
 
         <div className="lg:flex lg:gap-4 px-4">
-          <div className="lg:w-1/2 py-4">
+          <div className="lg:w-1/2">
             <SubtitleCard text={"Input"}>
               <ol className="py-2 list-decimal">
                 {inputs.map((line, i) => {
@@ -205,7 +209,7 @@ export function TranslatorApplication() {
             </SubtitleCard>
           </div>
 
-          <div className="lg:w-1/2 py-4">
+          <div className="lg:w-1/2">
             <SubtitleCard text={"Output"}>
               <ol className="py-2 list-decimal">
                 {outputs.map((line, i) => {

@@ -7,7 +7,7 @@ export default function Home() {
     <>
       <main className='min-h-screen flex flex-col justify-between'>
         <TranslatorApplication />
-        <footer className="flex w-full mb-4">
+        <footer className="flex w-full my-4">
           <div className='mx-auto'>
             <b className='w-full'>ChatGPT Subtitle Translator</b>
             <div className='flex flex-wrap items-center justify-center'>
