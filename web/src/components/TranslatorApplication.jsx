@@ -195,7 +195,7 @@ export function TranslatorApplication() {
         <div className="lg:flex lg:gap-4 px-4">
           <div className="lg:w-1/2">
             <SubtitleCard text={"Input"}>
-              <ol className="py-2 list-decimal">
+              <ol className="py-2 list-decimal line-marker ">
                 {inputs.map((line, i) => {
                   return (
                     <li key={i} className=''>
@@ -211,7 +211,7 @@ export function TranslatorApplication() {
 
           <div className="lg:w-1/2">
             <SubtitleCard text={"Output"}>
-              <ol className="py-2 list-decimal">
+              <ol className="py-2 list-decimal line-marker ">
                 {outputs.map((line, i) => {
                   return (
                     <li key={i} className=''>
