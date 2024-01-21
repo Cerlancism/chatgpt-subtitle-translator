@@ -137,7 +137,7 @@ export function TranslatorApplication() {
           <div className='p-4 flex flex-wrap justify-between w-full gap-4'>
             <Accordion className='border-1 w-full' variant="bordered" defaultSelectedKeys="all" ref={configSection}>
               <AccordionItem key="1" isCompact aria-label="Configuration" title="Configuration">
-                <div className='flex flex-wrap justify-between w-full gap-4 mb-2 pb-2'>
+                <div className='flex flex-wrap justify-between w-full gap-4 mb-2 pb-2 px-4'>
                   <Input
                     className="w-full"
                     size='sm'
