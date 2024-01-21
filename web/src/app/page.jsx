@@ -11,7 +11,7 @@ export default function Home() {
           <div className='mx-auto'>
             <b className='w-full'>ChatGPT Subtitle Translator</b>
             <div className='flex flex-wrap items-center justify-center'>
-              <div className='w-40 sm:w-auto text-center'>
+              <div className='sm:w-auto text-center'>
                 <Link isExternal className='mr-2 text-blue-500' href="https://github.com/Cerlancism">
                   @Cerlancism
                 </Link>
