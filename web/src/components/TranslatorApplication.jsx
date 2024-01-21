@@ -1,42 +1,57 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react'
-import { Accordion, AccordionItem, Button, Input } from "@nextui-org/react";
+import { Accordion, AccordionItem, Button, Input, Card, Textarea, Slider, Switch } from "@nextui-org/react";
 
 import { EyeSlashFilledIcon } from './EyeSlashFilledIcon';
 import { EyeFilledIcon } from './EyeFilledIcon';
 
 import { FileUploadButton } from '@/components/FileUploadButton';
 import { SubtitleCard } from '@/components/SubtitleCard';
+import { downloadString } from '@/utils/download';
 import { sampleSrt } from '@/data/sample';
 
 import { Translator } from "chatgpt-subtitle-translator"
 import { parser } from 'chatgpt-subtitle-translator/src/subtitle.mjs';
 import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
-import { downloadString } from '@/utils/download';
+import { CooldownContext } from 'chatgpt-subtitle-translator/src/cooldown.mjs';
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
+const coolerChatGPTAPI = new CooldownContext(60, 60000, "ChatGPTAPI")
+const coolerOpenAIModerator = new CooldownContext(60, 60000, "OpenAIModerator")
 
 export function TranslatorApplication() {
-  const [APIvalue, setAPIValue] = useState("");
-  const [isAPIInputVisible, setIsAPIInputVisible] = useState(false);
+  // Translator Configuration
+  const [APIvalue, setAPIValue] = useState("")
   const [fromLanguage, setFromLanguage] = useState("")
   const [toLanguage, setToLanguage] = useState("English")
+  const [systemInstruction, setSystemInstruction] = useState("")
+  const [model, setModel] = useState("gpt-3.5-turbo")
+  const [temperature, setTemperature] = useState(0)
+  const [useModerator, setUseModerator] = useState(true)
+  /** @type {React.MutableRefObject<HTMLInputElement>} */
+  const configSection = useRef()
+  const [isAPIInputVisible, setIsAPIInputVisible] = useState(false)
+  const toggleAPIInputVisibility = () => setIsAPIInputVisible(!isAPIInputVisible)
+
+  // Translator State
   const [srtInputText, setSrtInputText] = useState(sampleSrt)
   const [srtOutputText, setSrtOutputText] = useState(sampleSrt)
   const [inputs, setInputs] = useState(parser.fromSrt(sampleSrt).map(x => x.text))
   const [outputs, setOutput] = useState([])
   const [streamOutput, setStreamOutput] = useState("")
   const [translatorRunningState, setTranslatorRunningState] = useState(false)
-
-  /** @type {React.MutableRefObject<HTMLInputElement>} */
-  const configSection = useRef()
-
   /** @type {React.MutableRefObject<Translator>} */
   const translatorRef = useRef(null)
-
   const translatorRunningRef = useRef(false)
+  
+  // Translator Stats
+  const [usageInformation, setUsageInformation] = useState(/** @type {typeof Translator.prototype.usage}*/(null))
+  const [RPMInfomation, setRPMInformation] = useState(0)
 
-  const toggleAPIInputVisibility = () => setIsAPIInputVisible(!isAPIInputVisible);
+  // Persistent Data Restoration
+  useEffect(() => {
+    setAPIValue(localStorage.getItem(OPENAI_API_KEY) ?? "")
+  }, [])
 
   function setAPIKey(value) {
     localStorage.setItem(OPENAI_API_KEY, value)
@@ -49,12 +64,14 @@ export function TranslatorApplication() {
     console.log("[User Interface]", "Begin Generation")
     translatorRunningRef.current = true
     setOutput([])
+    setUsageInformation(null)
     let currentStream = ""
     const outputWorkingProgress = parser.fromSrt(srtInputText)
     const currentOutputs = []
     const openai = createOpenAIClient(APIvalue, true)
     translatorRef.current = new Translator({ from: fromLanguage, to: toLanguage }, {
       openai,
+      cooler: coolerChatGPTAPI,
       onStreamChunk: (data) => {
         currentStream += data
         setStreamOutput(currentStream)
@@ -62,13 +79,24 @@ export function TranslatorApplication() {
       onStreamEnd: () => {
         currentStream = ""
         setStreamOutput("")
+      },
+      moderationService: {
+        openai,
+        cooler: coolerOpenAIModerator
       }
     }, {
+      useModerator: useModerator,
       createChatCompletionRequest: {
-        temperature: 0,
+        model: model,
+        temperature: temperature,
         stream: true
       },
     })
+
+    if (systemInstruction) {
+      translatorRef.current.systemInstruction = systemInstruction
+    }
+
     try {
       for await (const output of translatorRef.current.translateLines(inputs)) {
         if (!translatorRunningRef.current) {
@@ -80,6 +108,8 @@ export function TranslatorApplication() {
         const srtEntry = outputWorkingProgress[output.index - 1]
         srtEntry.text = output.finalTransform
         setOutput([...currentOutputs])
+        setUsageInformation(translatorRef.current.usage)
+        setRPMInformation(translatorRef.current.services.cooler?.rate)
       }
       console.log({ sourceInputWorkingCopy: outputWorkingProgress })
       setSrtOutputText(parser.toSrt(outputWorkingProgress))
@@ -100,22 +130,17 @@ export function TranslatorApplication() {
     }
   }
 
-  useEffect(() => {
-    setAPIValue(localStorage.getItem(OPENAI_API_KEY) ?? "")
-  }, [])
-
   return (
     <>
       <div className='w-full'>
         <form onSubmit={(e) => generate(e)}>
           <div className='p-4 flex flex-wrap justify-between w-full gap-4'>
-            <Accordion className='border-1 w-full' variant="bordered" defaultSelectedKeys="all">
+            <Accordion className='border-1 w-full' variant="bordered" defaultSelectedKeys="all" ref={configSection}>
               <AccordionItem key="1" isCompact aria-label="Configuration" title="Configuration">
-                <div className='flex flex-wrap justify-between w-full gap-4 mb-2 p-4'>
+                <div className='flex flex-wrap justify-between w-full gap-4 mb-2 pb-2'>
                   <Input
                     className="w-full"
                     size='sm'
-                    ref={configSection}
                     autoFocus={true}
                     value={APIvalue}
                     onValueChange={(value) => setAPIKey(value)}
@@ -142,6 +167,7 @@ export function TranslatorApplication() {
                       type="text"
                       label="From Language"
                       placeholder="Auto"
+                      autoComplete='on'
                       value={fromLanguage}
                       onValueChange={setFromLanguage}
                     />
@@ -150,9 +176,54 @@ export function TranslatorApplication() {
                       size='sm'
                       type="text"
                       label="To Language"
+                      autoComplete='on'
                       value={toLanguage}
                       onValueChange={setToLanguage}
                     />
+                  </div>
+
+                  <div className='w-full'>
+                    <Textarea
+                      label="System Instruction"
+                      minRows={2}
+                      description={"Override preset system instruction"}
+                      placeholder={`Translate ${fromLanguage ? fromLanguage + " " : ""}to ${toLanguage}`}
+                      value={systemInstruction}
+                      onValueChange={setSystemInstruction}
+                    />
+                  </div>
+
+                  <div className='flex flex-wrap w-full gap-4'>
+                    <Input
+                      className='w-full md:w-4/12'
+                      size='sm'
+                      type="text"
+                      label="Model"
+                      autoComplete='on'
+                      value={model}
+                      onValueChange={setModel}
+                    />
+
+                    <Slider
+                      className='w-full md:w-4/12'
+                      label="Temperature"
+                      size="md"
+                      hideThumb={true}
+                      step={0.1}
+                      maxValue={2}
+                      minValue={0}
+                      value={temperature}
+                      onChange={(e) => setTemperature(Number(e))}
+                    />
+
+                    <Switch
+                      className='w-full md:w-4/12'
+                      size='sm'
+                      isSelected={useModerator}
+                      onValueChange={setUseModerator}
+                    >
+                      Use Moderator
+                    </Switch>
                   </div>
                 </div>
               </AccordionItem>
@@ -194,7 +265,7 @@ export function TranslatorApplication() {
 
         <div className="lg:flex lg:gap-4 px-4">
           <div className="lg:w-1/2">
-            <SubtitleCard text={"Input"}>
+            <SubtitleCard label={"Input"}>
               <ol className="py-2 list-decimal line-marker ">
                 {inputs.map((line, i) => {
                   return (
@@ -210,7 +281,7 @@ export function TranslatorApplication() {
           </div>
 
           <div className="lg:w-1/2">
-            <SubtitleCard text={"Output"}>
+            <SubtitleCard label={"Output"}>
               <ol className="py-2 list-decimal line-marker ">
                 {outputs.map((line, i) => {
                   return (
@@ -226,6 +297,18 @@ export function TranslatorApplication() {
                 </pre>
               </ol>
             </SubtitleCard>
+
+            {usageInformation && (
+              <Card shadow="sm" className='mt-4 p-4'>
+                <span><b>Estimated Usage</b></span>
+                <span>Tokens: {usageInformation?.usedTokens} ${usageInformation?.usedTokensPricing}</span>
+                {usageInformation?.wastedTokens > 0 && (
+                  <span className={'text-danger'}>Wasted: {usageInformation?.wastedTokens} ${usageInformation?.wastedTokensPricing} {usageInformation?.wastedPercent}</span>
+                )}
+                <span>{usageInformation?.rate} TPM {RPMInfomation} RPM</span>
+              </Card>
+            )}
+            
           </div>
         </div>
       </div>
