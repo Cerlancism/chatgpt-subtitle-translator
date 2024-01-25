@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react'
-import { Accordion, AccordionItem, Button, Input, Card, Textarea, Slider, Switch } from "@nextui-org/react";
+import { Accordion, AccordionItem, Button, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider } from "@nextui-org/react";
 
 import { EyeSlashFilledIcon } from './EyeSlashFilledIcon';
 import { EyeFilledIcon } from './EyeFilledIcon';
@@ -43,7 +43,7 @@ export function TranslatorApplication() {
   /** @type {React.MutableRefObject<Translator>} */
   const translatorRef = useRef(null)
   const translatorRunningRef = useRef(false)
-  
+
   // Translator Stats
   const [usageInformation, setUsageInformation] = useState(/** @type {typeof Translator.prototype.usage}*/(null))
   const [RPMInfomation, setRPMInformation] = useState(0)
@@ -133,15 +133,20 @@ export function TranslatorApplication() {
   return (
     <>
       <div className='w-full'>
-        <form onSubmit={(e) => generate(e)}>
-          <div className='p-4 flex flex-wrap justify-between w-full gap-4'>
-            <Accordion className='border-1 w-full' variant="bordered" defaultSelectedKeys="all" ref={configSection}>
-              <AccordionItem key="1" isCompact aria-label="Configuration" title="Configuration">
-                <div className='flex flex-wrap justify-between w-full gap-4 mb-2 pb-2 px-4'>
+        <form id="translator-config-form" onSubmit={(e) => generate(e)}>
+          <div className='px-4 pt-4 flex flex-wrap justify-between w-full gap-4'>
+            <Card className="z-10 w-full shadow-md border" shadow="none">
+              <CardHeader className="flex gap-3 pb-0">
+                <div className="flex flex-col">
+                  <p className="text-md">Configuration</p>
+                </div>
+              </CardHeader>
+              <CardBody>
+                <div className='flex flex-wrap justify-between w-full gap-4'>
                   <Input
                     className="w-full"
                     size='sm'
-                    autoFocus={true}
+                    // autoFocus={true}
                     value={APIvalue}
                     onValueChange={(value) => setAPIKey(value)}
                     isRequired
@@ -226,44 +231,45 @@ export function TranslatorApplication() {
                     </Switch>
                   </div>
                 </div>
-              </AccordionItem>
-            </Accordion>
-
-            <div className='w-full justify-between md:justify-center flex flex-wrap gap-1 sm:gap-4 mt-auto'>
-              <FileUploadButton label={"Import SRT"} onFileSelect={async (file) => {
-                // console.log("File", file);
-                try {
-                  const text = await file.text()
-                  const parsed = parser.fromSrt(text)
-                  setSrtInputText(text)
-                  setInputs(parsed.map(x => x.text))
-                } catch (error) {
-                  alert(error.message ?? error)
-                }
-              }} />
-              {!translatorRunningState && (
-                <Button type='submit' color="primary" isDisabled={!APIvalue || translatorRunningState}>
-                  Start
-                </Button>
-              )}
-
-              {translatorRunningState && (
-                <Button color="danger" onClick={() => stopGeneration()}>
-                  Stop
-                </Button>
-              )}
-
-              <Button color="primary" onClick={() => {
-                // console.log(srtOutputText)
-                downloadString(srtOutputText, "text/plain", "export.srt")
-              }}>
-                Export SRT
-              </Button>
-            </div>
+              </CardBody>
+            </Card>
           </div>
         </form>
 
-        <div className="lg:flex lg:gap-4 px-4">
+        <div className='w-full justify-between md:justify-center flex flex-wrap gap-1 sm:gap-4 mt-auto sticky top-0 backdrop-blur px-4 pt-4'>
+          <FileUploadButton label={"Import SRT"} onFileSelect={async (file) => {
+            // console.log("File", file);
+            try {
+              const text = await file.text()
+              const parsed = parser.fromSrt(text)
+              setSrtInputText(text)
+              setInputs(parsed.map(x => x.text))
+            } catch (error) {
+              alert(error.message ?? error)
+            }
+          }} />
+          {!translatorRunningState && (
+            <Button type='submit' form="translator-config-form" color="primary" isDisabled={!APIvalue || translatorRunningState}>
+              Start
+            </Button>
+          )}
+
+          {translatorRunningState && (
+            <Button color="danger" onClick={() => stopGeneration()} isLoading={!streamOutput}>
+              Stop
+            </Button>
+          )}
+
+          <Button color="primary" onClick={() => {
+            // console.log(srtOutputText)
+            downloadString(srtOutputText, "text/plain", "export.srt")
+          }}>
+            Export SRT
+          </Button>
+          <Divider/>
+        </div>
+
+        <div className="lg:flex lg:gap-4 px-4 mt-4">
           <div className="lg:w-1/2">
             <SubtitleCard label={"Input"}>
               <ol className="py-2 list-decimal line-marker ">
@@ -308,7 +314,7 @@ export function TranslatorApplication() {
                 <span>{usageInformation?.rate} TPM {RPMInfomation} RPM</span>
               </Card>
             )}
-            
+
           </div>
         </div>
       </div>
