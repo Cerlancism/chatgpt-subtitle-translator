@@ -266,7 +266,7 @@ export function TranslatorApplication() {
           }}>
             Export SRT
           </Button>
-          <Divider/>
+          <Divider className='mt-3 sm:mt-0'/>
         </div>
 
         <div className="lg:flex lg:gap-4 px-4 mt-4">
