@@ -103,7 +103,7 @@ export async function openaiRetryWrapper(func, maxRetries, description)
     }, async (retryContext) =>
     {
         console.error(`[Error_${description}] [openaiRetryWrapper] Max Retries Reached`, new Date(), retryContext)
-        throw `[Error_${description}] [openaiRetryWrapper] ${retryContext}`
+        throw `[Error_${description}] [openaiRetryWrapper] ${JSON.stringify(retryContext, undefined, 2)}`
     })
 }
 
