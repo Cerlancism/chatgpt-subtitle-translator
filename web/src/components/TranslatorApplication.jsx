@@ -16,6 +16,7 @@ import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
 import { CooldownContext } from 'chatgpt-subtitle-translator/src/cooldown.mjs';
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
+const RATE_LIMIT = "RATE_LIMIT"
 
 export function TranslatorApplication() {
   // Translator Configuration
@@ -50,11 +51,17 @@ export function TranslatorApplication() {
   // Persistent Data Restoration
   useEffect(() => {
     setAPIValue(localStorage.getItem(OPENAI_API_KEY) ?? "")
+    setRateLimit(Number(localStorage.getItem(RATE_LIMIT) ?? rateLimit))
   }, [])
 
   function setAPIKey(value) {
     localStorage.setItem(OPENAI_API_KEY, value)
     setAPIValue(value)
+  }
+
+  function setRateLimitValue(value) {
+    localStorage.setItem(RATE_LIMIT, value)
+    setRateLimit(Number(value))
   }
 
   async function generate(e) {
@@ -245,7 +252,7 @@ export function TranslatorApplication() {
                         min="1"
                         label="Rate Limit"
                         value={rateLimit.toString()}
-                        onValueChange={(value) => setRateLimit(Number(value))}
+                        onValueChange={(value) => setRateLimitValue(value)}
                         autoComplete='on'
                         endContent={
                           <div className="pointer-events-none flex items-center">
