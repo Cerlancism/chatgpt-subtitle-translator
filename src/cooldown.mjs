@@ -36,7 +36,7 @@ export class CooldownContext
         if (this.rate >= this.limit - 1)
         {
             // The limit has been reached, so we cannot make another request yet
-            const nextRequestTime = this.requests[0] + this.duration;
+            const nextRequestTime = (this.requests[0] ?? now) + this.duration;
             return nextRequestTime - now;
         }
 
