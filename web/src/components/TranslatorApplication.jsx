@@ -16,8 +16,6 @@ import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
 import { CooldownContext } from 'chatgpt-subtitle-translator/src/cooldown.mjs';
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
-const coolerChatGPTAPI = new CooldownContext(60, 60000, "ChatGPTAPI")
-const coolerOpenAIModerator = new CooldownContext(60, 60000, "OpenAIModerator")
 
 export function TranslatorApplication() {
   // Translator Configuration
@@ -28,6 +26,7 @@ export function TranslatorApplication() {
   const [model, setModel] = useState("gpt-3.5-turbo")
   const [temperature, setTemperature] = useState(0)
   const [useModerator, setUseModerator] = useState(true)
+  const [rateLimit, setRateLimit] = useState(60)
   /** @type {React.MutableRefObject<HTMLInputElement>} */
   const configSection = useRef()
   const [isAPIInputVisible, setIsAPIInputVisible] = useState(false)
@@ -69,6 +68,10 @@ export function TranslatorApplication() {
     const outputWorkingProgress = parser.fromSrt(srtInputText)
     const currentOutputs = []
     const openai = createOpenAIClient(APIvalue, true)
+
+    const coolerChatGPTAPI = new CooldownContext(rateLimit, 60000, "ChatGPTAPI")
+    const coolerOpenAIModerator = new CooldownContext(rateLimit, 60000, "OpenAIModerator")
+
     translatorRef.current = new Translator({ from: fromLanguage, to: toLanguage }, {
       openai,
       cooler: coolerChatGPTAPI,
@@ -86,6 +89,7 @@ export function TranslatorApplication() {
       }
     }, {
       useModerator: useModerator,
+      // batchSizes: [2,3],
       createChatCompletionRequest: {
         model: model,
         temperature: temperature,
@@ -198,37 +202,58 @@ export function TranslatorApplication() {
                     />
                   </div>
 
-                  <div className='flex flex-wrap w-full gap-4'>
-                    <Input
-                      className='w-full md:w-4/12'
-                      size='sm'
-                      type="text"
-                      label="Model"
-                      autoComplete='on'
-                      value={model}
-                      onValueChange={setModel}
-                    />
+                  <div className='flex flex-wrap md:flex-nowrap w-full gap-4'>
+                    <div className='w-full md:w-4/12'>
+                      <Input
+                        size='sm'
+                        type="text"
+                        label="Model"
+                        autoComplete='on'
+                        value={model}
+                        onValueChange={setModel}
+                      />
+                    </div>
 
-                    <Slider
-                      className='w-full md:w-4/12'
-                      label="Temperature"
-                      size="md"
-                      hideThumb={true}
-                      step={0.1}
-                      maxValue={2}
-                      minValue={0}
-                      value={temperature}
-                      onChange={(e) => setTemperature(Number(e))}
-                    />
+                    <div className='w-full md:w-3/12'>
+                      <Slider
+                        label="Temperature"
+                        size="md"
+                        hideThumb={true}
+                        step={0.1}
+                        maxValue={2}
+                        minValue={0}
+                        value={temperature}
+                        onChange={(e) => setTemperature(Number(e))}
+                      />
+                    </div>
 
-                    <Switch
-                      className='w-full md:w-4/12'
-                      size='sm'
-                      isSelected={useModerator}
-                      onValueChange={setUseModerator}
-                    >
-                      Use Moderator
-                    </Switch>
+                    <div className='w-full md:w-5/12 gap-4 flex flex-wrap md:flex-nowrap'>
+                      <div className='w-full md:w-6/12 flex'>
+                        <Switch
+                          size='sm'
+                          isSelected={useModerator}
+                          onValueChange={setUseModerator}
+                        >
+                          Use Moderator
+                        </Switch>
+                      </div>
+
+                      <Input
+                        className='w-full md:w-6/12'
+                        size='sm'
+                        type="number"
+                        min="1"
+                        label="Rate Limit"
+                        value={rateLimit.toString()}
+                        onValueChange={(value) => setRateLimit(Number(value))}
+                        autoComplete='on'
+                        endContent={
+                          <div className="pointer-events-none flex items-center">
+                            <span className="text-default-400 text-small">RPM</span>
+                          </div>
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </CardBody>
@@ -266,7 +291,7 @@ export function TranslatorApplication() {
           }}>
             Export SRT
           </Button>
-          <Divider className='mt-3 sm:mt-0'/>
+          <Divider className='mt-3 sm:mt-0' />
         </div>
 
         <div className="lg:flex lg:gap-4 px-4 mt-4">
