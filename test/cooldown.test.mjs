@@ -7,8 +7,9 @@ function testCooldown(burstCount, totalCount, waitTime)
 {
     test(`CooldownContext should handle ${burstCount} bursts correctly`, async () =>
     {
-        const description = "tester";
+        const description = `tester ${burstCount}/${totalCount} ${waitTime}ms`;
         const cooler = new CooldownContext(burstCount, waitTime, description);
+        cooler.baseDelay = 15
 
         let lastTime = Date.now();
 
@@ -36,6 +37,11 @@ function testCooldown(burstCount, totalCount, waitTime)
     });
 }
 
-testCooldown(1, 5, 50)
-testCooldown(10, 30, 250)
+while (true) {
+    testCooldown(1, 5, 33)
+    testCooldown(2, 5, 50)
+    testCooldown(10, 30, 250)
+    break
+    // await sleep(100)
+}
 

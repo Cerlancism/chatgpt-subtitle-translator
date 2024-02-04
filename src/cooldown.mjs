@@ -16,7 +16,7 @@ export class CooldownContext
         this.duration = duration
         this.description = description
 
-        this.baseDelay = 1
+        this.baseDelay = 1000
 
         this.requests = []
     }
