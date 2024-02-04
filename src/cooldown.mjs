@@ -16,7 +16,7 @@ export class CooldownContext
         this.duration = duration
         this.description = description
 
-        this.baseDelay = 0
+        this.baseDelay = 1
 
         this.requests = []
     }
@@ -28,6 +28,7 @@ export class CooldownContext
     cooldown()
     {
         // Remove any requests from the requests array that are older than the duration
+        // console.log("[CooldownContext]", this.description, this.requests.length)
         const now = Date.now();
         this.requests = this.requests.filter(time => now - time < this.duration);
         this.rate = this.requests.length
@@ -36,12 +37,11 @@ export class CooldownContext
         if (this.rate >= this.limit)
         {
             // The limit has been reached, so we cannot make another request yet
-            const nextRequestTime = this.requests[0]+ this.duration;
+            const nextRequestTime = this.requests[0] + this.duration;
             return nextRequestTime - now;
         }
 
         // The limit has not been reached, so we can make another request
-        this.requests.push(now);
         return 0;
     }
 
@@ -51,12 +51,13 @@ export class CooldownContext
 
         if (cooldown === 0)
         {
+            this.requests.push(Date.now());
             return false
         }
-        console.error("[Cooldown]", this.description, cooldown,`ms`)
+        console.error("[Cooldown]", this.description, cooldown, `ms`)
 
         await sleep(cooldown + this.baseDelay)
-
+        this.requests.push(Date.now());
         return true
     }
 }
