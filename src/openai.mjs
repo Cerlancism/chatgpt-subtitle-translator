@@ -41,11 +41,13 @@ export function getPricingModel(model)
 /**
  * @param {string} apiKey
  * @param {boolean} [dangerouslyAllowBrowser]
+ * @param {string} [baseURL]
  */
-export function createOpenAIClient(apiKey, dangerouslyAllowBrowser = undefined)
+export function createOpenAIClient(apiKey, dangerouslyAllowBrowser = undefined, baseURL = undefined)
 {
     return new OpenAI({
         apiKey,
+        baseURL,
         dangerouslyAllowBrowser: dangerouslyAllowBrowser,
         maxRetries: 3
     });
