@@ -16,11 +16,13 @@ import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
 import { CooldownContext } from 'chatgpt-subtitle-translator/src/cooldown.mjs';
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
+const OPENAI_BASE_URL = "OPENAI_BASE_URL"
 const RATE_LIMIT = "RATE_LIMIT"
 
 export function TranslatorApplication() {
   // Translator Configuration
   const [APIvalue, setAPIValue] = useState("")
+  const [baseUrlValue, setBaseUrlValue] = useState(undefined)
   const [fromLanguage, setFromLanguage] = useState("")
   const [toLanguage, setToLanguage] = useState("English")
   const [systemInstruction, setSystemInstruction] = useState("")
@@ -52,11 +54,23 @@ export function TranslatorApplication() {
   useEffect(() => {
     setAPIValue(localStorage.getItem(OPENAI_API_KEY) ?? "")
     setRateLimit(Number(localStorage.getItem(RATE_LIMIT) ?? rateLimit))
+    setBaseUrlValue(localStorage.getItem(OPENAI_BASE_URL) ?? undefined)
   }, [])
 
   function setAPIKey(value) {
     localStorage.setItem(OPENAI_API_KEY, value)
     setAPIValue(value)
+  }
+
+  function setBaseUrl(value) {
+    if (!value) {
+      value = undefined
+      localStorage.removeItem(OPENAI_BASE_URL)
+    }
+    if (value) {
+      localStorage.setItem(OPENAI_BASE_URL, value)
+    }
+    setBaseUrlValue(value)
   }
 
   function setRateLimitValue(value) {
@@ -74,7 +88,8 @@ export function TranslatorApplication() {
     let currentStream = ""
     const outputWorkingProgress = parser.fromSrt(srtInputText)
     const currentOutputs = []
-    const openai = createOpenAIClient(APIvalue, true)
+    console.log("OPENAI_BASE_URL", baseUrlValue)
+    const openai = createOpenAIClient(APIvalue, true, baseUrlValue)
 
     const coolerChatGPTAPI = new CooldownContext(rateLimit, 60000, "ChatGPTAPI")
     const coolerOpenAIModerator = new CooldownContext(rateLimit, 60000, "OpenAIModerator")
@@ -154,28 +169,41 @@ export function TranslatorApplication() {
               </CardHeader>
               <CardBody>
                 <div className='flex flex-wrap justify-between w-full gap-4'>
-                  <Input
-                    className="w-full"
-                    size='sm'
-                    // autoFocus={true}
-                    value={APIvalue}
-                    onValueChange={(value) => setAPIKey(value)}
-                    isRequired
-                    autoComplete='off'
-                    label="OpenAI API Key"
-                    variant="flat"
-                    description="API Key is stored locally in browser"
-                    endContent={
-                      <button className="focus:outline-none" type="button" onClick={toggleAPIInputVisibility}>
-                        {isAPIInputVisible ? (
-                          <EyeSlashFilledIcon className="text-2xl text-default-400 pointer-events-none" />
-                        ) : (
-                          <EyeFilledIcon className="text-2xl text-default-400 pointer-events-none" />
-                        )}
-                      </button>
-                    }
-                    type={isAPIInputVisible ? "text" : "password"}
-                  />
+                  <div className='flex flex-wrap md:flex-nowrap w-full gap-4'>
+                    <Input
+                      className="w-full md:w-6/12"
+                      size='sm'
+                      // autoFocus={true}
+                      value={APIvalue}
+                      onValueChange={(value) => setAPIKey(value)}
+                      isRequired
+                      autoComplete='off'
+                      label="OpenAI API Key"
+                      variant="flat"
+                      description="API Key is stored locally in browser"
+                      endContent={
+                        <button className="focus:outline-none" type="button" onClick={toggleAPIInputVisibility}>
+                          {isAPIInputVisible ? (
+                            <EyeSlashFilledIcon className="text-2xl text-default-400 pointer-events-none" />
+                          ) : (
+                            <EyeFilledIcon className="text-2xl text-default-400 pointer-events-none" />
+                          )}
+                        </button>
+                      }
+                      type={isAPIInputVisible ? "text" : "password"}
+                    />
+                    <Input
+                      className='w-full md:w-6/12'
+                      size='sm'
+                      type="text"
+                      label="OpenAI Base Url"
+                      placeholder="Default"
+                      autoComplete='on'
+                      value={baseUrlValue ?? ""}
+                      onValueChange={setBaseUrl}
+                    />
+                  </div>
+
                   <div className='flex w-full gap-4'>
                     <Input
                       className='w-full md:w-6/12'
