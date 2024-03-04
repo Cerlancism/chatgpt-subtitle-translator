@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@nextui-org/react": "^2.2.9",
-    "chatgpt-subtitle-translator": "github:Cerlancism/chatgpt-subtitle-translator#0c7e7c61d419baaccc64ad6599f2b88952c22046",
+    "chatgpt-subtitle-translator": "github:Cerlancism/chatgpt-subtitle-translator#b9501947a5f05e1b862389f8434f06f37f864f42",
     "next": "14.0.4",
     "react": "^18",
     "react-dom": "^18"
