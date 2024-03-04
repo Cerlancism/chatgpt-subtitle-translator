@@ -47,9 +47,9 @@ cli/translator.mjs --help
 
 
 Options:
-  - `-f, --from <language>`  
+  - `--from <language>`  
     Source language (default: "") 
-  - `-t, --to <language>`  
+  - `--to <language>`  
     Target language (default: "English")
   - `-f, --file <file>`  
     Input source text with the content of this file, in `.srt` format or plain text
