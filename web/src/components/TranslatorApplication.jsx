@@ -197,7 +197,7 @@ export function TranslatorApplication() {
                       size='sm'
                       type="text"
                       label="OpenAI Base Url"
-                      placeholder="Default"
+                      placeholder="https://api.openai.com/v1"
                       autoComplete='on'
                       value={baseUrlValue ?? ""}
                       onValueChange={setBaseUrl}
