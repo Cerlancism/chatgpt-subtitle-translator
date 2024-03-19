@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'] })
  */
 export const metadata = {
   title: 'ChatGPT Subtitle Translator',
-  description: 'Web Interface to translate SRT subtitles using OpenAI ChatGPT API',
+  description: 'Web graphical user interface to translate SRT subtitles using OpenAI ChatGPT API',
 }
 
 export default function RootLayout({ children }) {
