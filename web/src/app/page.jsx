@@ -9,7 +9,7 @@ export default function Home() {
         <TranslatorApplication />
         <footer className="flex w-full my-4">
           <div className='mx-auto'>
-            <b className='w-full'>ChatGPT Subtitle Translator</b>
+            <h1 className='text-center'><b className='w-full'>ChatGPT Subtitle Translator Web Interface</b></h1>
             <div className='flex flex-wrap items-center justify-center'>
               <div className='sm:w-auto text-center'>
                 <Link isExternal className='mr-2 text-blue-500' href="https://github.com/Cerlancism">
