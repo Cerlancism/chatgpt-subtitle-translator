@@ -37,7 +37,9 @@ export function createInstance(args)
         .option("--to <language>", "Target language", "English")
         .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model", DefaultOptions.createChatCompletionRequest.model)
 
-        .option("-f, --file <file>", "Text file name to use as input, .srt or plain text")
+        .option("-i, --input <file>, -f, --file <file>", "Text file name to use as input, .srt or plain text")
+        .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
+        .option("-f, --file <file>", "Alias for -i, --input")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
 
@@ -85,6 +87,11 @@ export function createInstance(args)
         ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
     };
 
+    if (opts.file && !opts.input)
+    {
+        opts.input = opts.file
+    }
+
     return { opts, options }
 }
 
@@ -117,20 +124,20 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
     {
         await translatePlainText(translator, opts.plainText)
     }
-    else if (opts.file)
+    else if (opts.input)
     {
-        if (opts.file.endsWith(".srt"))
+        if (opts.input.endsWith(".srt"))
         {
-            console.error("[CLI]", "Assume SRT file", opts.file)
-            const text = fs.readFileSync(opts.file, 'utf-8')
+            console.error("[CLI]", "Assume SRT file", opts.input)
+            const text = fs.readFileSync(opts.input, 'utf-8')
             const srtArraySource = parser.fromSrt(text)
             const srtArrayWorking = parser.fromSrt(text)
 
             const sourceLines = srtArraySource.map(x => x.text)
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
 
-            const progressFile = `${opts.file}.progress_${fileTag}.csv`
-            const outputFile = `${opts.file}.out_${fileTag}.srt`
+            const progressFile = `${opts.input}.progress_${fileTag}.csv`
+            const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}.srt`
 
             if (await checkFileExists(progressFile))
             {
@@ -190,11 +197,11 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
         }
         else
         {
-            console.error("[CLI]", "Assume plain text file", opts.file)
+            console.error("[CLI]", "Assume plain text file", opts.input)
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
-            const ext = path.extname(opts.file)
-            const outputFile = `${opts.file}.out_${fileTag}${ext}`
-            const text = fs.readFileSync(opts.file, 'utf-8')
+            const ext = path.extname(opts.input)
+            const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}${ext}`
+            const text = fs.readFileSync(opts.input, 'utf-8')
             fs.writeFileSync(outputFile, '')
             await translatePlainText(translator, text, outputFile)
         }

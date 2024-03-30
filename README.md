@@ -51,8 +51,10 @@ Options:
     Source language (default: "") 
   - `--to <language>`  
     Target language (default: "English")
-  - `-f, --file <file>`  
+  - `-i, --input <file>`  
     Input source text with the content of this file, in `.srt` format or plain text
+  - `-o, --output <file>`  
+    Output file name, defaults to be based on input file name
   - `-p, --plain-text <text>`  
     Input source text with this plain text argument
   - `-s, --system-instruction <instruction>`  
