@@ -37,9 +37,9 @@ export function createInstance(args)
         .option("--to <language>", "Target language", "English")
         .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model", DefaultOptions.createChatCompletionRequest.model)
 
-        .option("-i, --input <file>, -f, --file <file>", "Text file name to use as input, .srt or plain text")
+        .option("-i, --input <file>", "Text file name to use as input, .srt or plain text")
         .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
-        .option("-f, --file <file>", "Alias for -i, --input")
+        .option("-f, --file <file>", "Deprecated: alias for -i, --input")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
 
@@ -89,6 +89,7 @@ export function createInstance(args)
 
     if (opts.file && !opts.input)
     {
+        console.warn("[CLI]", "[WARNING]", "-f, --file is deprecated, use -i, --input")
         opts.input = opts.file
     }
 

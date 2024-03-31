@@ -135,7 +135,7 @@ Chuck Norris can walk with the animals, talk with the animals;
 
 ### Plain text file  
 ```bash
-cli/translator.mjs --stream --temperature 0 --file test/data/test_cn.txt
+cli/translator.mjs --stream --temperature 0 --input test/data/test_cn.txt
 ```  
 Input file: [test/data/test_cn.txt](test/data/test_cn.txt)
 ```
@@ -149,7 +149,7 @@ Goodbye!
 ```
 ### SRT file
 ```bash
-cli/translator.mjs --stream --temperature 0 --file test/data/test_ja_small.srt
+cli/translator.mjs --stream --temperature 0 --input test/data/test_ja_small.srt
 ```  
 Input file: [test/data/test_ja_small.srt](test/data/test_ja_small.srt)
 ```srt
