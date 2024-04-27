@@ -1,0 +1,96 @@
+1
+00:00:00,000 --> 00:00:02,000
+Good morning.
+
+2
+00:00:02,000 --> 00:00:05,000
+How are you?
+
+3
+00:00:05,000 --> 00:00:12,000
+I'm fine
+Today the weather is very nice.
+
+4
+00:00:12,000 --> 00:00:16,000
+Yes, the weather is very nice.
+
+5
+00:00:17,000 --> 00:00:21,000
+What are your plans for today?
+
+6
+00:00:21,000 --> 00:00:28,000
+Watching a movie with friends this afternoon.
+
+7
+00:00:28,000 --> 00:00:30,000
+Sounds great.
+
+8
+00:00:30,000 --> 00:00:33,000
+What movie?
+
+9
+00:00:33,000 --> 00:00:37,000
+An action movie.
+
+10
+00:00:37,000 --> 00:00:40,000
+I also like action movies.
+
+11
+00:00:40,000 --> 00:00:42,000
+I love movies.
+
+12
+00:00:42,000 --> 00:00:44,000
+It is something to look forward to.
+
+13
+00:00:45,000 --> 00:00:47,000
+But first, let's have lunch.
+
+14
+00:00:47,000 --> 00:00:49,000
+Let's have a meal.
+
+15
+00:00:49,000 --> 00:00:56,000
+Yes, that's a good idea
+What would you like to eat?
+
+16
+00:00:59,000 --> 00:01:00,000
+I feel like having sushi.
+
+17
+00:01:02,000 --> 00:01:03,000
+Okay.
+
+18
+00:01:03,000 --> 00:01:04,000
+I also like sushi.
+
+19
+00:01:06,000 --> 00:01:07,000
+Any recommended shops?
+
+20
+00:01:07,000 --> 00:01:10,000
+Yes.
+That shop is really delicious.
+
+21
+00:01:10,000 --> 00:01:12,000
+Thank you.
+Let's go there then.
+
+22
+00:01:12,000 --> 00:01:13,000
+Let's get going.
+
+23
+00:01:14,000 --> 00:01:17,000
+Let's do it!
+

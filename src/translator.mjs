@@ -296,7 +296,7 @@ export class Translator
             }
             else if (this.options.prefixNumber)
             {
-                const splits = splitStringByNumberLabel(finalTransform)
+                const splits = this.postprocessLine(finalTransform)
                 finalTransform = splits.text
                 outTransform = splits.text
                 const expectedLabel = workingIndex + 1
@@ -326,6 +326,17 @@ export class Translator
             line = `${offset + index + 1}. ${line}`
         }
         return line
+    }
+
+    /**
+     * @param {string} line
+     */
+    postprocessLine(line)
+    {
+        const splits = splitStringByNumberLabel(line)
+        splits.text = splits.text.replaceAll(" \\N ", "\n")
+        splits.text = splits.text.replaceAll("\\N", "\n")
+        return splits
     }
 
     /**
