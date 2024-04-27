@@ -54,7 +54,7 @@ export function TranslatorApplication() {
   useEffect(() => {
     setAPIValue(localStorage.getItem(OPENAI_API_KEY) ?? "")
     setRateLimit(Number(localStorage.getItem(RATE_LIMIT) ?? rateLimit))
-    setBaseUrlValue(localStorage.getItem(OPENAI_BASE_URL) ?? undefined)
+    setBaseUrlWithModerator(localStorage.getItem(OPENAI_BASE_URL) ?? undefined)
   }, [])
 
   function setAPIKey(value) {
@@ -69,6 +69,14 @@ export function TranslatorApplication() {
     }
     if (value) {
       localStorage.setItem(OPENAI_BASE_URL, value)
+    }
+    setBaseUrlWithModerator(value)
+  }
+
+  function setBaseUrlWithModerator(value)
+  {
+    if (!baseUrlValue && value && useModerator) {
+      setUseModerator(false)
     }
     setBaseUrlValue(value)
   }
@@ -269,8 +277,15 @@ export function TranslatorApplication() {
                           isSelected={useModerator}
                           onValueChange={setUseModerator}
                         >
-                          Use Moderator
                         </Switch>
+                        <div className="flex flex-col place-content-center gap-1">
+                          <p className="text-small">Use Moderator</p>
+                          {baseUrlValue && (
+                            <p className="text-tiny text-default-400">
+                              Base URL is set, disable moderator for compatibility.
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       <Input
