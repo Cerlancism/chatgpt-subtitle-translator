@@ -26,7 +26,7 @@ export function TranslatorApplication() {
   const [fromLanguage, setFromLanguage] = useState("")
   const [toLanguage, setToLanguage] = useState("English")
   const [systemInstruction, setSystemInstruction] = useState("")
-  const [model, setModel] = useState("gpt-3.5-turbo")
+  const [model, setModel] = useState("gpt-4o-mini")
   const [temperature, setTemperature] = useState(0)
   const [useModerator, setUseModerator] = useState(true)
   const [rateLimit, setRateLimit] = useState(60)
