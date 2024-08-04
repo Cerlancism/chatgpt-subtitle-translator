@@ -37,7 +37,7 @@ import { CooldownContext } from './cooldown.mjs';
  */
 export const DefaultOptions = {
     createChatCompletionRequest: {
-        model: "gpt-3.5-turbo"
+        model: "gpt-4o-mini"
     },
     initialPrompts: [],
     useModerator: true,

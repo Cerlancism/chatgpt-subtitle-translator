@@ -80,7 +80,7 @@ Options:
 
 Additional Options for ChatAPT:  
   - `-m, --model <model>`  
-    (default: `"gpt-3.5-turbo"`) https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
+    (default: `"gpt-4o-mini"`) https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
   - `--stream`  
     Stream progress output to terminal https://platform.openai.com/docs/api-reference/chat/create#chat/create-stream
   - `-t, --temperature <temperature>`  
