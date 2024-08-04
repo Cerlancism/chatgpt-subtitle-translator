@@ -296,7 +296,7 @@ export class Translator
             }
             else if (this.options.prefixNumber)
             {
-                const splits = this.postprocessLine(finalTransform)
+                const splits = this.postprocessNumberPrefixedLine(finalTransform)
                 finalTransform = splits.text
                 outTransform = splits.text
                 const expectedLabel = workingIndex + 1
@@ -306,6 +306,10 @@ export class Translator
                     this.moderatorFlags.set(workingIndex, { remarks: "Label Mismatch", outIndex: splits.number })
                     finalTransform = `[Flagged][Model] ${originalSource} -> ${finalTransform}`
                 }
+            }
+            else
+            {
+                finalTransform = this.postprocessLine(finalTransform)
             }
             this.workingProgress.push({ source: promptSource, transform: promptTransform })
             const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform, finalTransform }
@@ -331,12 +335,21 @@ export class Translator
     /**
      * @param {string} line
      */
-    postprocessLine(line)
+    postprocessNumberPrefixedLine(line)
     {
         const splits = splitStringByNumberLabel(line)
-        splits.text = splits.text.replaceAll(" \\N ", "\n")
-        splits.text = splits.text.replaceAll("\\N", "\n")
+        splits.text = this.postprocessLine(splits.text)
         return splits
+    }
+
+    /**
+     * @param {string} line
+     */
+    postprocessLine(line)
+    {
+        line = line.replaceAll(" \\N ", "\n")
+        line = line.replaceAll("\\N", "\n")
+        return line
     }
 
     /**
