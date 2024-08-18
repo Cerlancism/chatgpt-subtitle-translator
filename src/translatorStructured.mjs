@@ -54,7 +54,7 @@ export class TranslatorStructured extends Translator
     {
         if (lines.length === 1)
         {
-            return this.translateBaseFallback(lines)
+            return await this.translateBaseFallback(lines)
         }
         // const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
@@ -161,14 +161,14 @@ export class TranslatorStructured extends Translator
         } catch (error)
         {
             console.error("[TranslatorStructured]", `Error ${error?.constructor?.name}`, error?.message)
-            return this.translateBaseFallback(lines)
+            return await this.translateBaseFallback(lines)
         }
     }
 
     /**
      * @param {string[]} lines 
      */
-    translateBaseFallback(lines)
+    async translateBaseFallback(lines)
     {
         console.error("[TranslatorStructured]", "Fallback to base mode")
         const optionsRestore = {}
@@ -176,7 +176,7 @@ export class TranslatorStructured extends Translator
 
         this.options.createChatCompletionRequest.stream = this.optionsBackup.stream
         
-        const output = super.translatePrompt(lines)
+        const output = await super.translatePrompt(lines)
         
         this.options.createChatCompletionRequest.stream = optionsRestore.stream
 
