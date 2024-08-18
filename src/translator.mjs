@@ -101,6 +101,7 @@ export class Translator
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
+        const max_tokens = JSON.stringify(lines).length * 5 // Estimate
 
         /**
          * @param {string} text 
@@ -118,17 +119,18 @@ export class Translator
         }
 
         let startTime = 0, endTime = 0
+        const streamMode = this.options.createChatCompletionRequest.stream 
         const response = await openaiRetryWrapper(async () =>
         {
             await this.services.cooler?.cool()
             startTime = Date.now()
-
-            if (!this.options.createChatCompletionRequest.stream)
+            if (!streamMode)
             {
                 const promptResponse = await this.services.openai.chat.completions.create({
                     messages,
                     ...this.options.createChatCompletionRequest,
                     stream: false,
+                    max_tokens
                 })
                 endTime = Date.now()
                 const output = new TranslationOutput(
@@ -147,7 +149,8 @@ export class Translator
                     stream: true,
                     stream_options: {
                         include_usage: true
-                    }
+                    },
+                    max_tokens
                 })
 
                 this.streamController = promptResponse.controller

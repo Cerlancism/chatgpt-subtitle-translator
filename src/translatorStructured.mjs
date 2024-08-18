@@ -16,7 +16,8 @@ export class TranslatorStructured extends Translator
     constructor(language, services, options)
     {
         console.error(`[TranslatorStructured]`, "Structured Mode")
-
+        const optionsBackup = {}
+        optionsBackup.stream = options.createChatCompletionRequest?.stream
         if (options.prefixNumber)
         {
             console.warn("[TranslatorStructured]", "--no-prefix-number must be used in structured mode, overriding.")
@@ -25,11 +26,24 @@ export class TranslatorStructured extends Translator
 
         if (options.createChatCompletionRequest.stream)
         {
-            console.warn("[TranslatorStructured]", "--stream is not applicable in structured mode, disabling, expect long indications of progress.")
+            console.warn("[TranslatorStructured]", "--stream is not applicable in structured mode, disabling, expect long time waits for indications of progress. Stream mode will still be applied when falling back to base mode.")
             options.createChatCompletionRequest.stream = false
         }
 
+        if (options.batchSizes[0] === 10 && options.batchSizes[1] === 100)
+        {
+            const reducedBatchSizes = [10, 20]
+            console.warn("[TranslatorStructured]", "--batch-sizes is to be reduced to", JSON.stringify(reducedBatchSizes))
+            options.batchSizes = reducedBatchSizes
+        }
+        else if (options.batchSizes.some(x => x > 100))
+        {
+            throw new Error("[TranslatorStructured] Batch sizes should not exceed 100")
+        }
+
         super(language, services, options)
+
+        this.optionsBackup = optionsBackup
     }
 
     /**
@@ -38,12 +52,17 @@ export class TranslatorStructured extends Translator
      */
     async translatePrompt(lines)
     {
+        if (lines.length === 1)
+        {
+            return this.translateBaseFallback(lines)
+        }
         // const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         // const userMessage = { role: "user", content: `Translate from given schema` }
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext]
+        const max_tokens = JSON.stringify(lines).length * 5 // Estimate
 
         const structuredObject = {}
         for (const [key, value] of lines.entries())
@@ -53,7 +72,7 @@ export class TranslatorStructured extends Translator
                 const nestedObject = {}
                 for (const [nestedKey, nestedValue] of value.split("\\N").entries())
                 {
-                    nestedObject[nestedValue.replaceAll("\\", "")] = z.string()
+                    nestedObject[nestedValue.replaceAll("\\", "").trim()] = z.string()
                 }
                 structuredObject[NestedPlaceholder + key] = z.object({ ...nestedObject })
             }
@@ -69,44 +88,62 @@ export class TranslatorStructured extends Translator
             let startTime = 0, endTime = 0
             startTime = Date.now()
 
+            await this.services.cooler?.cool()
+
             const output = await this.services.openai.beta.chat.completions.parse({
                 messages,
                 ...this.options.createChatCompletionRequest,
                 stream: false,
                 response_format: zodResponseFormat(translationBatch, "translation_batch"),
+                max_tokens
             })
 
             // console.log("[TranslatorStructured]", output.choices[0].message.content)
 
             endTime = Date.now()
 
-            const parsed = output.choices[0].message.parsed
-            const linesOut = []
+            const translation = output.choices[0].message
 
-            let expectedIndex = 0
-            for (const [key, value] of Object.entries(parsed))
+            function getLinesOutput() 
             {
-                if (key.startsWith(NestedPlaceholder))
+                if (translation.refusal)
                 {
-                    let multilineOutput = []
-                    for (const [nestedKey, nestedValue] of Object.entries(value))
-                    {
-                        multilineOutput.push(nestedValue)
-                    }
-                    linesOut.push(multilineOutput.join("\\N"))
+                    return [translation.refusal]
                 }
                 else
                 {
-                    const expectedKey = lines[expectedIndex]
-                    if (key != expectedKey)
+                    const parsed = output.choices[0].message.parsed
+                    const linesOut = []
+
+                    let expectedIndex = 0
+                    for (const [key, value] of Object.entries(parsed))
                     {
-                        console.warn("[TranslatorStructured]", "Unexpected key", "Expected", expectedKey, "Received", key)
+                        if (key.startsWith(NestedPlaceholder))
+                        {
+                            let multilineOutput = []
+                            for (const [nestedKey, nestedValue] of Object.entries(value))
+                            {
+                                multilineOutput.push(nestedValue)
+                            }
+                            linesOut.push(multilineOutput.join("\\N"))
+                        }
+                        else
+                        {
+                            const expectedKey = lines[expectedIndex]
+                            if (key != expectedKey)
+                            {
+                                console.warn("[TranslatorStructured]", "Unexpected key", "Expected", expectedKey, "Received", key)
+                            }
+                            const element = parsed[key];
+                            linesOut.push(element)
+                        }
+                        expectedIndex++
                     }
-                    const element = parsed[key];
-                    linesOut.push(element)
+                    return linesOut
                 }
-                expectedIndex++
             }
+
+            const linesOut = getLinesOutput()
 
             const translationOutput = new TranslationOutput(
                 linesOut,
@@ -123,9 +160,26 @@ export class TranslatorStructured extends Translator
             return translationOutput
         } catch (error)
         {
-            console.error("[TranslatorStructured]", "Error", error)
-            console.error("[TranslatorStructured]", "Fallback to base mode")
-            return super.translatePrompt(lines)
+            console.error("[TranslatorStructured]", `Error ${error?.constructor?.name}`, error?.message)
+            return this.translateBaseFallback(lines)
         }
+    }
+
+    /**
+     * @param {string[]} lines 
+     */
+    translateBaseFallback(lines)
+    {
+        console.error("[TranslatorStructured]", "Fallback to base mode")
+        const optionsRestore = {}
+        optionsRestore.stream = this.options.createChatCompletionRequest?.stream
+
+        this.options.createChatCompletionRequest.stream = this.optionsBackup.stream
+        
+        const output = super.translatePrompt(lines)
+        
+        this.options.createChatCompletionRequest.stream = optionsRestore.stream
+
+        return output
     }
 }
