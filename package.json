@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-subtitle-translator",
-  "version": "2.12.4",
+  "version": "2.12.5",
   "description": "Translation tool based on ChatGPT API",
   "main": "src/translator.mjs",
   "type": "module",
