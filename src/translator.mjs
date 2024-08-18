@@ -1,4 +1,4 @@
-import { openaiRetryWrapper, completeChatStream, numTokensFromMessages, getPricingModel } from './openai.mjs';
+import { openaiRetryWrapper, completeChatStream, getPricingModel } from './openai.mjs';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
@@ -125,12 +125,17 @@ export class Translator
                 const promptResponse = await this.services.openai.chat.completions.create({
                     messages,
                     ...this.options.createChatCompletionRequest,
-                    stream: true
+                    stream: true,
+                    stream_options: {
+                        include_usage: true
+                    }
                 })
 
                 this.streamController = promptResponse.controller
 
                 let writeQueue = ''
+                /** @type {import('openai').OpenAI.Completions.CompletionUsage} */
+                let usage
                 const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) =>
                 {
                     const hasNewline = data.includes("\n")
@@ -151,14 +156,15 @@ export class Translator
                         this.services.onStreamChunk?.(writeQueue)
                         writeQueue = ''
                     }
-                }, () =>
+                }, (u) =>
                 {
                     endTime = Date.now()
+                    usage = u 
                     // process.stdout.write("\n")
                     this.services.onStreamEnd?.()
                 })
-                const prompt_tokens = numTokensFromMessages(messages)
-                const completion_tokens = numTokensFromMessages([{ content: streamOutput }])
+                const prompt_tokens = usage.prompt_tokens
+                const completion_tokens = usage.completion_tokens
                 const output = new TranslationOutput(
                     streamOutput,
                     prompt_tokens,

@@ -1,25 +1,27 @@
 import { OpenAI } from "openai";
 import { retryWrapper, sleep } from './helpers.mjs';
-import gp3Encoder from "@nem035/gpt-3-encoder";
 
+/**
+ * In USD per 1000 tokens
+ */
 export const ModelPricing = {
-    "gpt-3.5-turbo": { prompt: 0.50 / 1000000 * 1000, completion: 1.50 / 1000000 * 1000 },
-    "gpt-3.5-turbo-1106": { prompt: 0.001, completion: 0.002 },
-    "gpt-4": { prompt: 0.03, completion: 0.06 },
-    "gpt-4-32k": { prompt: 0.06, completion: 0.12 },
-    "gpt-4-1106-preview": { prompt: 0.01, completion: 0.03 },
-    "gpt-4o": { prompt: 5.00 / 1000000 * 1000, completion: 15.00 / 1000000 * 1000 },
-    "gpt-4o-mini": { prompt: 0.150 / 1000000 * 1000, completion: 0.600 / 1000000 * 1000 },
+    "gpt-3.5-turbo"             : { prompt: 0.50 / 1000000 * 1000,  completion: 1.50 / 1000000 * 1000 },
+    "gpt-3.5-turbo-1106"        : { prompt: 0.001,                  completion: 0.002 },
+    "gpt-4"                     : { prompt: 0.03,                   completion: 0.06 },
+    "gpt-4-32k"                 : { prompt: 0.06,                   completion: 0.12 },
+    "gpt-4-1106-preview"        : { prompt: 0.01,                   completion: 0.03 },
+    "gpt-4o"                    : { prompt: 5.00 / 1000000 * 1000,  completion: 15.00 / 1000000 * 1000 },
+    "gpt-4o-mini"               : { prompt: 0.150 / 1000000 * 1000, completion: 0.600 / 1000000 * 1000 },
 }
 
 export const ModelPricingAlias = {
-    "gpt-3.5-turbo-0301": "gpt-3.5-turbo",
-    "gpt-3.5-turbo-0613": "gpt-3.5-turbo",
-    "gpt-3.5-turbo-16k": "gpt-3.5-turbo-1106",
-    "gpt-3.5-turbo-16k-0613": "gpt-3.5-turbo-1106",
-    "gpt-4-0613": "gpt-4",
-    "gpt-4o-2024-05-13": "gpt-4o",
-    "gpt-4o-mini-2024-07-18": "gpt-4o-mini"
+    "gpt-3.5-turbo-0301"        : "gpt-3.5-turbo",
+    "gpt-3.5-turbo-0613"        : "gpt-3.5-turbo",
+    "gpt-3.5-turbo-16k"         : "gpt-3.5-turbo-1106",
+    "gpt-3.5-turbo-16k-0613"    : "gpt-3.5-turbo-1106",
+    "gpt-4-0613"                : "gpt-4",
+    "gpt-4o-2024-05-13"         : "gpt-4o",
+    "gpt-4o-mini-2024-07-18"    : "gpt-4o-mini"
 }
 
 /**
@@ -115,25 +117,33 @@ export async function openaiRetryWrapper(func, maxRetries, description)
 
 /**
  * @param {import("openai/streaming").Stream<import("openai").OpenAI.Chat.Completions.ChatCompletionChunk>} response
+ * @param {(d: string) => void} onData 
+ * @param {(u: import('openai').OpenAI.Completions.CompletionUsage) => void} onEnd
  * @returns {Promise<string>}
  */
-export async function completeChatStream(response, onData = (d) => { }, onEnd = () => { })
+export async function completeChatStream(response, onData = (d) => { }, onEnd = (u) => { })
 {
     let output = ''
     return await new Promise(async (resolve, reject) =>
     {
         try
         {
+            /** @type {import('openai').OpenAI.Completions.CompletionUsage} */
+            let usage;
             for await (const part of response)
             {
-                const text = part.choices[0].delta.content
+                const text = part.choices[0]?.delta?.content
                 if (text)
                 {
                     output += text
                     onData(text)
                 }
+                else if (part.usage)
+                {
+                    usage = part.usage
+                }
             }
-            onEnd()
+            onEnd(usage)
             resolve(output)
 
         } catch (error)
@@ -142,48 +152,4 @@ export async function completeChatStream(response, onData = (d) => { }, onEnd = 
             reject(chatStreamError)
         }
     })
-}
-
-/**
- * Seems to overcount a little bit
- * @param {Object[]} messages
- */
-export function numTokensFromMessages(messages, model = 'gpt-3.5-turbo-0301')
-{
-    switch (model)
-    {
-        case 'gpt-3.5-turbo':
-            // console.warn('Warning: gpt-3.5-turbo may change over time. Returning num tokens assuming gpt-3.5-turbo-0301.');
-            return numTokensFromMessages(messages, 'gpt-3.5-turbo-0301');
-        case 'gpt-4':
-            // console.warn('Warning: gpt-4 may change over time. Returning num tokens assuming gpt-4-0314.');
-            return numTokensFromMessages(messages, 'gpt-4-0314');
-        case 'gpt-3.5-turbo-0301':
-            var tokensPerMessage = 4; // every message follows <im_start>{role/name}\n{content}<im_end>\n
-            var tokensPerName = -1; // if there's a name, the role is omitted
-            break;
-        case 'gpt-4-0314':
-            var tokensPerMessage = 3;
-            var tokensPerName = 1;
-            break;
-        default:
-            throw new Error(`numTokensFromMessages() is not implemented for model ${model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.`);
-    }
-
-    let numTokens = 0;
-    for (const message of messages)
-    {
-        numTokens += tokensPerMessage;
-        for (const [key, value] of Object.entries(message))
-        {
-            numTokens += gp3Encoder.encode(value).length;
-            if (key === 'name')
-            {
-                numTokens += tokensPerName;
-            }
-        }
-    }
-
-    numTokens += 2; // every reply is primed with <im_start>assistant
-    return numTokens;
 }

@@ -10,7 +10,6 @@
   "author": "Cerlancism",
   "license": "MIT",
   "dependencies": {
-    "@nem035/gpt-3-encoder": "^1.1.7",
     "@types/node": "^20.15.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
