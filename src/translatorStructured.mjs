@@ -4,6 +4,8 @@ import { z } from "zod";
 import { Translator } from "./translator.mjs";
 import { TranslationOutput } from "./translatorOutput.mjs";
 
+const NestedPlaceholder = "nested_"
+
 export class TranslatorStructured extends Translator
 {
     /**
@@ -44,12 +46,20 @@ export class TranslatorStructured extends Translator
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext]
 
         const structuredObject = {}
-        for (const key in lines)
+        for (const [key, value] of lines.entries())
         {
-            if (Object.prototype.hasOwnProperty.call(lines, key))
+            if (value.includes("\\N"))
             {
-                const value = lines[key]
-                structuredObject[value] = z.string()
+                const nestedObject = {}
+                for (const [nestedKey, nestedValue] of value.split("\\N").entries())
+                {
+                    nestedObject[nestedValue.replaceAll("\\", "")] = z.string()
+                }
+                structuredObject[NestedPlaceholder + key] = z.object({ ...nestedObject })
+            }
+            else 
+            {
+                structuredObject[value.replaceAll("\\", "")] = z.string()
             }
         }
         const translationBatch = z.object({ ...structuredObject });
@@ -74,9 +84,18 @@ export class TranslatorStructured extends Translator
             const linesOut = []
 
             let expectedIndex = 0
-            for (const key in parsed)
+            for (const [key, value] of Object.entries(parsed))
             {
-                if (Object.prototype.hasOwnProperty.call(parsed, key))
+                if (key.startsWith(NestedPlaceholder))
+                {
+                    let multilineOutput = []
+                    for (const [nestedKey, nestedValue] of Object.entries(value))
+                    {
+                        multilineOutput.push(nestedValue)
+                    }
+                    linesOut.push(multilineOutput.join("\\N"))
+                }
+                else
                 {
                     const expectedKey = lines[expectedIndex]
                     if (key != expectedKey)
@@ -85,8 +104,8 @@ export class TranslatorStructured extends Translator
                     }
                     const element = parsed[key];
                     linesOut.push(element)
-                    expectedIndex++
                 }
+                expectedIndex++
             }
 
             const translationOutput = new TranslationOutput(

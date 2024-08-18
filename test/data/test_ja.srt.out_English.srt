@@ -16,7 +16,7 @@ The weather is nice today, isn't it?
 
 5
 00:00:12,000 --> 00:00:16,000
-Yes, it's very nice weather.
+Yes, it is very nice weather.
 
 6
 00:00:17,000 --> 00:00:21,000
@@ -24,19 +24,19 @@ What are you doing today?
 
 7
 00:00:21,000 --> 00:00:24,000
-In the afternoon.
+In the afternoon,
 
 8
 00:00:24,000 --> 00:00:26,000
-With friends.
+with friends,
 
 9
 00:00:26,000 --> 00:00:28,000
-We're going to watch a movie.
+I will watch a movie.
 
 10
 00:00:28,000 --> 00:00:30,000
-That sounds great.
+That sounds nice.
 
 11
 00:00:30,000 --> 00:00:33,000
@@ -48,39 +48,39 @@ It's an action movie.
 
 13
 00:00:37,000 --> 00:00:40,000
-I also like action movies.
+I also like action
 
 14
 00:00:40,000 --> 00:00:42,000
-That sounds exciting.
+I love action movies.
 
 15
 00:00:42,000 --> 00:00:44,000
-But first, let's have lunch.
+That sounds fun.
 
 16
 00:00:45,000 --> 00:00:47,000
-Yes, that's a good idea.
+But first, let's eat lunch.
 
 17
 00:00:47,000 --> 00:00:49,000
-What would you like to eat?
+Let's eat.
 
 18
 00:00:49,000 --> 00:00:50,000
-I feel like having sushi.
+Yes, that's a good idea.
 
 19
 00:00:55,000 --> 00:00:56,000
-Yes, let's go get some sushi.
+What do you want to eat?
 
 20
 00:00:59,000 --> 00:01:00,000
-What kind of sushi do you like?
+I want to eat sushi.
 
 21
 00:01:02,000 --> 00:01:03,000
-That sounds good.
+Sounds good,
 
 22
 00:01:03,000 --> 00:01:04,000
@@ -88,33 +88,33 @@ I also like sushi.
 
 23
 00:01:06,000 --> 00:01:07,000
-Do you have any recommended sushi restaurants?
+Is there a recommended restaurant?
 
 24
 00:01:07,000 --> 00:01:08,000
-Yes, there is one place that is very delicious.
+Do you have any recommendations?
 
 25
 00:01:09,000 --> 00:01:10,000
-It's over there.
+Yes,
 
 26
 00:01:10,000 --> 00:01:11,000
-Thank you very much.
+That place is very
 
 27
 00:01:11,000 --> 00:01:12,000
-Let's go there.
+delicious.
 
 28
 00:01:12,000 --> 00:01:13,000
-Thank you for the recommendation.
+Thank you very much,
 
 29
 00:01:13,000 --> 00:01:14,000
-Let's go there then.
+Let's go there.
 
 30
 00:01:14,000 --> 00:01:17,000
-Alright, let's go!
+Well then, let's go!
 
