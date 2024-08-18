@@ -7,13 +7,13 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Features
 - **New work in progress**: Web UI
+- **New experimental approach**: [Structured output](https://openai.com/index/introducing-structured-outputs-in-the-api/) for more concise results, enabled with `--experimental-structured-mode` in CLI
 - Line-based batching: avoiding token limit per request, reducing overhead token wastage, maintaining translation context to certain extent
 - Checking with the free OpenAI Moderation tool: prevent token wastage if the model is highly likely to refuse to translate
 - Streaming process output
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview) 
-- **TODO**: Tokens per minute rate limits (TPM) 
 - Progress resumption (CLI  Only) - mitigation for frequent API gateway errors and downtimes
-- **TODO**: Retry translation parts
+
 
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
@@ -77,22 +77,24 @@ Options:
     
     Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
+  - `--experimental-structured-mode`
+    Using structured response format from https://openai.com/index/introducing-structured-outputs-in-the-api/ (default: `false`)
 
 Additional Options for ChatAPT:  
   - `-m, --model <model>`  
-    (default: `"gpt-4o-mini"`) https://platform.openai.com/docs/api-reference/chat/create#chat/create-model
+    (default: `"gpt-4o-mini"`) https://platform.openai.com/docs/api-reference/chat/create
   - `--stream`  
-    Stream progress output to terminal https://platform.openai.com/docs/api-reference/chat/create#chat/create-stream
+    Stream progress output to terminal https://platform.openai.com/docs/api-reference/chat/create#chat-create-stream
   - `-t, --temperature <temperature>`  
-    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`) https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
+    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`) https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature
   - `--top_p <top_p>`  
-    Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p
+    Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat-create-top_p
   - `--presence_penalty <presence_penalty>`  
-    Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-presence_penalty
+    Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat-create-presence_penalty
   - `--frequency_penalty <frequency_penalty`  
-    Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty
+    Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat-create-frequency_penalty
   - `--logit_bias <logit_bias>`  
-    Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias
+    Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat-create-logit_bias
 
 
 ## Examples

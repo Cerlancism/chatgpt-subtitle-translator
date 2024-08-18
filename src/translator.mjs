@@ -3,6 +3,7 @@ import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
 import { CooldownContext } from './cooldown.mjs';
+import { TranslationOutput } from './translatorOutput.mjs';
 
 /**
  * @typedef TranslationServiceContext
@@ -34,6 +35,7 @@ import { CooldownContext } from './cooldown.mjs';
  * 
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
+ * @property {boolean} structuredMode
  */
 export const DefaultOptions = {
     createChatCompletionRequest: {
@@ -44,7 +46,8 @@ export const DefaultOptions = {
     prefixNumber: true,
     lineMatching: true,
     historyPromptLength: 10,
-    batchSizes: [10, 100]
+    batchSizes: [10, 100],
+    structuredMode: false
 }
 /**
  * Translator using ChatGPT
@@ -87,16 +90,32 @@ export class Translator
     }
 
     /**
-     * @param {string} text
+     * @param {string[]} lines
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(text)
+    async translatePrompt(lines)
     {
+        const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: `${text}` }
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
+
+        /**
+         * @param {string} text 
+         */
+        function getOutput(text)
+        {
+            if (lines.length === 1)
+            {
+                return [text.split("\n").join(" ")]
+            }
+            else
+            {
+                return text.split("\n").filter(x => x.trim().length > 0)
+            }
+        }
 
         let startTime = 0, endTime = 0
         const response = await openaiRetryWrapper(async () =>
@@ -113,7 +132,7 @@ export class Translator
                 })
                 endTime = Date.now()
                 const output = new TranslationOutput(
-                    promptResponse.choices[0].message.content,
+                    getOutput(promptResponse.choices[0].message.content),
                     promptResponse.usage?.prompt_tokens,
                     promptResponse.usage?.completion_tokens,
                     promptResponse.usage?.total_tokens
@@ -159,14 +178,14 @@ export class Translator
                 }, (u) =>
                 {
                     endTime = Date.now()
-                    usage = u 
+                    usage = u
                     // process.stdout.write("\n")
                     this.services.onStreamEnd?.()
                 })
                 const prompt_tokens = usage.prompt_tokens
                 const completion_tokens = usage.completion_tokens
                 const output = new TranslationOutput(
-                    streamOutput,
+                    getOutput(streamOutput),
                     prompt_tokens,
                     completion_tokens
                 )
@@ -191,9 +210,8 @@ export class Translator
         {
             const input = batch[x]
             this.buildContext()
-            const output = await this.translatePrompt(input)
-            const text = output.content
-            const writeOut = text.split("\n").join(" ")
+            const output = await this.translatePrompt([input])
+            const writeOut = output.content[0]
             yield* this.yieldOutput([batch[x]], [writeOut])
         }
     }
@@ -212,7 +230,6 @@ export class Translator
         for (let index = this.offset, reducedBatchSessions = 0; index < theEnd; index += this.currentBatchSize)
         {
             let batch = lines.slice(index, index + this.currentBatchSize).map((x, i) => this.preprocessLine(x, i, index))
-            const input = batch.join("\n\n")
 
             if (this.options.useModerator && !this.services.moderationService)
             {
@@ -221,7 +238,8 @@ export class Translator
 
             if (this.options.useModerator && this.services.moderationService)
             {
-                const moderationData = await checkModeration(input, this.services.moderationService)
+                const inputForModeration = batch.join("\n\n")
+                const moderationData = await checkModeration(inputForModeration, this.services.moderationService)
                 if (moderationData.flagged)
                 {
                     if (!this.changeBatchSize('decrease')) // Already at smallest batch size
@@ -236,7 +254,7 @@ export class Translator
                 }
             }
             this.buildContext()
-            const output = await this.translatePrompt(input)
+            const output = await this.translatePrompt(batch)
 
             if (this.aborted)
             {
@@ -244,14 +262,22 @@ export class Translator
                 return
             }
 
-            const text = output.content
-            let outputs = text.split("\n").filter(x => x.length > 0)
+            let outputs = output.content
 
-            if (this.options.lineMatching && batch.length !== outputs.length)
+            if ((this.options.lineMatching && batch.length !== outputs.length) || (batch.length > 1 && output.refusal))
             {
                 this.promptTokensWasted += output.promptTokens
                 this.completionTokensWasted += output.completionTokens
-                console.error(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
+
+                if (output.refusal) 
+                {
+                    console.error(`[Translator]`, "Refusal: ", output.refusal)
+                }
+                else
+                {
+                    console.error(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
+                }
+
                 console.error(`[Translator]`, "batch", batch)
                 console.error(`[Translator]`, "transformed", outputs)
 
@@ -479,22 +505,5 @@ export class Translator
         console.error("[Translator]", "Aborting")
         this.streamController?.abort()
         this.aborted = true
-    }
-}
-
-export class TranslationOutput
-{
-    /**
-     * @param {string} content
-     * @param {number} promptTokens
-     * @param {number} completionTokens
-     * @param {number} [totalTokens]
-     */
-    constructor(content, promptTokens, completionTokens, totalTokens)
-    {
-        this.content = content
-        this.promptTokens = promptTokens ?? 0
-        this.completionTokens = completionTokens ?? 0
-        this.totalTokens = totalTokens ?? (this.promptTokens + this.completionTokens)
     }
 }

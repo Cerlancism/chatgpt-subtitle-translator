@@ -13,6 +13,7 @@ import { wrapQuotes } from "../src/helpers.mjs";
 import { parser } from "../src/subtitle.mjs";
 
 import 'dotenv/config'
+import { TranslatorStructured } from '../src/translatorStructured.mjs';
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY, undefined, process.env.OPENAI_BASE_URL)
 const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
@@ -42,6 +43,7 @@ export function createInstance(args)
         .option("-f, --file <file>", "Deprecated: alias for -i, --input")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
+        .option("--experimental-structured-mode", "Using structured response format from https://openai.com/index/introducing-structured-outputs-in-the-api/", false)
 
         .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
@@ -85,6 +87,7 @@ export function createInstance(args)
         ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
         ...(opts.historyPromptLength !== undefined && { historyPromptLength: opts.historyPromptLength }),
         ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
+        ...(opts.experimentalStructuredMode && { structuredMode: opts.experimentalStructuredMode })
     };
 
     if (opts.file && !opts.input)
@@ -114,7 +117,15 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
         }
     }
 
-    const translator = new Translator({ from: opts.from, to: opts.to }, services, options);
+    function getTranslator()
+    {
+        if (options.structuredMode) {
+            return new TranslatorStructured({ from: opts.from, to: opts.to }, services, options);
+        }
+        return new Translator({ from: opts.from, to: opts.to }, services, options);
+    }
+
+    const translator = getTranslator()
 
     if (opts.systemInstruction)
     {
@@ -193,6 +204,7 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
                 }
             } catch (error)
             {
+                console.error("[CLI]", "Error", error)
                 process.exit(1)
             }
         }
@@ -236,6 +248,7 @@ async function translatePlainText(translator, text, outfile)
         }
     } catch (error)
     {
+        console.error("[CLI]", "Error", error)
         process.exit(1)
     }
 
