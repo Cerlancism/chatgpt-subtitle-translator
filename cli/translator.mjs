@@ -44,6 +44,8 @@ export function createInstance(args)
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
         .option("--experimental-structured-mode", "Using structured response format from https://openai.com/index/introducing-structured-outputs-in-the-api/", false)
+        .option("--experimental-max_token <value>", "", parseInt, 0)
+        .option("--experimental-input-multiplier <value>", "", parseInt, 0)
 
         .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
@@ -87,13 +89,22 @@ export function createInstance(args)
         ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
         ...(opts.historyPromptLength !== undefined && { historyPromptLength: opts.historyPromptLength }),
         ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
-        ...(opts.experimentalStructuredMode && { structuredMode: opts.experimentalStructuredMode })
+        ...(opts.experimentalStructuredMode && { structuredMode: opts.experimentalStructuredMode }),
+        ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
+        ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier })
+
     };
 
     if (opts.file && !opts.input)
     {
         console.warn("[CLI]", "[WARNING]", "-f, --file is deprecated, use -i, --input")
         opts.input = opts.file
+    }
+
+    if (options.inputMultiplier && !options.max_token)
+    {
+        console.error("[CLI]", "[ERROR]", "--experimental-input-multiplier must be set with --experimental-max_token")
+        process.exit(1)
     }
 
     return { opts, options }

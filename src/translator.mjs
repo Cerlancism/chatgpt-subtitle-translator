@@ -36,6 +36,8 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
  * @property {boolean} structuredMode
+ * @property {number} max_token
+ * @property {number} inputMultiplier
  */
 export const DefaultOptions = {
     createChatCompletionRequest: {
@@ -47,7 +49,9 @@ export const DefaultOptions = {
     lineMatching: true,
     historyPromptLength: 10,
     batchSizes: [10, 100],
-    structuredMode: false
+    structuredMode: false,
+    max_token: 0,
+    inputMultiplier: 0
 }
 /**
  * Translator using ChatGPT
@@ -90,6 +94,22 @@ export class Translator
     }
 
     /**
+     * @param {string[]} lines 
+     */
+    getMaxToken(lines)
+    {
+        if (this.options.max_token && !this.options.inputMultiplier)
+        {
+            return this.options.max_token
+        }
+        else if (this.options.max_token && this.options.inputMultiplier)
+        {
+            return JSON.stringify(lines).length * this.options.inputMultiplier
+        }
+        return undefined
+    }
+
+    /**
      * @param {string[]} lines
      * @returns {Promise<TranslationOutput>}
      */
@@ -101,7 +121,7 @@ export class Translator
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
-        const max_tokens = JSON.stringify(lines).length * 5 // Estimate
+        const max_tokens = this.getMaxToken(lines)
 
         /**
          * @param {string} text 

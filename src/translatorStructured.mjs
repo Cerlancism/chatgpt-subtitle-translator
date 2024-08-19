@@ -62,7 +62,7 @@ export class TranslatorStructured extends Translator
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext]
-        const max_tokens = JSON.stringify(lines).length * 5 // Estimate
+        const max_tokens = this.getMaxToken(lines)
 
         const structuredObject = {}
         for (const [key, value] of lines.entries())
