@@ -38,6 +38,7 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * @property {boolean | "array" | "object" } structuredMode
  * @property {number} max_token
  * @property {number} inputMultiplier
+ * @property {string} fallbackModel
  */
 export const DefaultOptions = {
     createChatCompletionRequest: {
@@ -51,7 +52,8 @@ export const DefaultOptions = {
     batchSizes: [10, 100],
     structuredMode: false,
     max_token: 0,
-    inputMultiplier: 0
+    inputMultiplier: 0,
+    fallbackModel: undefined,
 }
 /**
  * Translator using ChatGPT

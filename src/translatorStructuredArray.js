@@ -50,13 +50,38 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                 max_tokens
             })
 
-            // console.log("[TranslatorStructuredObject]", output.choices[0].message.content)
+            // console.log("[TranslatorStructuredArray]", output.choices[0].message.content)
 
             endTime = Date.now()
 
-            const translation = output.choices[0].message
+            const translationCandidate = output.choices[0].message
 
-            const linesOut = translation.parsed.outputs
+            const getLinesOutput = async (/** @type {import("openai/resources/beta/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) =>
+            {
+                if (lines.length === 1 && translation.refusal && this.options.fallbackModel)
+                {
+                    console.log("[TranslatorStructuredArray] Refusal Fallback", this.options.fallbackModel)
+                    const requestOptions = { ...this.options.createChatCompletionRequest }
+                    requestOptions.model = this.options.fallbackModel
+                    const fallBackOutput = await this.services.openai.beta.chat.completions.parse({
+                        messages,
+                        ...requestOptions,
+                        stream: false,
+                        response_format: zodResponseFormat(structuredArray, "translation_array"),
+                        max_tokens
+                    })
+                    translation = fallBackOutput.choices[0].message
+                }
+                
+                if (translation.refusal)
+                {
+                    return [translation.refusal]
+                }
+
+                return translation.parsed.outputs
+            }
+
+            const linesOut = await getLinesOutput(translationCandidate)
 
             const translationOutput = new TranslationOutput(
                 linesOut,
