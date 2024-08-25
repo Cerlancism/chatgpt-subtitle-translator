@@ -133,7 +133,8 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
 
     function getTranslator()
     {
-        if (options.structuredMode === true) {
+        if (options.structuredMode === true)
+        {
             options.structuredMode = "array"
         }
         if (options.structuredMode == "array")
