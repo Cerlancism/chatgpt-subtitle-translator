@@ -1,12 +1,12 @@
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
-import { Translator } from "./translator.mjs";
 import { TranslationOutput } from "./translatorOutput.mjs";
+import { TranslatorStructuredBase } from "./translatorStructuredBase.js";
 
 const NestedPlaceholder = "nested_"
 
-export class TranslatorStructured extends Translator
+export class TranslatorStructuredObject extends TranslatorStructuredBase
 {
     /**
      * @param {{from?: string, to: string}} language
@@ -15,35 +15,18 @@ export class TranslatorStructured extends Translator
      */
     constructor(language, services, options)
     {
-        console.error(`[TranslatorStructured]`, "Structured Mode")
-        const optionsBackup = {}
-        optionsBackup.stream = options.createChatCompletionRequest?.stream
-        if (options.prefixNumber)
-        {
-            console.warn("[TranslatorStructured]", "--no-prefix-number must be used in structured mode, overriding.")
-            options.prefixNumber = false
-        }
-
-        if (options.createChatCompletionRequest.stream)
-        {
-            console.warn("[TranslatorStructured]", "--stream is not applicable in structured mode, disabling, expect long time waits for indications of progress. Stream mode will still be applied when falling back to base mode.")
-            options.createChatCompletionRequest.stream = false
-        }
-
         if (options.batchSizes[0] === 10 && options.batchSizes[1] === 100)
         {
             const reducedBatchSizes = [10, 20]
-            console.warn("[TranslatorStructured]", "--batch-sizes is to be reduced to", JSON.stringify(reducedBatchSizes))
+            console.warn("[TranslatorStructuredObject]", "--batch-sizes is to be reduced to", JSON.stringify(reducedBatchSizes))
             options.batchSizes = reducedBatchSizes
         }
         else if (options.batchSizes.some(x => x > 100))
         {
-            throw new Error("[TranslatorStructured] Batch sizes should not exceed 100")
+            throw new Error("[TranslatorStructuredObject] Batch sizes should not exceed 100")
         }
 
         super(language, services, options)
-
-        this.optionsBackup = optionsBackup
     }
 
     /**
@@ -98,7 +81,7 @@ export class TranslatorStructured extends Translator
                 max_tokens
             })
 
-            // console.log("[TranslatorStructured]", output.choices[0].message.content)
+            // console.log("[TranslatorStructuredObject]", output.choices[0].message.content)
 
             endTime = Date.now()
 
@@ -132,7 +115,7 @@ export class TranslatorStructured extends Translator
                             const expectedKey = lines[expectedIndex]
                             if (key != expectedKey)
                             {
-                                console.warn("[TranslatorStructured]", "Unexpected key", "Expected", expectedKey, "Received", key)
+                                console.warn("[TranslatorStructuredObject]", "Unexpected key", "Expected", expectedKey, "Received", key)
                             }
                             const element = parsed[key];
                             linesOut.push(element)
@@ -160,7 +143,7 @@ export class TranslatorStructured extends Translator
             return translationOutput
         } catch (error)
         {
-            console.error("[TranslatorStructured]", `Error ${error?.constructor?.name}`, error?.message)
+            console.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
             return await this.translateBaseFallback(lines)
         }
     }
@@ -170,7 +153,7 @@ export class TranslatorStructured extends Translator
      */
     async translateBaseFallback(lines)
     {
-        console.error("[TranslatorStructured]", "Fallback to base mode")
+        console.error("[TranslatorStructuredObject]", "Fallback to base mode")
         const optionsRestore = {}
         optionsRestore.stream = this.options.createChatCompletionRequest?.stream
 

@@ -3,17 +3,19 @@ import fs from 'node:fs'
 import path from 'node:path';
 import url from 'url'
 
-import { Command } from "commander"
+import { Command, Option } from "commander"
 import { ProxyAgent } from 'proxy-agent';
 
 import { Translator, DefaultOptions } from "../src/translator.mjs"
+import { TranslatorStructuredObject } from '../src/translatorStructuredObject.mjs';
+import { TranslatorStructuredArray } from '../src/translatorStructuredArray.js';
 import { createOpenAIClient } from '../src/openai.mjs'
 import { CooldownContext } from '../src/cooldown.mjs';
 import { wrapQuotes } from "../src/helpers.mjs";
 import { parser } from "../src/subtitle.mjs";
 
 import 'dotenv/config'
-import { TranslatorStructured } from '../src/translatorStructured.mjs';
+
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY, undefined, process.env.OPENAI_BASE_URL)
 const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
@@ -43,7 +45,7 @@ export function createInstance(args)
         .option("-f, --file <file>", "Deprecated: alias for -i, --input")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
-        .option("--experimental-structured-mode", "Using structured response format from https://openai.com/index/introducing-structured-outputs-in-the-api/", false)
+        .addOption(new Option("--experimental-structured-mode [mode]", "Using structured response format from https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
         .option("--experimental-max_token <value>", "", parseInt, 0)
         .option("--experimental-input-multiplier <value>", "", parseInt, 0)
 
@@ -130,10 +132,18 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
 
     function getTranslator()
     {
-        if (options.structuredMode) {
-            return new TranslatorStructured({ from: opts.from, to: opts.to }, services, options);
+        if (options.structuredMode === true || options.structuredMode == "array")
+        {
+            return new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
         }
-        return new Translator({ from: opts.from, to: opts.to }, services, options);
+        else if (options.structuredMode == "object")
+        {
+            return new TranslatorStructuredObject({ from: opts.from, to: opts.to }, services, options);
+        }
+        else
+        {
+            return new Translator({ from: opts.from, to: opts.to }, services, options);
+        }
     }
 
     const translator = getTranslator()
