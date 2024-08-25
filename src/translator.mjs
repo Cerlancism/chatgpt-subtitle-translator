@@ -468,9 +468,19 @@ export class Translator
         }
 
         this.promptContext = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/([
-            { role: "user", content: sliced.map((x, i) => checkFlaggedMapper(x.source, i)).join("\n\n") },
-            { role: "assistant", content: sliced.map((x, i) => checkFlaggedMapper(x.transform, i)).join("\n\n") }
+            { role: "user", content: this.buildContextLines(sliced.map((x, i) => checkFlaggedMapper(x.source, i)), "user") },
+            { role: "assistant", content: this.buildContextLines(sliced.map((x, i) => checkFlaggedMapper(x.transform, i)), "assistant") }
         ])
+    }
+
+    /**
+     * @param {string[]} lines 
+     * @param {"user" | "assistant" } role
+     * @returns {string}
+     */
+    buildContextLines(lines, role)
+    {
+        return lines.join("\n\n")
     }
 
     get usage()

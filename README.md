@@ -77,8 +77,11 @@ Options:
     
     Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
-  - `--experimental-structured-mode`
-    Using structured response format from https://openai.com/index/introducing-structured-outputs-in-the-api/ (default: `false`)
+  - `--experimental-structured-mode [mode]`
+    Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/. (default: `array`, choices `array`, `object`)
+      - `--experimental-structured-mode array` Structures the input and output into plain array format. This option is more concise as compared to base mode, though uses slightly more tokens per batch.
+      - `--experimental-structured-mode object` Structures both the input and output into a dynamically generated object schema based on input values. This option is even more concise and uses fewer tokens, but the batch has to be smaller, and is slow and unreliable. Due to its unreliability, it may lead to more resubmission retries, potentially wasting more tokens in the process. 
+
 
 Additional Options for ChatAPT:  
   - `-m, --model <model>`  

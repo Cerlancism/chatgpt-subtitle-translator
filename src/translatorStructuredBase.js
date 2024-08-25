@@ -27,4 +27,22 @@ export class TranslatorStructuredBase extends Translator
 
         this.optionsBackup = optionsBackup
     }
+
+    /**
+     * @param {string[]} lines 
+     */
+    async translateBaseFallback(lines)
+    {
+        console.error("[TranslatorStructuredObject]", "Fallback to base mode")
+        const optionsRestore = {}
+        optionsRestore.stream = this.options.createChatCompletionRequest?.stream
+
+        this.options.createChatCompletionRequest.stream = this.optionsBackup.stream
+
+        const output = await super.translatePrompt(lines)
+
+        this.options.createChatCompletionRequest.stream = optionsRestore.stream
+
+        return output
+    }
 }

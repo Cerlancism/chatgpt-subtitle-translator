@@ -77,7 +77,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
                 messages,
                 ...this.options.createChatCompletionRequest,
                 stream: false,
-                response_format: zodResponseFormat(translationBatch, "translation_batch"),
+                response_format: zodResponseFormat(translationBatch, "translation_object"),
                 max_tokens
             })
 
@@ -146,23 +146,5 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
             console.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
             return await this.translateBaseFallback(lines)
         }
-    }
-
-    /**
-     * @param {string[]} lines 
-     */
-    async translateBaseFallback(lines)
-    {
-        console.error("[TranslatorStructuredObject]", "Fallback to base mode")
-        const optionsRestore = {}
-        optionsRestore.stream = this.options.createChatCompletionRequest?.stream
-
-        this.options.createChatCompletionRequest.stream = this.optionsBackup.stream
-        
-        const output = await super.translatePrompt(lines)
-        
-        this.options.createChatCompletionRequest.stream = optionsRestore.stream
-
-        return output
     }
 }

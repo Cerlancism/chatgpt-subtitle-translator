@@ -45,7 +45,7 @@ export function createInstance(args)
         .option("-f, --file <file>", "Deprecated: alias for -i, --input")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
-        .addOption(new Option("--experimental-structured-mode [mode]", "Using structured response format from https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
+        .addOption(new Option("--experimental-structured-mode [mode]", "Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
         .option("--experimental-max_token <value>", "", parseInt, 0)
         .option("--experimental-input-multiplier <value>", "", parseInt, 0)
 
@@ -132,7 +132,10 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
 
     function getTranslator()
     {
-        if (options.structuredMode === true || options.structuredMode == "array")
+        if (options.structuredMode === true) {
+            options.structuredMode = "array"
+        }
+        if (options.structuredMode == "array")
         {
             return new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
         }
