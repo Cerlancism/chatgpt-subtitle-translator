@@ -147,4 +147,24 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
             return await this.translateBaseFallback(lines)
         }
     }
+
+
+    /**
+     * @param {string[]} sourceLines
+     * @param {string[]} transformLines
+     */
+    getContext(sourceLines, transformLines)
+    {
+        const output = {}
+
+        for (let index = 0; index < sourceLines.length; index++) {
+            const source = sourceLines[index];
+            const transform = transformLines[index]
+            output[source] = transform
+        }
+
+        return  /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/ ([
+            { role: "assistant", content: JSON.stringify(output) }
+        ])
+    }
 }

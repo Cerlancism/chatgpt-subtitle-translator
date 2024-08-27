@@ -23,9 +23,9 @@
             "program": "${workspaceFolder}/cli/translator.mjs",
             // "args": ["--plain-text", "你好"]
             // "args": ["--stream", "--to", "Chinese", "--input", "test/data/test_ja_small.srt", "-t", "0", "--batch-sizes", "[2, 3]", "--history-prompt-length", "3"],
-            // "args": ["-i", "./test/data/test_cn_multiline.srt", "--stream", "--batch-sizes", "[5, 10]"],
-            "args": ["-i", "./test/data/test_cn_multiline.srt", "--experimental-structured-mode", "--experimental-max_token", "4096", "--experimental-input-multiplier", "2", "--batch-sizes", "[5, 10]", "--experimental-fallback-model", "gpt-3.5-turbo-0613"],
-            // "args": ["-i", "./test/data/test_cn_multiline.srt", "--experimental-structured-mode", "object", "--experimental-max_token", "4096", "--experimental-input-multiplier", "2"],
+            "args": ["-i", "./test/data/test_cn_multiline.srt", "--stream", "--batch-sizes", "[5, 10]"],
+            // "args": ["-i", "./test/data/test_cn_multiline.srt", "--experimental-structured-mode", "--experimental-max_token", "4096", "--experimental-input-multiplier", "2", "--batch-sizes", "[5, 10]", "--experimental-fallback-model", "gpt-3.5-turbo-0613"],
+            // "args": ["-i", "./test/data/test_cn_multiline.srt", "--experimental-structured-mode", "object", "--experimental-max_token", "4096", "--experimental-input-multiplier", "2", "--batch-sizes", "[5, 10]"],
             // "args": ["--to", "Chinese", "--input", "test/data/test_ja_small.srt", "-t", "1", "--initial-prompts", "[{\\\"role\\\": \\\"user\\\", \\\"content\\\": \\\"Translate to Chinese with Chinese Explaination\\\"}]", "--batch-sizes", "[2, 10]", "--history-prompt-length", "5"]
             // "args": ["--temperature", "0.1", "--no-use-moderator", "--no-prefix-line-with-number", "--top_p", "1", "--frequency_penalty", "1", "--presence_penalty", "1"]
         }

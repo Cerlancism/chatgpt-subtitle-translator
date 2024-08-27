@@ -107,7 +107,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
      * @param {string[]} lines 
      * @param {"user" | "assistant" } role
      */
-    buildContextLines(lines, role)
+    getContextLines(lines, role)
     {
         if (role === "user")
         {

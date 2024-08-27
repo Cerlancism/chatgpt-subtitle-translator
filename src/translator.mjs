@@ -142,7 +142,7 @@ export class Translator
         }
 
         let startTime = 0, endTime = 0
-        const streamMode = this.options.createChatCompletionRequest.stream 
+        const streamMode = this.options.createChatCompletionRequest.stream
         const response = await openaiRetryWrapper(async () =>
         {
             await this.services.cooler?.cool()
@@ -469,9 +469,21 @@ export class Translator
             return text
         }
 
-        this.promptContext = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/([
-            { role: "user", content: this.buildContextLines(sliced.map((x, i) => checkFlaggedMapper(x.source, i)), "user") },
-            { role: "assistant", content: this.buildContextLines(sliced.map((x, i) => checkFlaggedMapper(x.transform, i)), "assistant") }
+        const checkedSource = sliced.map((x, i) => checkFlaggedMapper(x.source, i))
+        const checkedTransform = sliced.map((x, i) => checkFlaggedMapper(x.transform, i))
+        this.promptContext = this.getContext(checkedSource, checkedTransform)
+    }
+
+
+    /**
+     * @param {string[]} sourceLines
+     * @param {string[]} transformLines
+     */
+    getContext(sourceLines, transformLines)
+    {
+        return  /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/ ([
+            { role: "user", content: this.getContextLines(sourceLines, "user") },
+            { role: "assistant", content: this.getContextLines(transformLines, "assistant") }
         ])
     }
 
@@ -480,7 +492,7 @@ export class Translator
      * @param {"user" | "assistant" } role
      * @returns {string}
      */
-    buildContextLines(lines, role)
+    getContextLines(lines, role)
     {
         return lines.join("\n\n")
     }
