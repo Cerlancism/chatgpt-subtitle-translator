@@ -33,7 +33,7 @@ export class TranslatorStructuredBase extends Translator
      */
     async translateBaseFallback(lines)
     {
-        console.error("[TranslatorStructuredObject]", "Fallback to base mode")
+        console.error("[TranslatorStructuredBase]", "Fallback to base mode")
         const optionsRestore = {}
         optionsRestore.stream = this.options.createChatCompletionRequest?.stream
 
