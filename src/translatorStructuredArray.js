@@ -1,4 +1,4 @@
-import { zodResponseFormat } from "openai/helpers/zod";
+import { APIUserAbortError } from "openai";
 import { z } from "zod";
 
 import { Translator } from "./translator.mjs";
@@ -103,7 +103,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
         } catch (error)
         {
             console.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
-            return await this.translateBaseFallback(lines)
+            return await this.translateBaseFallback(lines, error)
         }
     }
 

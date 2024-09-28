@@ -37,7 +37,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
     {
         if (lines.length === 1)
         {
-            return await this.translateBaseFallback(lines)
+            return await this.translateBaseFallback(lines, undefined)
         }
         // const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
@@ -146,7 +146,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
         } catch (error)
         {
             console.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
-            return await this.translateBaseFallback(lines)
+            return await this.translateBaseFallback(lines, error)
         }
     }
 

@@ -1,3 +1,4 @@
+import { APIUserAbortError } from "openai";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import { Translator } from "./translator.mjs";
 
@@ -25,9 +26,13 @@ export class TranslatorStructuredBase extends Translator
 
     /**
      * @param {string[]} lines 
+     * @param {Error} error
      */
-    async translateBaseFallback(lines)
+    async translateBaseFallback(lines, error)
     {
+        if (error && error instanceof APIUserAbortError) {
+            return
+        }
         console.error("[TranslatorStructuredBase]", "Fallback to base mode")
         const optionsRestore = {}
         optionsRestore.stream = this.options.createChatCompletionRequest?.stream
