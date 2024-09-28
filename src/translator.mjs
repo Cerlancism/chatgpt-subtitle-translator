@@ -211,8 +211,8 @@ export class Translator
                     // process.stdout.write("\n")
                     this.services.onStreamEnd?.()
                 })
-                const prompt_tokens = usage.prompt_tokens
-                const completion_tokens = usage.completion_tokens
+                const prompt_tokens = usage?.prompt_tokens
+                const completion_tokens = usage?.completion_tokens
                 const output = new TranslationOutput(
                     getOutput(streamOutput),
                     prompt_tokens,

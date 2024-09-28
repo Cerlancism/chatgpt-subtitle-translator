@@ -132,9 +132,9 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
 
             const translationOutput = new TranslationOutput(
                 linesOut,
-                output.usage.prompt_tokens,
-                output.usage.completion_tokens,
-                output.usage.total_tokens,
+                output.usage?.prompt_tokens,
+                output.usage?.completion_tokens,
+                output.usage?.total_tokens,
                 output.choices[0].message.refusal
             )
 
