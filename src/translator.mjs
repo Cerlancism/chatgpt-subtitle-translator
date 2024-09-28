@@ -18,6 +18,8 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * @type {TranslatorOptions}
  * @typedef TranslatorOptions
  * @property {Pick<Partial<import('openai').OpenAI.Chat.ChatCompletionCreateParams>, "messages" | "model"> & Omit<import('openai').OpenAI.Chat.ChatCompletionCreateParams, "messages" | "model">} createChatCompletionRequest
+ * Moderation model
+ * @property {import('openai').OpenAI.ModerationModel} moderationModel
  * Options to ChatGPT besides the messages, it is recommended to set `temperature: 0` for a (almost) deterministic translation
  * @property {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} initialPrompts 
  * Initiation prompt messages before the translation request messages
@@ -44,6 +46,7 @@ export const DefaultOptions = {
     createChatCompletionRequest: {
         model: "gpt-4o-mini"
     },
+    moderationModel: "omni-moderation-latest",
     initialPrompts: [],
     useModerator: true,
     prefixNumber: true,
@@ -265,7 +268,7 @@ export class Translator
             if (this.options.useModerator && this.services.moderationService)
             {
                 const inputForModeration = batch.join("\n\n")
-                const moderationData = await checkModeration(inputForModeration, this.services.moderationService)
+                const moderationData = await checkModeration(inputForModeration, this.services.moderationService, this.options.moderationModel)
                 if (moderationData.flagged)
                 {
                     if (!this.changeBatchSize('decrease')) // Already at smallest batch size

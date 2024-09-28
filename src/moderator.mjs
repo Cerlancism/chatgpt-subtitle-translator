@@ -16,13 +16,14 @@ import { openaiRetryWrapper } from "./openai.mjs"
 /**
  * @param {string | string[]} input
  * @param {ModerationServiceContext} services
+ * @param {import('openai').OpenAI.ModerationModel} model
  */
-export async function checkModeration(input, services)
+export async function checkModeration(input, services, model = undefined)
 {
     return await openaiRetryWrapper(async () =>
     {
         await services.cooler?.cool()
-        const moderation = await services.openai.moderations.create({ input })
+        const moderation = await services.openai.moderations.create({ input, model })
         const moderationData = moderation.results[0]
 
         if (moderationData.flagged)

@@ -39,6 +39,7 @@ export function createInstance(args)
         .option("--from <language>", "Source language")
         .option("--to <language>", "Target language", "English")
         .option("-m, --model <model>", "https://platform.openai.com/docs/api-reference/chat/create#chat/create-model", DefaultOptions.createChatCompletionRequest.model)
+        .option("--moderation-model <model>", "https://platform.openai.com/docs/api-reference/moderations", DefaultOptions.moderationModel)
 
         .option("-i, --input <file>", "Text file name to use as input, .srt or plain text")
         .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
@@ -87,6 +88,7 @@ export function createInstance(args)
             // ...(opts.user && { user: opts.user }),
         },
         ...(opts.initialPrompts && { initialPrompts: opts.initialPrompts }),
+        ...(opts.moderationModel !== undefined && { moderationModel: opts.moderationModel }),
         ...(opts.useModerator !== undefined && { useModerator: opts.useModerator }),
         ...(opts.prefixNumber !== undefined && { prefixNumber: opts.prefixNumber }),
         ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
