@@ -11,6 +11,8 @@ import { downloadString } from '@/utils/download';
 import { sampleSrt } from '@/data/sample';
 
 import { Translator } from "chatgpt-subtitle-translator"
+import { TranslatorStructuredArray } from "chatgpt-subtitle-translator/src/translatorStructuredArray"
+
 import { parser } from 'chatgpt-subtitle-translator/src/subtitle.mjs';
 import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
 import { CooldownContext } from 'chatgpt-subtitle-translator/src/cooldown.mjs';
@@ -29,6 +31,7 @@ export function TranslatorApplication() {
   const [model, setModel] = useState("gpt-4o-mini")
   const [temperature, setTemperature] = useState(0)
   const [useModerator, setUseModerator] = useState(true)
+  const [useStructuredMode, setUseStructuredMode] = useState(true)
   const [rateLimit, setRateLimit] = useState(60)
   /** @type {React.MutableRefObject<HTMLInputElement>} */
   const configSection = useRef()
@@ -102,7 +105,9 @@ export function TranslatorApplication() {
     const coolerChatGPTAPI = new CooldownContext(rateLimit, 60000, "ChatGPTAPI")
     const coolerOpenAIModerator = new CooldownContext(rateLimit, 60000, "OpenAIModerator")
 
-    translatorRef.current = new Translator({ from: fromLanguage, to: toLanguage }, {
+    const TranslatorImplementation = useStructuredMode ? TranslatorStructuredArray : Translator
+
+    translatorRef.current = new TranslatorImplementation({ from: fromLanguage, to: toLanguage }, {
       openai,
       cooler: coolerChatGPTAPI,
       onStreamChunk: (data) => {
@@ -246,7 +251,7 @@ export function TranslatorApplication() {
                   </div>
 
                   <div className='flex flex-wrap md:flex-nowrap w-full gap-4'>
-                    <div className='w-full md:w-4/12'>
+                    <div className='w-full md:w-1/5'>
                       <Input
                         size='sm'
                         type="text"
@@ -257,7 +262,19 @@ export function TranslatorApplication() {
                       />
                     </div>
 
-                    <div className='w-full md:w-3/12'>
+                    <div className='w-full md:w-1/5 flex'>
+                      <Switch
+                        size='sm'
+                        isSelected={useStructuredMode}
+                        onValueChange={setUseStructuredMode}
+                      >
+                      </Switch>
+                      <div className="flex flex-col place-content-center gap-1">
+                        <p className="text-small">Use Structured Mode</p>
+                      </div>
+                    </div>
+
+                    <div className='w-full md:w-1/5'>
                       <Slider
                         label="Temperature"
                         size="md"
@@ -270,7 +287,7 @@ export function TranslatorApplication() {
                       />
                     </div>
 
-                    <div className='w-full md:w-5/12 gap-4 flex flex-wrap md:flex-nowrap'>
+                    <div className='w-full md:w-2/5 gap-4 flex flex-wrap md:flex-nowrap'>
                       <div className='w-full md:w-6/12 flex'>
                         <Switch
                           size='sm'
@@ -373,7 +390,7 @@ export function TranslatorApplication() {
                     </li>
                   )
                 })}
-                <pre className='px-2'>
+                <pre className='px-2 text-wrap'>
                   {streamOutput}
                 </pre>
               </ol>
