@@ -42,13 +42,12 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
 
             await this.services.cooler?.cool()
 
-            const output = await this.services.openai.beta.chat.completions.parse({
+            const output = await this.streamParse({
                 messages,
                 ...this.options.createChatCompletionRequest,
-                stream: false,
-                response_format: zodResponseFormat(structuredArray, "translation_array"),
+                stream: this.options.createChatCompletionRequest.stream,
                 max_tokens
-            })
+            }, { structure: structuredArray, name: "translation_array" })
 
             // console.log("[TranslatorStructuredArray]", output.choices[0].message.content)
 

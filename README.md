@@ -83,7 +83,7 @@ Options:
       - `--experimental-structured-mode object` Structures both the input and output into a dynamically generated object schema based on input values. This option is even more concise and uses fewer tokens, but the batch has to be smaller, and is slow and unreliable. Due to its unreliability, it may lead to more resubmission retries, potentially wasting more tokens in the process. 
 
 
-Additional Options for ChatAPT:  
+Additional Options for GPT:  
   - `-m, --model <model>`  
     (default: `"gpt-4o-mini"`) https://platform.openai.com/docs/api-reference/chat/create
   - `--stream`  
