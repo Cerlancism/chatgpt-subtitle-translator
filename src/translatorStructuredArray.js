@@ -47,7 +47,10 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                 ...this.options.createChatCompletionRequest,
                 stream: this.options.createChatCompletionRequest.stream,
                 max_tokens
-            }, { structure: structuredArray, name: "translation_array" })
+            }, {
+                structure: structuredArray,
+                name: "translation_array"
+            })
 
             // console.log("[TranslatorStructuredArray]", output.choices[0].message.content)
 
@@ -62,16 +65,18 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                     console.log("[TranslatorStructuredArray] Refusal Fallback", this.options.fallbackModel)
                     const requestOptions = { ...this.options.createChatCompletionRequest }
                     requestOptions.model = this.options.fallbackModel
-                    const fallBackOutput = await this.services.openai.beta.chat.completions.parse({
+                    const fallBackOutput = await this.streamParse({
                         messages,
                         ...requestOptions,
                         stream: false,
-                        response_format: zodResponseFormat(structuredArray, "translation_array"),
                         max_tokens
+                    }, {
+                        structure: structuredArray,
+                        name: "translation_array"
                     })
                     translation = fallBackOutput.choices[0].message
                 }
-                
+
                 if (translation.refusal)
                 {
                     return [translation.refusal]

@@ -73,12 +73,14 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
 
             await this.services.cooler?.cool()
 
-            const output = await this.services.openai.beta.chat.completions.parse({
+            const output = await this.streamParse({
                 messages,
                 ...this.options.createChatCompletionRequest,
-                stream: false,
-                response_format: zodResponseFormat(translationBatch, "translation_object"),
+                stream: this.options.createChatCompletionRequest.stream,
                 max_tokens
+            }, {
+                structure: translationBatch,
+                name: "translation_object"
             })
 
             // console.log("[TranslatorStructuredObject]", output.choices[0].message.content)
@@ -157,7 +159,8 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
     {
         const output = {}
 
-        for (let index = 0; index < sourceLines.length; index++) {
+        for (let index = 0; index < sourceLines.length; index++)
+        {
             const source = sourceLines[index];
             const transform = transformLines[index]
             output[source] = transform
