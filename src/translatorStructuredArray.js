@@ -68,7 +68,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                     const fallBackOutput = await this.streamParse({
                         messages,
                         ...requestOptions,
-                        stream: false,
+                        stream: requestOptions.stream,
                         max_tokens
                     }, {
                         structure: structuredArray,
