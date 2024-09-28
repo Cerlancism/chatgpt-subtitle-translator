@@ -63,6 +63,8 @@ Options:
     Initial prompts for the translation in JSON (default: `"[]"`) 
   - `--no-use-moderator`  
     Don't use the OpenAI API Moderation endpoint
+  - `--moderation-model`  
+    (default: `"omni-moderation-latest"`) https://platform.openai.com/docs/models/moderation
   - `--no-prefix-number`  
     Don't prefix lines with numerical indices
   - `--no-line-matching`  
