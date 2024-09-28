@@ -16,8 +16,8 @@ export class TranslatorStructuredBase extends Translator
         if (options.prefixNumber)
         {
             console.warn("[TranslatorStructuredBase]", "--no-prefix-number must be used in structured mode, overriding.")
-            options.prefixNumber = false
         }
+        options.prefixNumber = false
         super(language, services, options)
 
         this.optionsBackup = optionsBackup
