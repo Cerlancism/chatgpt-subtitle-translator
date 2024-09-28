@@ -58,6 +58,8 @@ export class TranslatorStructuredBase extends Translator
                     include_usage: true
                 }
             })
+            
+            this.streamController = runner.controller
 
             runner.on("content.delta", (e) =>
             {
