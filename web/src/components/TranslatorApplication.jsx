@@ -76,8 +76,7 @@ export function TranslatorApplication() {
     setBaseUrlWithModerator(value)
   }
 
-  function setBaseUrlWithModerator(value)
-  {
+  function setBaseUrlWithModerator(value) {
     if (!baseUrlValue && value && useModerator) {
       setUseModerator(false)
     }
@@ -116,6 +115,9 @@ export function TranslatorApplication() {
       },
       onStreamEnd: () => {
         currentStream = ""
+        if (translatorRef.current?.aborted) {
+          return
+        }
         setStreamOutput("")
       },
       moderationService: {
@@ -137,10 +139,10 @@ export function TranslatorApplication() {
     }
 
     try {
+      setStreamOutput("")
       for await (const output of translatorRef.current.translateLines(inputs)) {
         if (!translatorRunningRef.current) {
           console.error("[User Interface]", "Aborted")
-          setStreamOutput("")
           break
         }
         currentOutputs.push(output.finalTransform)
