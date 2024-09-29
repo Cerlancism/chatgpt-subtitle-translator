@@ -13,6 +13,7 @@
     "@types/node": "^20.15.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
+    "JSONStream": "^1.3.5",
     "openai": "^4.65.0",
     "proxy-agent": "^6.4.0",
     "readline": "^1.3.0",

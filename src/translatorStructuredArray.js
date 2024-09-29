@@ -50,7 +50,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
             }, {
                 structure: structuredArray,
                 name: "translation_array"
-            })
+            }, true)
 
             // console.log("[TranslatorStructuredArray]", output.choices[0].message.content)
 
