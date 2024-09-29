@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react'
-import { Accordion, AccordionItem, Button, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider } from "@nextui-org/react";
+import { Button, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider } from "@nextui-org/react";
 
 import { EyeSlashFilledIcon } from './EyeSlashFilledIcon';
 import { EyeFilledIcon } from './EyeFilledIcon';
@@ -10,12 +10,7 @@ import { SubtitleCard } from '@/components/SubtitleCard';
 import { downloadString } from '@/utils/download';
 import { sampleSrt } from '@/data/sample';
 
-import { Translator } from "chatgpt-subtitle-translator"
-import { TranslatorStructuredArray } from "chatgpt-subtitle-translator/src/translatorStructuredArray"
-
-import { parser } from 'chatgpt-subtitle-translator/src/subtitle.mjs';
-import { createOpenAIClient } from 'chatgpt-subtitle-translator/src/openai.mjs'
-import { CooldownContext } from 'chatgpt-subtitle-translator/src/cooldown.mjs';
+import { Translator, TranslatorStructuredArray, subtitleParser, createOpenAIClient, CooldownContext } from "chatgpt-subtitle-translator"
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
 const OPENAI_BASE_URL = "OPENAI_BASE_URL"
@@ -42,7 +37,7 @@ export function TranslatorApplication() {
   // Translator State
   const [srtInputText, setSrtInputText] = useState(sampleSrt)
   const [srtOutputText, setSrtOutputText] = useState(sampleSrt)
-  const [inputs, setInputs] = useState(parser.fromSrt(sampleSrt).map(x => x.text))
+  const [inputs, setInputs] = useState(subtitleParser.fromSrt(sampleSrt).map(x => x.text))
   const [outputs, setOutput] = useState([])
   const [streamOutput, setStreamOutput] = useState("")
   const [translatorRunningState, setTranslatorRunningState] = useState(false)
@@ -102,7 +97,7 @@ export function TranslatorApplication() {
     setOutput([])
     setUsageInformation(null)
     let currentStream = ""
-    const outputWorkingProgress = parser.fromSrt(srtInputText)
+    const outputWorkingProgress = subtitleParser.fromSrt(srtInputText)
     const currentOutputs = []
     console.log("OPENAI_BASE_URL", baseUrlValue)
     const openai = createOpenAIClient(APIvalue, true, baseUrlValue)
@@ -174,7 +169,7 @@ export function TranslatorApplication() {
         setRPMInformation(translatorRef.current.services.cooler?.rate)
       }
       console.log({ sourceInputWorkingCopy: outputWorkingProgress })
-      setSrtOutputText(parser.toSrt(outputWorkingProgress))
+      setSrtOutputText(subtitleParser.toSrt(outputWorkingProgress))
     } catch (error) {
       console.error(error)
       alert(error?.message ?? error)
@@ -373,7 +368,7 @@ export function TranslatorApplication() {
             // console.log("File", file);
             try {
               const text = await file.text()
-              const parsed = parser.fromSrt(text)
+              const parsed = subtitleParser.fromSrt(text)
               setSrtInputText(text)
               setInputs(parsed.map(x => x.text))
             } catch (error) {
