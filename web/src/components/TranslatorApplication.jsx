@@ -30,6 +30,7 @@ export function TranslatorApplication() {
   const [systemInstruction, setSystemInstruction] = useState("")
   const [model, setModel] = useState("gpt-4o-mini")
   const [temperature, setTemperature] = useState(0)
+  const [batchSizes, setBatchSizes] = useState([10, 50])
   const [useModerator, setUseModerator] = useState(true)
   const [useStructuredMode, setUseStructuredMode] = useState(true)
   const [rateLimit, setRateLimit] = useState(60)
@@ -77,8 +78,13 @@ export function TranslatorApplication() {
   }
 
   function setBaseUrlWithModerator(value) {
-    if (!baseUrlValue && value && useModerator) {
-      setUseModerator(false)
+    if (!baseUrlValue && value) {
+      if (useModerator) {
+        setUseModerator(false)
+      }
+      if (useStructuredMode) {
+        setUseStructuredMode(false)
+      }
     }
     setBaseUrlValue(value)
   }
@@ -110,6 +116,9 @@ export function TranslatorApplication() {
       openai,
       cooler: coolerChatGPTAPI,
       onStreamChunk: (data) => {
+        if (currentStream === '' && data === "\n") {
+          return
+        }
         currentStream += data
         setStreamOutput(currentStream)
       },
@@ -120,13 +129,25 @@ export function TranslatorApplication() {
         }
         setStreamOutput("")
       },
+      onClearLine: () => {
+        const progressLines = currentStream.split("\n")
+        if (progressLines[0] === "") {
+          progressLines.shift()
+        }
+        progressLines.pop()
+        currentStream = progressLines.join("\n") + "\n"
+        if (currentStream === "\n") {
+          currentStream = ""
+        }
+        setStreamOutput(currentStream)
+      },
       moderationService: {
         openai,
         cooler: coolerOpenAIModerator
       }
     }, {
       useModerator: useModerator,
-      // batchSizes: [2,3],
+      batchSizes: batchSizes, //[10, 50],
       createChatCompletionRequest: {
         model: model,
         temperature: temperature,
@@ -253,7 +274,7 @@ export function TranslatorApplication() {
                   </div>
 
                   <div className='flex flex-wrap md:flex-nowrap w-full gap-4'>
-                    <div className='w-full md:w-1/5'>
+                    <div className='w-full md:w-1/6'>
                       <Input
                         size='sm'
                         type="text"
@@ -264,7 +285,7 @@ export function TranslatorApplication() {
                       />
                     </div>
 
-                    <div className='w-full md:w-1/5 flex'>
+                    <div className='w-full md:w-1/6 flex'>
                       <Switch
                         size='sm'
                         isSelected={useStructuredMode}
@@ -273,15 +294,20 @@ export function TranslatorApplication() {
                       </Switch>
                       <div className="flex flex-col place-content-center gap-1">
                         <p className="text-small">Use Structured Mode</p>
+                        {baseUrlValue && (
+                          <p className="text-tiny text-default-400">
+                            Base URL is set, disable structured mode for compatibility.
+                          </p>
+                        )}
                       </div>
                     </div>
 
-                    <div className='w-full md:w-1/5'>
+                    <div className='w-full md:w-1/6'>
                       <Slider
                         label="Temperature"
                         size="md"
                         hideThumb={true}
-                        step={0.1}
+                        step={0.05}
                         maxValue={2}
                         minValue={0}
                         value={temperature}
@@ -289,7 +315,19 @@ export function TranslatorApplication() {
                       />
                     </div>
 
-                    <div className='w-full md:w-2/5 gap-4 flex flex-wrap md:flex-nowrap'>
+                    <div className='w-full md:w-1/6'>
+                      <Slider
+                        label="Batch Sizes"
+                        size="md"
+                        step={10}
+                        maxValue={200}
+                        minValue={10}
+                        value={batchSizes}
+                        onChange={(e) => typeof e === "number" ? setBatchSizes([e]) : setBatchSizes(e)}
+                      />
+                    </div>
+
+                    <div className='w-full md:w-2/6 gap-4 flex flex-wrap md:flex-nowrap'>
                       <div className='w-full md:w-6/12 flex'>
                         <Switch
                           size='sm'
