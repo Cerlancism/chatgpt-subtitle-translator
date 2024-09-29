@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { CooldownContext } from "../src/cooldown.mjs";
+import { CooldownContext } from "../src/main.mjs";
 import { sleep } from "../src/helpers.mjs";
 
 function testCooldown(burstCount, totalCount, waitTime)

@@ -1,4 +1,6 @@
+import { PassThrough } from "stream";
 import { z } from "zod";
+import JSONStream from "JSONStream";
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.js";
@@ -16,9 +18,10 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
     }
 
     /**
-   * @param {[string]} lines
-   * @returns {Promise<TranslationOutput>}
-   */
+     * @override
+     * @param {[string]} lines
+     * @returns {Promise<TranslationOutput>}
+     */
     async translatePrompt(lines)
     {
         // const text = lines.join("\n\n")
@@ -106,6 +109,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
     }
 
     /**
+     * @override
      * @param {string[]} lines 
      * @param {"user" | "assistant" } role
      */
@@ -119,5 +123,54 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
         {
             return JSON.stringify({ outputs: lines })
         }
+    }
+
+    /**
+     * @override
+     * @template T
+     * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<T>} runner 
+     */
+    jsonStreamParse(runner)
+    {
+        this.services.onStreamChunk?.("\n")
+        const passThroughStream = new PassThrough()
+        let writeBuffer = ''
+        runner.on("content.delta", (e) =>
+        {
+            writeBuffer += e.delta
+            passThroughStream.write(e.delta)
+            if (writeBuffer)
+            {
+                this.services.onStreamChunk?.(writeBuffer)
+                writeBuffer = ''
+            }
+        })
+
+        runner.on("content.done", () =>
+        {
+            passThroughStream.end()
+            this.services.onClearLine?.()
+        })
+
+        const parser = JSONStream.parse(["outputs", true])
+
+        parser.on("data", (output) =>
+        {
+            try
+            {
+                this.services.onClearLine?.()
+                writeBuffer = `${output}\n`
+            } catch (err)
+            {
+                console.error("[TranslatorStructuredBase]", "Parsing error:", err)
+            }
+        })
+
+        parser.on("error", (err) =>
+        {
+            console.error("[TranslatorStructuredBase]", "JSONStream parsing error:", err)
+        })
+
+        passThroughStream.pipe(parser)
     }
 }

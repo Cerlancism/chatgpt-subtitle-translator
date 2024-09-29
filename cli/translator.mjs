@@ -2,17 +2,22 @@
 import fs from 'node:fs'
 import path from 'node:path';
 import url from 'url'
+import readline from 'readline'
 
 import { Command, Option } from "commander"
 import { ProxyAgent } from 'proxy-agent';
 
-import { Translator, DefaultOptions } from "../src/translator.mjs"
-import { TranslatorStructuredObject } from '../src/translatorStructuredObject.mjs';
-import { TranslatorStructuredArray } from '../src/translatorStructuredArray.js';
-import { createOpenAIClient } from '../src/openai.mjs'
-import { CooldownContext } from '../src/cooldown.mjs';
-import { wrapQuotes } from "../src/helpers.mjs";
-import { parser } from "../src/subtitle.mjs";
+import
+{
+    DefaultOptions,
+    Translator,
+    TranslatorStructuredObject,
+    TranslatorStructuredArray,
+    createOpenAIClient,
+    CooldownContext,
+    subtitleParser,
+    wrapQuotes
+} from "../src/main.mjs"
 
 import 'dotenv/config'
 
@@ -127,6 +132,11 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
         cooler: coolerChatGPTAPI,
         onStreamChunk: (data) => process.stdout.write(data),
         onStreamEnd: () => process.stdout.write("\n"),
+        onClearLine: () =>
+        {
+            readline.clearLine(process.stdout, 0)
+            readline.cursorTo(process.stdout, 0)
+        },
         moderationService: {
             openai,
             cooler: coolerOpenAIModerator
@@ -170,8 +180,8 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
         {
             console.error("[CLI]", "Assume SRT file", opts.input)
             const text = fs.readFileSync(opts.input, 'utf-8')
-            const srtArraySource = parser.fromSrt(text)
-            const srtArrayWorking = parser.fromSrt(text)
+            const srtArraySource = subtitleParser.fromSrt(text)
+            const srtArrayWorking = subtitleParser.fromSrt(text)
 
             const sourceLines = srtArraySource.map(x => x.text)
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
@@ -223,7 +233,7 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
                     const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
                     const srtEntry = srtArrayWorking[output.index - 1]
                     srtEntry.text = output.finalTransform
-                    const outSrt = parser.toSrt([srtEntry])
+                    const outSrt = subtitleParser.toSrt([srtEntry])
                     console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
                     await Promise.all([
                         fs.promises.appendFile(progressFile, csv),

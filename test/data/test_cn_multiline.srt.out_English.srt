@@ -8,8 +8,7 @@ How are you?
 
 3
 00:00:05,000 --> 00:00:12,000
-Yes, I am fine.
-The weather is very nice today.
+Yes, I'm good. The weather is nice today.
 
 4
 00:00:12,000 --> 00:00:16,000
@@ -17,11 +16,11 @@ Yes, the weather is very nice.
 
 5
 00:00:17,000 --> 00:00:21,000
-What do you plan to do today?
+What are you planning to do today?
 
 6
 00:00:21,000 --> 00:00:28,000
-I will watch a movie with friends in the afternoon.
+I'm going to watch a movie with friends in the afternoon.
 
 7
 00:00:28,000 --> 00:00:30,000
@@ -41,7 +40,7 @@ I also like action movies.
 
 11
 00:00:40,000 --> 00:00:42,000
-I love movies.
+I like movies.
 
 12
 00:00:42,000 --> 00:00:44,000
@@ -57,8 +56,7 @@ Let's eat.
 
 15
 00:00:49,000 --> 00:00:56,000
-Yes, that's a good idea.
-What do you want to eat?
+Yes, that's a good idea. What do you want to eat?
 
 16
 00:00:59,000 --> 00:01:00,000
@@ -74,17 +72,15 @@ I also like sushi.
 
 19
 00:01:06,000 --> 00:01:07,000
-Is there a recommended restaurant?
+Do you have a recommended place?
 
 20
 00:01:07,000 --> 00:01:10,000
-Yes.
-That restaurant is very good.
+Yes. That place is very delicious.
 
 21
 00:01:10,000 --> 00:01:12,000
-Thank you.
-Let's go to that restaurant.
+Thank you. Let's go to that place.
 
 22
 00:01:12,000 --> 00:01:13,000

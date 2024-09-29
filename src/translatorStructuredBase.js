@@ -1,7 +1,5 @@
-import { PassThrough } from "stream";
 import { APIUserAbortError } from "openai";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
-import JSONStream from "JSONStream";
 import { Translator } from "./translator.mjs";
 
 export class TranslatorStructuredBase extends Translator
@@ -37,22 +35,14 @@ export class TranslatorStructuredBase extends Translator
             return
         }
         console.error("[TranslatorStructuredBase]", "Fallback to base mode")
-        const optionsRestore = {}
-        optionsRestore.stream = this.options.createChatCompletionRequest?.stream
-
-        this.options.createChatCompletionRequest.stream = this.optionsBackup.stream
-
         const output = await super.translatePrompt(lines)
-
-        this.options.createChatCompletionRequest.stream = optionsRestore.stream
-
         return output
     }
 
     /**
-     * @template T
+     * @template {import('zod').ZodType} ZodInput
      * @param {import('openai').OpenAI.ChatCompletionCreateParams} params
-     * @param {{structure: import('zod').ZodType<T>, name: string}} zFormat
+     * @param {{structure: ZodInput, name: string}} zFormat
      * @param {boolean} jsonStream
      */
     async streamParse(params, zFormat, jsonStream = false)
@@ -101,50 +91,12 @@ export class TranslatorStructuredBase extends Translator
     }
 
     /**
+     * @abstract
      * @template T
      * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<T>} runner 
      */
     jsonStreamParse(runner)
     {
-        const passThroughStream = new PassThrough()
-        let writeBuffer = ''
-        runner.on("content.delta", (e) =>
-        {
-            writeBuffer += e.delta
-            passThroughStream.write(e.delta)
-            if (writeBuffer)
-            {
-                this.services.onStreamChunk?.(writeBuffer)
-                writeBuffer = ''
-            }
-        })
 
-        runner.on("content.done", () =>
-        {
-            passThroughStream.end()
-        })
-
-        const parser = JSONStream.parse(["outputs", true])
-
-        parser.on("data", (output) =>
-        {
-            try
-            {
-                if (writeBuffer) {
-                    writeBuffer += "\n"
-                }
-                // this.services.onStreamChunk?.("\n")
-            } catch (err)
-            {
-                console.error("[TranslatorStructuredBase]", "Parsing error:", err)
-            }
-        })
-
-        parser.on("error", (err) =>
-        {
-            console.error("[TranslatorStructuredBase]", "JSONStream parsing error:", err)
-        })
-
-        passThroughStream.pipe(parser)
     }
 }

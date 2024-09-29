@@ -29,6 +29,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
     }
 
     /**
+     * @override
      * @param {[string]} lines
      * @returns {Promise<TranslationOutput>}
      */
@@ -151,6 +152,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
 
 
     /**
+     * @override
      * @param {string[]} sourceLines
      * @param {string[]} transformLines
      */

@@ -11,6 +11,7 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * @property {CooldownContext} [cooler]
  * @property {(data: string) => void} [onStreamChunk]
  * @property {() => void} [onStreamEnd]
+ * @property {() => void} [onClearLine]
  * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService]
  */
 

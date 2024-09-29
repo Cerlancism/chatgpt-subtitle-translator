@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert";
 
-import { createOpenAIClient } from "../src/openai.mjs";
+import { createOpenAIClient } from "../src/main.mjs";
 
 import 'dotenv/config'
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY)

@@ -3,11 +3,8 @@ import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert';
 
-import { parser } from '../src/subtitle.mjs';
-import { Translator } from '../src/translator.mjs';
+import { subtitleParser, Translator, CooldownContext, createOpenAIClient } from '../src/main.mjs';
 import { wrapQuotes } from '../src/helpers.mjs';
-import { CooldownContext } from '../src/cooldown.mjs';
-import { createOpenAIClient } from '../src/openai.mjs';
 
 import 'dotenv/config'
 import { TranslatorStructuredArray } from '../src/translatorStructuredArray.js';
@@ -18,7 +15,7 @@ const coolerOpenAIModerator = new CooldownContext(2, 2000, "OpenAIModerator")
 test('should output subtitles', async () =>
 {
     const fileContent = fs.readFileSync('./test/data/test_ja_small.srt', 'utf-8')
-    const srtParsed = parser.fromSrt(fileContent).map(x => x.text);
+    const srtParsed = subtitleParser.fromSrt(fileContent).map(x => x.text);
 
     const translator = new TranslatorStructuredArray({ from: "Japanese", to: "Chinese zh-cn" }, {
         cooler: coolerChatGPTAPI,
