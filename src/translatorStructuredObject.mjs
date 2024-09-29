@@ -1,4 +1,3 @@
-import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
 import { TranslationOutput } from "./translatorOutput.mjs";
@@ -64,7 +63,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
                 structuredObject[value.replaceAll("\\", "")] = z.string()
             }
         }
-        const translationBatch = z.object({ ...structuredObject });
+        const translationBatch = z.object({ ...structuredObject })
 
         try
         {
@@ -119,7 +118,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
                             {
                                 console.warn("[TranslatorStructuredObject]", "Unexpected key", "Expected", expectedKey, "Received", key)
                             }
-                            const element = parsed[key];
+                            const element = parsed[key]
                             linesOut.push(element)
                         }
                         expectedIndex++
@@ -161,7 +160,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
 
         for (let index = 0; index < sourceLines.length; index++)
         {
-            const source = sourceLines[index];
+            const source = sourceLines[index]
             const transform = transformLines[index]
             output[source] = transform
         }

@@ -1,7 +1,5 @@
-import { APIUserAbortError } from "openai";
 import { z } from "zod";
 
-import { Translator } from "./translator.mjs";
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.js";
 
