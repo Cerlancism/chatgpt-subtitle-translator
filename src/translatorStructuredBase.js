@@ -1,8 +1,8 @@
+import { PassThrough } from "stream";
 import { APIUserAbortError } from "openai";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
+import JSONStream from "JSONStream";
 import { Translator } from "./translator.mjs";
-import JSONStream from "JSONStream"; // Import JSONStream
-import { PassThrough } from "stream"; // Import PassThrough stream
 
 export class TranslatorStructuredBase extends Translator
 {
@@ -50,11 +50,11 @@ export class TranslatorStructuredBase extends Translator
     }
 
     /**
-  * @template T
-  * @param {import('openai').OpenAI.ChatCompletionCreateParams} params
-  * @param {{structure: import('zod').ZodType<T>, name: string}} zFormat
-  * @param {boolean} jsonStream
-  */
+     * @template T
+     * @param {import('openai').OpenAI.ChatCompletionCreateParams} params
+     * @param {{structure: import('zod').ZodType<T>, name: string}} zFormat
+     * @param {boolean} jsonStream
+     */
     async streamParse(params, zFormat, jsonStream = false)
     {
         if (params.stream)
@@ -66,9 +66,9 @@ export class TranslatorStructuredBase extends Translator
                 stream_options: {
                     include_usage: true,
                 },
-            });
+            })
 
-            this.streamController = runner.controller;
+            this.streamController = runner.controller
 
             if (jsonStream)
             {
@@ -78,16 +78,16 @@ export class TranslatorStructuredBase extends Translator
             {
                 runner.on("content.delta", (e) =>
                 {
-                    this.services.onStreamChunk?.(e.delta);
-                });
+                    this.services.onStreamChunk?.(e.delta)
+                })
             }
-            await runner.done();
+            await runner.done()
 
-            this.services.onStreamEnd?.();
+            this.services.onStreamEnd?.()
 
-            const final = await runner.finalChatCompletion();
+            const final = await runner.finalChatCompletion()
 
-            return final;
+            return final
 
         } else
         {
@@ -95,8 +95,8 @@ export class TranslatorStructuredBase extends Translator
                 ...params,
                 response_format: zodResponseFormat(zFormat.structure, zFormat.name),
                 stream: false,
-            });
-            return output;
+            })
+            return output
         }
     }
 
@@ -106,25 +106,25 @@ export class TranslatorStructuredBase extends Translator
      */
     jsonStreamParse(runner)
     {
-        const passThroughStream = new PassThrough();
+        const passThroughStream = new PassThrough()
         let writeBuffer = ''
         runner.on("content.delta", (e) =>
         {
             writeBuffer += e.delta
-            passThroughStream.write(e.delta);
+            passThroughStream.write(e.delta)
             if (writeBuffer)
             {
-                this.services.onStreamChunk?.(writeBuffer);
+                this.services.onStreamChunk?.(writeBuffer)
                 writeBuffer = ''
             }
-        });
+        })
 
         runner.on("content.done", () =>
         {
-            passThroughStream.end();
-        });
+            passThroughStream.end()
+        })
 
-        const parser = JSONStream.parse(["outputs", true]);
+        const parser = JSONStream.parse(["outputs", true])
 
         parser.on("data", (output) =>
         {
@@ -133,18 +133,18 @@ export class TranslatorStructuredBase extends Translator
                 if (writeBuffer) {
                     writeBuffer += "\n"
                 }
-                // this.services.onStreamChunk?.("\n");
+                // this.services.onStreamChunk?.("\n")
             } catch (err)
             {
-                console.error("[TranslatorStructuredBase]", "Parsing error:", err);
+                console.error("[TranslatorStructuredBase]", "Parsing error:", err)
             }
-        });
+        })
 
         parser.on("error", (err) =>
         {
-            console.error("[TranslatorStructuredBase]", "JSONStream parsing error:", err);
-        });
+            console.error("[TranslatorStructuredBase]", "JSONStream parsing error:", err)
+        })
 
-        passThroughStream.pipe(parser);
+        passThroughStream.pipe(parser)
     }
 }
