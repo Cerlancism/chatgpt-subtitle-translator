@@ -93,13 +93,14 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                 linesOut,
                 output.usage?.prompt_tokens,
                 output.usage?.completion_tokens,
-                output.usage?.total_tokens,
                 output.usage?.prompt_tokens_details?.cached_tokens,
+                output.usage?.total_tokens,
                 output.choices[0].message.refusal
             )
 
             this.promptTokensUsed += translationOutput.promptTokens
             this.completionTokensUsed += translationOutput.completionTokens
+            this.cachedTokens += translationOutput.cachedTokens
             this.tokensProcessTimeMs += (endTime - startTime)
 
             return translationOutput

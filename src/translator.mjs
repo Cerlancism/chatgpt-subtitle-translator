@@ -176,7 +176,8 @@ export class Translator
                     getOutput(promptResponse.choices[0].message.content),
                     promptResponse.usage?.prompt_tokens,
                     promptResponse.usage?.completion_tokens,
-                    promptResponse.usage?.total_tokens
+                    promptResponse.usage?.prompt_tokens_details?.cached_tokens,
+                    promptResponse.usage?.total_tokens,
                 )
                 return output
             }
@@ -227,11 +228,13 @@ export class Translator
                 const prompt_tokens = usage?.prompt_tokens
                 const completion_tokens = usage?.completion_tokens
                 const cached_tokens = usage?.prompt_tokens_details?.cached_tokens
+                const total_tokens = usage?.total_tokens
                 const output = new TranslationOutput(
                     getOutput(streamOutput),
                     prompt_tokens,
                     completion_tokens,
-                    cached_tokens
+                    cached_tokens,
+                    total_tokens
                 )
                 return output
             }

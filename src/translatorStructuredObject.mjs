@@ -135,8 +135,8 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
                 linesOut,
                 output.usage?.prompt_tokens,
                 output.usage?.completion_tokens,
-                output.usage?.total_tokens,
                 output.usage?.prompt_tokens_details?.cached_tokens,
+                output.usage?.total_tokens,
                 output.choices[0].message.refusal
             )
 
