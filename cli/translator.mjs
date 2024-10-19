@@ -52,10 +52,12 @@ export function createInstance(args)
         .option("-f, --file <file>", "Deprecated: alias for -i, --input")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
+
         .option("--experimental-max_token <value>", "", parseInt, 0)
         .option("--experimental-input-multiplier <value>", "", parseInt, 0)
         .option("--experimental-fallback-model <value>", "Model to be used for refusal fallback")
         .addOption(new Option("--experimental-structured-mode [mode]", "Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
+        .option("--experimental-use-full-context", "Use the full history, chunked by historyPromptLength, to work better with prompt caching.")
 
         .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
@@ -107,6 +109,7 @@ export function createInstance(args)
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
         ...(opts.experimentalFallbackModel && { fallbackModel: opts.experimentalFallbackModel }),
+        ...(opts.experimentalUseFullContext && { useFullContext: opts.experimentalUseFullContext }),
         ...(opts.logLevel && { logLevel: opts.logLevel })
     };
 

@@ -33,6 +33,8 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Enforce one to one line quantity input output matching
  * @property {number} historyPromptLength `10` \
  * Length of the prompt history to be retained and passed over to the next translation request in order to maintain some context.
+ * @property {boolean} useFullContext
+ * Use the full history, chunked by historyPromptLength, to work better with prompt caching.
  * @property {number[]} batchSizes `[10, 100]` \
  * The number of lines to include in each translation prompt, provided that they are estimated to within the token limit. 
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
@@ -55,6 +57,7 @@ export const DefaultOptions = {
     prefixNumber: true,
     lineMatching: true,
     historyPromptLength: 10,
+    useFullContext: false,
     batchSizes: [10, 100],
     structuredMode: false,
     max_token: 0,
@@ -465,10 +468,20 @@ export class Translator
     {
         if (this.workingProgress.length === 0 || this.options.historyPromptLength === 0)
         {
-            return
+            return;
         }
-        const sliced = this.workingProgress.slice(-this.options.historyPromptLength)
-        const offset = this.workingProgress.length - this.options.historyPromptLength
+
+        let sliced;
+        if (this.options.useFullContext)
+        {
+            // Use the entire workingProgress if useFullContext is true
+            sliced = this.workingProgress;
+        } else
+        {
+            // Otherwise, slice based on historyPromptLength
+            sliced = this.workingProgress.slice(-this.options.historyPromptLength);
+        }
+        const offset = this.workingProgress.length - sliced.length;
 
         /**
          * @param {string} text
@@ -476,20 +489,19 @@ export class Translator
          */
         const checkFlaggedMapper = (text, index) =>
         {
-            const id = index + (offset < 0 ? 0 : offset)
+            const id = index + (offset < 0 ? 0 : offset);
             if (this.moderatorFlags.has(id))
             {
                 // log.warn("[Translator]", "Prompt Flagged", id, text)
-                return this.preprocessLine("-", id, 0)
+                return this.preprocessLine("-", id, 0);
             }
-            return text
-        }
+            return text;
+        };
 
-        const checkedSource = sliced.map((x, i) => checkFlaggedMapper(x.source, i))
-        const checkedTransform = sliced.map((x, i) => checkFlaggedMapper(x.transform, i))
-        this.promptContext = this.getContext(checkedSource, checkedTransform)
+        const checkedSource = sliced.map((x, i) => checkFlaggedMapper(x.source, i));
+        const checkedTransform = sliced.map((x, i) => checkFlaggedMapper(x.transform, i));
+        this.promptContext = this.getContext(checkedSource, checkedTransform);
     }
-
 
     /**
      * @param {string[]} sourceLines
@@ -497,11 +509,24 @@ export class Translator
      */
     getContext(sourceLines, transformLines)
     {
-        return  /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/ ([
-            { role: "user", content: this.getContextLines(sourceLines, "user") },
-            { role: "assistant", content: this.getContextLines(transformLines, "assistant") }
-        ])
+        const chunks = [];
+        const chunkSize = this.options.historyPromptLength;
+        for (let i = 0; i < sourceLines.length; i += chunkSize)
+        {
+            const sourceChunk = sourceLines.slice(i, i + chunkSize);
+            const transformChunk = transformLines.slice(i, i + chunkSize);
+            chunks.push({
+                role: "user",
+                content: this.getContextLines(sourceChunk, "user")
+            });
+            chunks.push({
+                role: "assistant",
+                content: this.getContextLines(transformChunk, "assistant")
+            });
+        }
+        return /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/ (chunks);
     }
+
 
     /**
      * @param {string[]} lines 
