@@ -223,7 +223,7 @@ export class Translator
                 })
                 const prompt_tokens = usage?.prompt_tokens
                 const completion_tokens = usage?.completion_tokens
-                const cached_tokens = usage?.prompt_tokens_details.cached_tokens
+                const cached_tokens = usage?.prompt_tokens_details?.cached_tokens
                 const output = new TranslationOutput(
                     getOutput(streamOutput),
                     prompt_tokens,
