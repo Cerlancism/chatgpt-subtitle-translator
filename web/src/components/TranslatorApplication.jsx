@@ -438,6 +438,9 @@ export function TranslatorApplication() {
                 {usageInformation?.wastedTokens > 0 && (
                   <span className={'text-danger'}>Wasted: {usageInformation?.wastedTokens} ${usageInformation?.wastedTokensPricing} {usageInformation?.wastedPercent}</span>
                 )}
+                {usageInformation?.cachedTokens > 0 && (
+                  <span className={'text-success'}>Cached: {usageInformation?.cachedTokens}</span>
+                )}
                 <span>{usageInformation?.rate} TPM {RPMInfomation} RPM</span>
               </Card>
             )}
