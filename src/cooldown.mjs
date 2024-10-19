@@ -1,3 +1,4 @@
+import log from "loglevel"
 import { sleep } from "./helpers.mjs"
 
 /**
@@ -28,7 +29,7 @@ export class CooldownContext
     cooldown()
     {
         // Remove any requests from the requests array that are older than the duration
-        // console.log("[CooldownContext]", this.description, this.requests.length)
+        // log.debug("[CooldownContext]", this.description, this.requests.length)
         const now = Date.now();
         this.requests = this.requests.filter(time => now - time < this.duration);
         this.rate = this.requests.length
@@ -54,7 +55,7 @@ export class CooldownContext
             this.requests.push(Date.now());
             return false
         }
-        console.error("[Cooldown]", this.description, cooldown, `ms`)
+        log.error("[Cooldown]", this.description, cooldown, `ms`)
 
         await sleep(cooldown + this.baseDelay)
         this.requests.push(Date.now());

@@ -1,5 +1,6 @@
 import { APIUserAbortError } from "openai";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
+import log from "loglevel"
 import { Translator } from "./translator.mjs";
 
 export class TranslatorStructuredBase extends Translator
@@ -11,12 +12,12 @@ export class TranslatorStructuredBase extends Translator
      */
     constructor(language, services, options)
     {
-        console.error(`[TranslatorStructuredBase]`, "Structured Mode:", options.structuredMode)
+        log.debug(`[TranslatorStructuredBase]`, "Structured Mode:", options.structuredMode)
         const optionsBackup = {}
         optionsBackup.stream = options.createChatCompletionRequest?.stream
         if (options.prefixNumber)
         {
-            console.warn("[TranslatorStructuredBase]", "--no-prefix-number must be used in structured mode, overriding.")
+            log.warn("[TranslatorStructuredBase]", "--no-prefix-number must be used in structured mode, overriding.")
         }
         options.prefixNumber = false
         super(language, services, options)
@@ -34,7 +35,7 @@ export class TranslatorStructuredBase extends Translator
         {
             return
         }
-        console.error("[TranslatorStructuredBase]", "Fallback to base mode")
+        log.warn("[TranslatorStructuredBase]", "Fallback to base mode")
         const output = await super.translatePrompt(lines)
         return output
     }

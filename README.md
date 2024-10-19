@@ -83,7 +83,12 @@ Options:
     Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/. (default: `array`, choices `array`, `object`)
       - `--experimental-structured-mode array` Structures the input and output into plain array format. This option is more concise as compared to base mode, though uses slightly more tokens per batch.
       - `--experimental-structured-mode object` Structures both the input and output into a dynamically generated object schema based on input values. This option is even more concise and uses fewer tokens, but the batch has to be smaller, and is slow and unreliable. Due to its unreliability, it may lead to more resubmission retries, potentially wasting more tokens in the process. 
-
+  - `--log-level [level]`
+    Log level (choices: "trace", "debug", "info", "warn", "error", "silent")
+  - `--silent`
+    Same as `--log-level silent`
+  - `--quiet`
+    Same as `--log-level silent`
 
 Additional Options for GPT:  
   - `-m, --model <model>`  

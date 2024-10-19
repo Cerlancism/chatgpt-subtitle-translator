@@ -1,3 +1,4 @@
+import log from "loglevel"
 import { CooldownContext } from "./cooldown.mjs"
 import { openaiRetryWrapper } from "./openai.mjs"
 
@@ -28,10 +29,10 @@ export async function checkModeration(input, services, model = undefined)
 
         if (moderationData.flagged)
         {
-            console.error("[CheckModeration]", "flagged", getModeratorResults(moderationData))
+            log.debug("[CheckModeration]", "flagged", getModeratorResults(moderationData))
         }
 
-        // console.error("Moderation complete")
+        // log.debug("Moderation complete")
 
         return moderationData
     }, 3, "CheckModeration")

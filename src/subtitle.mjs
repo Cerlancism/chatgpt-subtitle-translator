@@ -1,4 +1,5 @@
 import srtParser2 from "srt-parser-2"
+import log from "loglevel"
 
 export const parser = new srtParser2();
 
@@ -53,7 +54,7 @@ export function parseTimeOffset(timeOffset)
         timeOffset = timeOffset.replace(/[-.]/g, ":"); // replace hyphens and dots with colons
         let timeParts = timeOffset.split(":");
 
-        console.log(timeParts)
+        log.debug(timeParts)
 
         if (timeParts.length === 1)
         {

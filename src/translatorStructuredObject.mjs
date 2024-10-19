@@ -1,4 +1,5 @@
 import { z } from "zod";
+import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.js";
@@ -17,7 +18,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
         if (options.batchSizes[0] === 10 && options.batchSizes[1] === 100)
         {
             const reducedBatchSizes = [10, 20]
-            console.warn("[TranslatorStructuredObject]", "--batch-sizes is to be reduced to", JSON.stringify(reducedBatchSizes))
+            log.warn("[TranslatorStructuredObject]", "--batch-sizes is to be reduced to", JSON.stringify(reducedBatchSizes))
             options.batchSizes = reducedBatchSizes
         }
         else if (options.batchSizes.some(x => x > 100))
@@ -83,7 +84,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
                 name: "translation_object"
             })
 
-            // console.log("[TranslatorStructuredObject]", output.choices[0].message.content)
+            // log.debug("[TranslatorStructuredObject]", output.choices[0].message.content)
 
             endTime = Date.now()
 
@@ -117,7 +118,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
                             const expectedKey = lines[expectedIndex]
                             if (key != expectedKey)
                             {
-                                console.warn("[TranslatorStructuredObject]", "Unexpected key", "Expected", expectedKey, "Received", key)
+                                log.warn("[TranslatorStructuredObject]", "Unexpected key", "Expected", expectedKey, "Received", key)
                             }
                             const element = parsed[key]
                             linesOut.push(element)
@@ -135,6 +136,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
                 output.usage?.prompt_tokens,
                 output.usage?.completion_tokens,
                 output.usage?.total_tokens,
+                output.usage?.prompt_tokens_details.cached_tokens,
                 output.choices[0].message.refusal
             )
 
@@ -145,7 +147,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
             return translationOutput
         } catch (error)
         {
-            console.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
+            log.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
             return await this.translateBaseFallback(lines, error)
         }
     }

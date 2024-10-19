@@ -1,6 +1,7 @@
 import { PassThrough } from "stream";
 import { z } from "zod";
 import JSONStream from "JSONStream";
+import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.js";
@@ -53,7 +54,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                 name: "translation_array"
             }, true)
 
-            // console.log("[TranslatorStructuredArray]", output.choices[0].message.content)
+            // log.debug("[TranslatorStructuredArray]", output.choices[0].message.content)
 
             endTime = Date.now()
 
@@ -63,7 +64,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
             {
                 if (lines.length === 1 && translation.refusal && this.options.fallbackModel)
                 {
-                    console.log("[TranslatorStructuredArray] Refusal Fallback", this.options.fallbackModel)
+                    log.debug("[TranslatorStructuredArray] Refusal Fallback", this.options.fallbackModel)
                     const requestOptions = { ...this.options.createChatCompletionRequest }
                     requestOptions.model = this.options.fallbackModel
                     const fallBackOutput = await this.streamParse({
@@ -93,6 +94,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                 output.usage?.prompt_tokens,
                 output.usage?.completion_tokens,
                 output.usage?.total_tokens,
+                output.usage?.prompt_tokens_details?.cached_tokens,
                 output.choices[0].message.refusal
             )
 
@@ -103,7 +105,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
             return translationOutput
         } catch (error)
         {
-            console.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
+            log.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
             return await this.translateBaseFallback(lines, error)
         }
     }
@@ -162,13 +164,13 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                 writeBuffer = `${output}\n`
             } catch (err)
             {
-                console.error("[TranslatorStructuredBase]", "Parsing error:", err)
+                log.error("[TranslatorStructuredBase]", "Parsing error:", err)
             }
         })
 
         parser.on("error", (err) =>
         {
-            console.error("[TranslatorStructuredBase]", "JSONStream parsing error:", err)
+            log.error("[TranslatorStructuredBase]", "JSONStream parsing error:", err)
         })
 
         passThroughStream.pipe(parser)

@@ -1,4 +1,5 @@
 import { OpenAI } from "openai";
+import log from "loglevel"
 import { retryWrapper, sleep } from './helpers.mjs';
 
 /**
@@ -86,7 +87,7 @@ export async function openaiRetryWrapper(func, maxRetries, description)
         let delay = 1000 * retryContext.currentTry * retryContext.currentTry
         if (error instanceof OpenAI.APIError)
         {
-            console.error(`[Error_${description}]`, new Date(), "Status", error.status, error.name, error.message, error.error)
+            log.error(`[Error_${description}]`, new Date(), "Status", error.status, error.name, error.message, error.error)
 
             if (error.status === 429 || (error.status >= 500 && error.status <= 599))
             {
@@ -96,12 +97,12 @@ export async function openaiRetryWrapper(func, maxRetries, description)
             {
                 throw `[Error_${description}] ${new Date()} ${error.message}`
             }
-            console.error(`[Error_${description}]`, "Retries", retryContext.currentTry, "Delay", delay)
+            log.error(`[Error_${description}]`, "Retries", retryContext.currentTry, "Delay", delay)
             await sleep(delay)
         }
         else if (error instanceof ChatStreamSyntaxError)
         {
-            console.error(`[Error_${description}] ${error.message}`, "Retries", retryContext.currentTry, "Delay", delay)
+            log.error(`[Error_${description}] ${error.message}`, "Retries", retryContext.currentTry, "Delay", delay)
             await sleep(delay)
         }
         else
@@ -110,7 +111,7 @@ export async function openaiRetryWrapper(func, maxRetries, description)
         }
     }, async (retryContext) =>
     {
-        console.error(`[Error_${description}] [openaiRetryWrapper] Max Retries Reached`, new Date(), retryContext)
+        log.error(`[Error_${description}] [openaiRetryWrapper] Max Retries Reached`, new Date(), retryContext)
         throw `[Error_${description}] [openaiRetryWrapper] Max Retries Reached, Error: ${retryContext.error?.message ?? retryContext.error}`
     })
 }

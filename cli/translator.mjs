@@ -6,6 +6,7 @@ import readline from 'readline'
 
 import { Command, Option } from "commander"
 import { ProxyAgent } from 'proxy-agent';
+import log from 'loglevel'
 
 import
 {
@@ -35,7 +36,7 @@ export function createInstance(args)
 
     if (httpProxyConfig || httpsProxyConfig)
     {
-        console.error("[CLI HTTP/HTTPS PROXY]", "Using HTTP/HTTPS Proxy from ENV Detected", { httpProxyConfig, httpsProxyConfig })
+        log.debug("[CLI HTTP/HTTPS PROXY]", "Using HTTP/HTTPS Proxy from ENV Detected", { httpProxyConfig, httpsProxyConfig })
         openai.httpAgent = new ProxyAgent()
     }
 
@@ -51,10 +52,10 @@ export function createInstance(args)
         .option("-f, --file <file>", "Deprecated: alias for -i, --input")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
-        .addOption(new Option("--experimental-structured-mode [mode]", "Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
         .option("--experimental-max_token <value>", "", parseInt, 0)
         .option("--experimental-input-multiplier <value>", "", parseInt, 0)
         .option("--experimental-fallback-model <value>", "Model to be used for refusal fallback")
+        .addOption(new Option("--experimental-structured-mode [mode]", "Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
 
         .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
@@ -72,6 +73,9 @@ export function createInstance(args)
         .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty", parseFloat)
         .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias", JSON.parse)
         // .option("--user <user>", "A unique identifier representing your end-user")
+        .addOption(new Option("--log-level <level>", "Log level").choices(["trace", "debug", "info", "warn", "error", "silent"]))
+        .option("--silent", "Same as --log-level silent")
+        .option("--quiet", "Same as --log-level silent")
         .parse(args)
 
     const opts = program.opts()
@@ -102,18 +106,33 @@ export function createInstance(args)
         ...(opts.experimentalStructuredMode && { structuredMode: opts.experimentalStructuredMode }),
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
-        ...(opts.experimentalFallbackModel && { fallbackModel: opts.experimentalFallbackModel })
+        ...(opts.experimentalFallbackModel && { fallbackModel: opts.experimentalFallbackModel }),
+        ...(opts.logLevel && { logLevel: opts.logLevel })
     };
+
+    log.setDefaultLevel("debug")
+
+    if (opts.silent || opts.quiet)
+    {
+        options.logLevel = "silent"
+    }
+
+    if (options.logLevel)
+    {
+        log.setLevel(options.logLevel)
+    }
+
+    log.debug("[CLI]", "Log level", Object.entries(log.levels).find(x => x[1] === log.getLevel())?.[0])
 
     if (opts.file && !opts.input)
     {
-        console.warn("[CLI]", "[WARNING]", "-f, --file is deprecated, use -i, --input")
+        log.warn("[CLI]", "[WARNING]", "-f, --file is deprecated, use -i, --input")
         opts.input = opts.file
     }
 
     if (options.inputMultiplier && !options.max_token)
     {
-        console.error("[CLI]", "[ERROR]", "--experimental-input-multiplier must be set with --experimental-max_token")
+        log.error("[CLI]", "[ERROR]", "--experimental-input-multiplier must be set with --experimental-max_token")
         process.exit(1)
     }
 
@@ -130,9 +149,15 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
     const services = {
         openai,
         cooler: coolerChatGPTAPI,
-        onStreamChunk: (data) => process.stdout.write(data),
-        onStreamEnd: () => process.stdout.write("\n"),
-        onClearLine: () =>
+        onStreamChunk: log.getLevel() === log.levels.SILENT ? () => { } : (data) =>
+        {
+            return process.stdout.write(data);
+        },
+        onStreamEnd: log.getLevel() === log.levels.SILENT ? () => { } : () =>
+        {
+            return process.stdout.write("\n");
+        },
+        onClearLine: log.getLevel() === log.levels.SILENT ? () => { } : () =>
         {
             readline.clearLine(process.stdout, 0)
             readline.cursorTo(process.stdout, 0)
@@ -178,7 +203,7 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
     {
         if (opts.input.endsWith(".srt"))
         {
-            console.error("[CLI]", "Assume SRT file", opts.input)
+            log.debug("[CLI]", "Assume SRT file", opts.input)
             const text = fs.readFileSync(opts.input, 'utf-8')
             const srtArraySource = subtitleParser.fromSrt(text)
             const srtArrayWorking = subtitleParser.fromSrt(text)
@@ -195,15 +220,15 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
 
                 if (progress.length === sourceLines.length)
                 {
-                    console.error("[CLI]", `Progress already completed ${progressFile}`)
-                    console.error("[CLI]", `Overwriting ${progressFile}`)
+                    log.debug("[CLI]", `Progress already completed ${progressFile}`)
+                    log.debug("[CLI]", `Overwriting ${progressFile}`)
                     fs.writeFileSync(progressFile, '')
-                    console.error("[CLI]", `Overwriting ${outputFile}`)
+                    log.debug("[CLI]", `Overwriting ${outputFile}`)
                     fs.writeFileSync(outputFile, '')
                 }
                 else
                 {
-                    console.error("[CLI]", `Resuming from ${progressFile}`, progress.length)
+                    log.debug("[CLI]", `Resuming from ${progressFile}`, progress.length)
                     const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
                     for (let index = 0; index < progress.length; index++)
                     {
@@ -234,7 +259,7 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
                     const srtEntry = srtArrayWorking[output.index - 1]
                     srtEntry.text = output.finalTransform
                     const outSrt = subtitleParser.toSrt([srtEntry])
-                    console.log(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
+                    log.info(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
                     await Promise.all([
                         fs.promises.appendFile(progressFile, csv),
                         fs.promises.appendFile(outputFile, outSrt)
@@ -242,13 +267,13 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
                 }
             } catch (error)
             {
-                console.error("[CLI]", "Error", error)
+                log.error("[CLI]", "Error", error)
                 process.exit(1)
             }
         }
         else
         {
-            console.error("[CLI]", "Assume plain text file", opts.input)
+            log.debug("[CLI]", "Assume plain text file", opts.input)
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
             const ext = path.extname(opts.input)
             const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}${ext}`
@@ -277,7 +302,7 @@ async function translatePlainText(translator, text, outfile)
         {
             if (!translator.options.createChatCompletionRequest.stream)
             {
-                console.log(output.transform)
+                log.info(output.transform)
             }
             if (outfile)
             {
@@ -286,7 +311,7 @@ async function translatePlainText(translator, text, outfile)
         }
     } catch (error)
     {
-        console.error("[CLI]", "Error", error)
+        log.error("[CLI]", "Error", error)
         process.exit(1)
     }
 
