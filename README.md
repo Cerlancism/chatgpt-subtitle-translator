@@ -7,8 +7,8 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
-- **New**: Supports structured output: [Structured output](https://openai.com/index/introducing-structured-outputs-in-the-api/) for more concise results, available in the Web UI and in CLI with `--experimental-structured-mode`.
-- **New**: Supports prompt caching: [Prompt caching](https://openai.com/index/api-prompt-caching/), by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--experimental-use-full-context` (CLI only).
+- **New**: Supports [Structured output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--experimental-structured-mode`.
+- **New**: Supports [Prompt caching](https://openai.com/index/api-prompt-caching/), by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--experimental-use-full-context` (CLI only).
 - Line-based batching: avoiding token limit per request, reducing overhead token wastage, maintaining translation context to certain extent  
 - Checking with the free OpenAI Moderation tool: prevent token wastage if the model is highly likely to refuse to translate  
 - Streaming process output  
