@@ -90,6 +90,10 @@ Options:
     The translated lines per user and assistant message pairs are sliced as defined by `--history-prompt-length` (by default `--history-prompt-length 10`), it is recommended to set this to the largest batch size (by default `--batch-sizes "[10,100]"`): `--history-prompt-length 100`.  
     
     Enabling this may risk running into the model's context window limit, typically `128K`, but should be sufficient for most cases.
+  - `--experimental-fallback-model <value>`  
+    Model to be used for refusal fallback
+  - `--experimental-unstructured-fallback`  
+    Enable unstructured mode fallback when using structured mode with fallback model
   - `--log-level <level>`  
     Log level (default: `debug`, choices: `trace`, `debug`, `info`, `warn`, `error`, `silent`)
   - `--silent`  

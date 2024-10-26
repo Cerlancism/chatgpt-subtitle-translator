@@ -56,6 +56,7 @@ export function createInstance(args)
         .option("--experimental-max_token <value>", "", parseInt, 0)
         .option("--experimental-input-multiplier <value>", "", parseInt, 0)
         .option("--experimental-fallback-model <value>", "Model to be used for refusal fallback")
+        .option("--experimental-unstructured-fallback", "Enable unstructured mode fallback when using structured mode with fallback model")
         .addOption(new Option("--experimental-structured-mode [mode]", "Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
         .option("--experimental-use-full-context", "Use the full history, chunked by historyPromptLength, to work better with prompt caching.")
 
@@ -70,10 +71,10 @@ export function createInstance(args)
         // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
         // .option("--stop <stop>", "Up to 4 sequences where the API will stop generating further tokens")
         // .option("--max-tokens <max_tokens>", "The maximum number of tokens to generate in the chat completion", parseInt)
-        .option("--top_p <top_p>", "Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p", parseFloat)
-        .option("--presence_penalty <presence_penalty>", "Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-presence_penalty", parseFloat)
-        .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty", parseFloat)
-        .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias", JSON.parse)
+        .option("--top_p <top_p>", "Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat-create-top_p", parseFloat)
+        .option("--presence_penalty <presence_penalty>", "Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat-create-presence_penalty", parseFloat)
+        .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat-create-frequency_penalty", parseFloat)
+        .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat-create-logit_bias", JSON.parse)
         // .option("--user <user>", "A unique identifier representing your end-user")
         .addOption(new Option("--log-level <level>", "Log level").choices(["trace", "debug", "info", "warn", "error", "silent"]))
         .option("--silent", "Same as --log-level silent")
@@ -110,6 +111,7 @@ export function createInstance(args)
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
         ...(opts.experimentalFallbackModel && { fallbackModel: opts.experimentalFallbackModel }),
         ...(opts.experimentalUseFullContext && { useFullContext: opts.experimentalUseFullContext }),
+        ...(opts.experimentalUnstructuredFallback && { unstructuredFallback: opts.experimentalUnstructuredFallback }),
         ...(opts.logLevel && { logLevel: opts.logLevel })
     };
 

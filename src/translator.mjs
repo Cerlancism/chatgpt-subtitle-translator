@@ -244,6 +244,85 @@ export class Translator
         this.completionTokensUsed += response.completionTokens
         this.cachedTokens += response.cachedTokens
         this.tokensProcessTimeMs += (endTime - startTime)
+
+        if (response.content.length === 1 && response.content[0].includes("[Flagged][Model]") && this.options.fallbackModel) {
+            log.debug("[Translator] Refusal Fallback", this.options.fallbackModel)
+            const requestOptions = { ...this.options.createChatCompletionRequest }
+            requestOptions.model = this.options.fallbackModel
+            const fallbackResponse = await openaiRetryWrapper(async () => {
+                await this.services.cooler?.cool()
+                startTime = Date.now()
+                if (!streamMode) {
+                    const promptResponse = await this.services.openai.chat.completions.create({
+                        messages,
+                        ...requestOptions,
+                        stream: false,
+                        max_tokens
+                    })
+                    endTime = Date.now()
+                    const output = new TranslationOutput(
+                        getOutput(promptResponse.choices[0].message.content),
+                        promptResponse.usage?.prompt_tokens,
+                        promptResponse.usage?.completion_tokens,
+                        promptResponse.usage?.prompt_tokens_details?.cached_tokens,
+                        promptResponse.usage?.total_tokens,
+                    )
+                    return output
+                } else {
+                    const promptResponse = await this.services.openai.chat.completions.create({
+                        messages,
+                        ...requestOptions,
+                        stream: true,
+                        stream_options: {
+                            include_usage: true
+                        },
+                        max_tokens
+                    })
+
+                    this.streamController = promptResponse.controller
+
+                    let writeQueue = ''
+                    /** @type {import('openai').OpenAI.Completions.CompletionUsage} */
+                    let usage
+                    const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) => {
+                        const hasNewline = data.includes("\n")
+                        if (writeQueue.length === 0 && !hasNewline) {
+                            this.services.onStreamChunk?.(data)
+                        } else if (hasNewline) {
+                            writeQueue += data
+                            writeQueue = writeQueue.replaceAll("\n\n", "\n")
+                        } else {
+                            writeQueue += data
+                            this.services.onStreamChunk?.(writeQueue)
+                            writeQueue = ''
+                        }
+                    }, (u) => {
+                        endTime = Date.now()
+                        usage = u
+                        this.services.onStreamEnd?.()
+                    })
+                    const prompt_tokens = usage?.prompt_tokens
+                    const completion_tokens = usage?.completion_tokens
+                    const cached_tokens = usage?.prompt_tokens_details?.cached_tokens
+                    const total_tokens = usage?.total_tokens
+                    const output = new TranslationOutput(
+                        getOutput(streamOutput),
+                        prompt_tokens,
+                        completion_tokens,
+                        cached_tokens,
+                        total_tokens
+                    )
+                    return output
+                }
+            }, 3, "FallbackTranslationPrompt")
+
+            this.promptTokensUsed += fallbackResponse.promptTokens
+            this.completionTokensUsed += fallbackResponse.completionTokens
+            this.cachedTokens += fallbackResponse.cachedTokens
+            this.tokensProcessTimeMs += (endTime - startTime)
+            return fallbackResponse
+        }
+
         return response
     }
 
