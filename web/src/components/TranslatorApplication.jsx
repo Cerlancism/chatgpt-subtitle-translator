@@ -15,6 +15,9 @@ import { Translator, TranslatorStructuredArray, subtitleParser, createOpenAIClie
 const OPENAI_API_KEY = "OPENAI_API_KEY"
 const OPENAI_BASE_URL = "OPENAI_BASE_URL"
 const RATE_LIMIT = "RATE_LIMIT"
+const MODEL = "MODEL"
+
+const DefaultModel = "gpt-4o-mini"
 
 export function TranslatorApplication() {
   // Translator Configuration
@@ -23,14 +26,13 @@ export function TranslatorApplication() {
   const [fromLanguage, setFromLanguage] = useState("")
   const [toLanguage, setToLanguage] = useState("English")
   const [systemInstruction, setSystemInstruction] = useState("")
-  const [model, setModel] = useState("gpt-4o-mini")
+  const [model, setModel] = useState(DefaultModel)
   const [temperature, setTemperature] = useState(0)
   const [batchSizes, setBatchSizes] = useState([10, 50])
   const [useModerator, setUseModerator] = useState(true)
   const [useStructuredMode, setUseStructuredMode] = useState(true)
   const [rateLimit, setRateLimit] = useState(60)
-  /** @type {React.MutableRefObject<HTMLInputElement>} */
-  const configSection = useRef()
+
   const [isAPIInputVisible, setIsAPIInputVisible] = useState(false)
   const toggleAPIInputVisibility = () => setIsAPIInputVisible(!isAPIInputVisible)
 
@@ -41,7 +43,7 @@ export function TranslatorApplication() {
   const [outputs, setOutput] = useState([])
   const [streamOutput, setStreamOutput] = useState("")
   const [translatorRunningState, setTranslatorRunningState] = useState(false)
-  /** @type {React.MutableRefObject<Translator>} */
+  /** @type {React.RefObject<Translator>} */
   const translatorRef = useRef(null)
   const translatorRunningRef = useRef(false)
 
@@ -54,6 +56,8 @@ export function TranslatorApplication() {
     setAPIValue(localStorage.getItem(OPENAI_API_KEY) ?? "")
     setRateLimit(Number(localStorage.getItem(RATE_LIMIT) ?? rateLimit))
     setBaseUrlWithModerator(localStorage.getItem(OPENAI_BASE_URL) ?? undefined)
+    setModelValue(localStorage.getItem(MODEL) ?? undefined)
+
   }, [])
 
   function setAPIKey(value) {
@@ -84,9 +88,25 @@ export function TranslatorApplication() {
     setBaseUrlValue(value)
   }
 
+  /**
+   * @param {string} value
+   */
   function setRateLimitValue(value) {
     localStorage.setItem(RATE_LIMIT, value)
     setRateLimit(Number(value))
+  }
+
+  /**
+   * @param {string | undefined} value
+   */
+  function setModelValue(value) {
+    if (!value) {
+      localStorage.removeItem(MODEL)
+    }
+    else {
+      localStorage.setItem(MODEL, value)
+    }
+    setModel(value)
   }
 
   async function generate(e) {
@@ -274,9 +294,10 @@ export function TranslatorApplication() {
                         size='sm'
                         type="text"
                         label="Model"
+                        placeholder={DefaultModel}
                         autoComplete='on'
                         value={model}
-                        onValueChange={setModel}
+                        onValueChange={setModelValue}
                       />
                     </div>
 
