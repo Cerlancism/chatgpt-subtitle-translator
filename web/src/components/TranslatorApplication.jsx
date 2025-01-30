@@ -56,8 +56,7 @@ export function TranslatorApplication() {
     setAPIValue(localStorage.getItem(OPENAI_API_KEY) ?? "")
     setRateLimit(Number(localStorage.getItem(RATE_LIMIT) ?? rateLimit))
     setBaseUrlWithModerator(localStorage.getItem(OPENAI_BASE_URL) ?? undefined)
-    setModelValue(localStorage.getItem(MODEL) ?? undefined)
-
+    setModelValue(localStorage.getItem(MODEL) ?? DefaultModel)
   }, [])
 
   function setAPIKey(value) {
