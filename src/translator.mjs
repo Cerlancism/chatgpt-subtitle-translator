@@ -105,6 +105,11 @@ export class Translator
         this.pricingModel = getPricingModel(this.options.createChatCompletionRequest.model)
         this.aborted = false
 
+        this.thinkTags = {
+            start: "<think>",
+            end: "</think>"
+        }
+
         if (options.logLevel)
         {
             log.setLevel(options.logLevel)
@@ -129,6 +134,37 @@ export class Translator
     }
 
     /**
+     * @param {string[]} inputLines
+     * @param {string} rawContent
+     */
+    getOutput(inputLines, rawContent)
+    {
+        rawContent = rawContent.trim()
+        if (rawContent.startsWith(this.thinkTags.start))
+        {
+            const endTagIndex = rawContent.indexOf(this.thinkTags.end)
+            if (endTagIndex > 0)
+            {
+                const endIndex = endTagIndex + this.thinkTags.end.length
+                const thinkBlock = rawContent.slice(0, endIndex).trim()
+                if (thinkBlock)
+                {
+                    log.debug("[Translator]", "[ThinkBlock] Detected\n", thinkBlock)
+                }
+                rawContent = rawContent.slice(endIndex)
+            }
+        }
+        if (inputLines.length === 1)
+        {
+            return [rawContent.split("\n").join(" ")]
+        }
+        else
+        {
+            return rawContent.split("\n").filter(x => x.trim().length > 0)
+        }
+    }
+
+    /**
      * @param {string[]} lines
      * @returns {Promise<TranslationOutput>}
      */
@@ -142,20 +178,7 @@ export class Translator
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
         const max_tokens = this.getMaxToken(lines)
 
-        /**
-         * @param {string} text 
-         */
-        function getOutput(text)
-        {
-            if (lines.length === 1)
-            {
-                return [text.split("\n").join(" ")]
-            }
-            else
-            {
-                return text.split("\n").filter(x => x.trim().length > 0)
-            }
-        }
+
 
         let startTime = 0, endTime = 0
         const streamMode = this.options.createChatCompletionRequest.stream
@@ -172,12 +195,18 @@ export class Translator
                     max_tokens
                 })
                 endTime = Date.now()
+                const usage = promptResponse.usage
+                const rawContent = promptResponse.choices[0].message.content
+                const prompt_tokens = usage?.prompt_tokens
+                const completion_tokens = usage?.completion_tokens
+                const cached_tokens = usage?.prompt_tokens_details?.cached_tokens
+                const total_tokens = usage?.total_tokens
                 const output = new TranslationOutput(
-                    getOutput(promptResponse.choices[0].message.content),
-                    promptResponse.usage?.prompt_tokens,
-                    promptResponse.usage?.completion_tokens,
-                    promptResponse.usage?.prompt_tokens_details?.cached_tokens,
-                    promptResponse.usage?.total_tokens,
+                    this.getOutput(lines, rawContent),
+                    prompt_tokens,
+                    completion_tokens,
+                    cached_tokens,
+                    total_tokens
                 )
                 return output
             }
@@ -230,7 +259,7 @@ export class Translator
                 const cached_tokens = usage?.prompt_tokens_details?.cached_tokens
                 const total_tokens = usage?.total_tokens
                 const output = new TranslationOutput(
-                    getOutput(streamOutput),
+                    this.getOutput(lines, streamOutput),
                     prompt_tokens,
                     completion_tokens,
                     cached_tokens,
@@ -417,7 +446,7 @@ export class Translator
      */
     postprocessNumberPrefixedLine(line)
     {
-        const splits = splitStringByNumberLabel(line)
+        const splits = splitStringByNumberLabel(line.trim())
         splits.text = this.postprocessLine(splits.text)
         return splits
     }
