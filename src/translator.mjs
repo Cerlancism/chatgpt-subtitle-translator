@@ -104,6 +104,7 @@ export class Translator
 
         this.pricingModel = getPricingModel(this.options.createChatCompletionRequest.model)
         this.aborted = false
+        this.ensureExpectedTranslation = 3
 
         this.thinkTags = {
             start: "<think>",
@@ -178,11 +179,9 @@ export class Translator
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
         const max_tokens = this.getMaxToken(lines)
 
-
-
         let startTime = 0, endTime = 0
         const streamMode = this.options.createChatCompletionRequest.stream
-        const response = await openaiRetryWrapper(async () =>
+        const responseGenerator = async () => await openaiRetryWrapper(async () =>
         {
             await this.services.cooler?.cool()
             startTime = Date.now()
@@ -268,6 +267,71 @@ export class Translator
                 return output
             }
         }, 3, "TranslationPrompt")
+
+        let response = await responseGenerator()
+
+        if (this.ensureExpectedTranslation > 0)
+        {
+            const checkTranslation = async (/** @type {number} */ currentTry) =>
+            {
+                try
+                {
+                    const checkTranslationResponse = await this.services.openai.chat.completions.create({
+                        messages: [
+                            {
+                                role: "system",
+                                content:
+                                    `With the given translation instruction:\n${this.systemInstruction}\n\n` +
+                                    `Strictly check if given output is in the expected language as instructed, do not accept only if the expected language is incorrect.`
+                            },
+                            {
+                                role: "user",
+                                content:
+                                    `Translation output:\n${response.content.join("\n\n")}\n\n` +
+                                    `Give your response, accepted as true or false, if accepted is false, provide the reason. Reply in this JSON schema format:\n` +
+                                    `{ accepted: boolean, reason: string | null }`
+                            }
+                        ],
+                        model: this.options.createChatCompletionRequest.model,
+                        stream: false,
+                        response_format: {
+                            type: "json_object"
+                        }
+                    })
+                    const checkTranslationContent = checkTranslationResponse.choices[0].message.content.trim()
+                    const checkTranslationResult = JSON.parse(checkTranslationContent)
+                    if (!checkTranslationResult.accepted && checkTranslationResult.remarks)
+                    {
+                        log.warn("[Translator]", "checkTranslation", "rejected", "currentTry", currentTry, "remarks:", checkTranslationResult.remarks)
+                        return false
+                    }
+                    else
+                    {
+                        if (!checkTranslationResult.accepted)
+                        {
+                            log.warn("[Translator]", "checkTranslation", "ignoring invalid response format")
+                        }
+                        return true
+                    }
+                } catch (error)
+                {
+                    log.error("[Translator]", "checkTranslation", "error", error)
+                    return false
+                }
+            }
+
+            for (let index = 0; index < this.ensureExpectedTranslation; index++)
+            {
+                if (await checkTranslation(index + 1))
+                {
+                    break
+                }
+                else
+                {
+                    response = await responseGenerator()
+                }
+            }
+        }
 
         this.promptTokensUsed += response.promptTokens
         this.completionTokensUsed += response.completionTokens
