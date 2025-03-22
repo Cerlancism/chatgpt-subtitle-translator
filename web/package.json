@@ -11,13 +11,13 @@
   "dependencies": {
     "@nextui-org/react": "2.2.10",
     "chatgpt-subtitle-translator": "github:Cerlancism/chatgpt-subtitle-translator#0082efb3715a2c806ba1fb15af3fff1c08afb913",
-    "next": "14.2.13",
+    "next": "14.2.25",
     "react": "^18",
     "react-dom": "^18"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.20",
+    "autoprefixer": "^10.4.21",
     "postcss": "^8",
-    "tailwindcss": "^3.4.13"
+    "tailwindcss": "^3"
   }
 }
