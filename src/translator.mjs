@@ -574,13 +574,16 @@ export class Translator
     {
         if (!this.pricingModel)
         {
-            return null
+            log.warn("[Translator]", `Cost computation not supported for ${this.options.createChatCompletionRequest.model}`)
         }
+
+        const pricePrompt = this.pricingModel?.prompt
+        const priceCompletion = this.pricingModel?.completion
 
         const usedTokens = this.promptTokensUsed + this.completionTokensUsed
         const wastedTokens = this.promptTokensWasted + this.completionTokensWasted
-        const usedTokensPricing = roundWithPrecision(this.pricingModel.prompt * (this.promptTokensUsed / 1000) + this.pricingModel.completion * (this.completionTokensUsed / 1000), 3)
-        const wastedTokensPricing = roundWithPrecision(this.pricingModel.prompt * (this.promptTokensWasted / 1000) + this.pricingModel.completion * (this.completionTokensWasted / 1000), 3)
+        const usedTokensPricing = pricePrompt ? roundWithPrecision(pricePrompt * (this.promptTokensUsed / 1000) + priceCompletion * (this.completionTokensUsed / 1000), 3) : NaN
+        const wastedTokensPricing = priceCompletion ? roundWithPrecision(pricePrompt * (this.promptTokensWasted / 1000) + priceCompletion * (this.completionTokensWasted / 1000), 3) : NaN
         const rate = roundWithPrecision(usedTokens / (this.tokensProcessTimeMs / 1000 / 60), 2)
         const wastedPercent = (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 })
         const cachedTokens = this.cachedTokens
@@ -598,11 +601,6 @@ export class Translator
     async printUsage()
     {
         const usage = this.usage
-        if (!usage)
-        {
-            log.warn("[Translator]", `Cost computation not supported yet for ${this.options.createChatCompletionRequest.model}`)
-            return
-        }
 
         await sleep(10)
 
@@ -618,9 +616,9 @@ export class Translator
 
         log.debug(
             `[Translator] Estimated Usage -`,
-            "Tokens:", usedTokens, "$", usedTokensPricing,
-            "Wasted:", wastedTokens, "$", wastedTokensPricing, wastedPercent,
-            "Cached:", cachedTokens,
+            "Tokens:", usedTokens, "$", usedTokensPricing >= 0 ? usedTokensPricing : "-",
+            "Wasted:", wastedTokens, "$", wastedTokensPricing >= 0 ? wastedTokensPricing : "-", wastedPercent,
+            "Cached:", cachedTokens >= 0 ? cachedTokens : "-",
             "Rate:", rate, "TPM", this.services.cooler?.rate, "RPM",
         )
     }
