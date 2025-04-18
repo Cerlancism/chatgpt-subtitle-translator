@@ -342,7 +342,7 @@ Yes, it's very nice weather.
 | 500   | 25,400          | 79,297      | 9,025                       |
 | 1000  | 52,988          | 184,596     | 20,593                      |
 
-*Test data can be found in [test](./test/) directory. Token count also roughly included chat structure and prime token overheads*
+*Test data can be found in [test/data](./test/data) directory. Token count also roughly included chat structure and prime token overheads*
 
 
 ![comparison analysis chart](./docs/comparison_analysis_chart.png)
