@@ -327,23 +327,21 @@ Yes, it's very nice weather.
 </tr>
 </table>
 
-### Results
-**TODO**: More analysis
+### Token Usage Comparison and Analysis
 
-5 SRT lines:  
-[test/data/test_ja_small.srt](test/data/test_ja_small.srt)  
-- None (Plain text SRT input output):  
-  Tokens: `299`
-- No batching, with SRT stripping but one line per prompt with System Instruction overhead, including up to 10 historical prompt context:  
-  Tokens: `362` 
-- SRT stripping and line batching of 2:  
-  Tokens: `276`
 
-30 SRT lines:  
-[test/data/test_ja.srt](test/data/test_ja.srt)
-- None (Plain text SRT input output):  
-  Tokens: `1625`
-- No batching, with SRT stripping but one line per prompt with System Instruction overhead, including up to 10 historical prompt context:  
-  Tokens: `6719` 
-- SRT stripping and line batching of `[5, 10]`, including up to 10 historical prompt context:  
-  Tokens: `1036`
+| Lines | Plain Text | No Batching | ChatGPT Subtitle Translator |
+|-------|------------|-------------|-----------------------------|
+| 5     | 205        | 445         | 89                          |
+| 30    | 1460       | 5662        | 320                         |
+| 100   | 4987       | 62555       | 1187                        |
+| 500   | 25376      | 79589       | 6396                        |
+| 1000  | 52964      | 110446      | 15007                       |
+
+
+![comparison analysis chart](./docs/comparison_analysis_chart.png)
+**Plain Text**: Plain text including SRT formating and timestamps input/output  
+**No Batching**: SRT formating and timestamps stripping, but one line per prompt with system instruction overhead, including up to `10` historical data for context per prompt  
+**ChatGPT Subtitle Translator**: SRT formating and timestamps stripping, line batching of `100`, including up to `10` historical data for context per batch
+
+*This analysis assumes perfect input/output quantity matching. In reality, this depends on model and subtitle quality. Typically, buffer an additional 20%~30% token usage for retries; refer to the `--batch-sizes` CLI option.*
