@@ -237,22 +237,22 @@ Translate to English
 <tr>
 <td>
 
-Tokens: `164`
+Tokens: `127`
 
 </td>
 <td>
 
-Tokens: `83`
+Tokens: `45`
 
 </td>
 <td>
 
-Tokens: `46`
+Tokens: `39`
 
 </td>
 <td>
 
-Tokens: `130`
+Tokens: `124`
 
 </td>
 </tr>
@@ -332,22 +332,22 @@ Yes, it's very nice weather.
 </tr>
 </table>
 
-### Token Usage Comparison and Analysis
-
-
+### Token Estimated Usage Analysis and Comparison
 | Lines | SRT Text Format | No Batching | ChatGPT Subtitle Translator |
 |-------|-----------------|-------------|-----------------------------|
-| 5     | 280             | 309         | 133                         |
-| 10    | 511             | 380         | 171                         |
-| 50    | 2518            | 2001        | 818                         |
-| 100   | 5011            | 3980        | 1611                        |
-| 500   | 25400           | 21263       | 9025                        |
-| 1000  | 52988           | 49168       | 20593                       |
+| 5     | 280             | 469         | 133                         |
+| 10    | 511             | 834         | 171                         |
+| 50    | 2,518           | 7,944       | 818                         |
+| 100   | 5,011           | 15,263      | 1,611                       |
+| 500   | 25,400          | 79,297      | 9,025                       |
+| 1000  | 52,988          | 184,596     | 20,593                      |
+
+*Test data can be found in [test](./test/) directory. Token count also roughly included chat structure and prime token overheads*
 
 
 ![comparison analysis chart](./docs/comparison_analysis_chart.png)
-**Plain Text**: Plain text including SRT formating and timestamps input/output  
+**SRT Text Format**: Full SRT text format including timestamps for input/output  
 **No Batching**: SRT formating and timestamps stripping, but one line per prompt with system instruction overhead, including up to `10` historical data for context per prompt  
 **ChatGPT Subtitle Translator**: SRT formating and timestamps stripping, line batching of `100`, including up to `10` historical data for context per batch
 
-*This analysis assumes perfect input/output quantity matching. In reality, this depends on model and subtitle quality. Typically, buffer an additional 20%~30% token usage for retries; refer to the `--batch-sizes` CLI option.*
+*This analysis assumes perfect input/output quantity matching. In reality, this depends on model and subtitle quality. Typically, buffer an additional 20%~30% token usage for retries, refer to the `--batch-sizes` CLI option.*
