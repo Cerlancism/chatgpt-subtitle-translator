@@ -1,0 +1,200 @@
+1
+00:00:00,000 --> 00:00:02,000
+Good morning.
+
+2
+00:00:02,000 --> 00:00:05,000
+How are you?
+
+3
+00:00:05,000 --> 00:00:07,000
+I'm fine, thank you.
+
+4
+00:00:08,000 --> 00:00:12,000
+The weather is nice today.
+
+5
+00:00:12,000 --> 00:00:16,000
+Yes, it's very good weather.
+
+6
+00:00:17,000 --> 00:00:21,000
+What will you do today?
+
+7
+00:00:21,000 --> 00:00:24,000
+From the afternoon
+
+8
+00:00:24,000 --> 00:00:26,000
+With friends
+
+9
+00:00:26,000 --> 00:00:28,000
+Watch a movie.
+
+10
+00:00:28,000 --> 00:00:30,000
+That sounds nice.
+
+11
+00:00:30,000 --> 00:00:33,000
+What movie is it?
+
+12
+00:00:33,000 --> 00:00:37,000
+It's an action movie.
+
+13
+00:00:37,000 --> 00:00:40,000
+Me too, action.
+
+14
+00:00:40,000 --> 00:00:42,000
+I like movies.
+
+15
+00:00:42,000 --> 00:00:44,000
+That's something to look forward to.
+
+16
+00:00:45,000 --> 00:00:47,000
+But first, let's have lunch.
+
+17
+00:00:47,000 --> 00:00:49,000
+Let's eat.
+
+18
+00:00:49,000 --> 00:00:50,000
+Yes, that's a good idea.
+
+19
+00:00:55,000 --> 00:00:56,000
+What would you like to eat?
+
+20
+00:00:59,000 --> 00:01:00,000
+I want to eat sushi.
+
+21
+00:01:02,000 --> 00:01:03,000
+That's nice.
+
+22
+00:01:03,000 --> 00:01:04,000
+I also like sushi.
+
+23
+00:01:06,000 --> 00:01:07,000
+Do you have any recommended shops?
+
+24
+00:01:07,000 --> 00:01:08,000
+Do you have it?
+
+25
+00:01:09,000 --> 00:01:10,000
+Yes,
+
+26
+00:01:10,000 --> 00:01:11,000
+That place is very
+
+27
+00:01:11,000 --> 00:01:12,000
+It's delicious.
+
+28
+00:01:12,000 --> 00:01:13,000
+Thank you.
+
+29
+00:01:13,000 --> 00:01:14,000
+Let's go there.
+
+30
+00:01:14,000 --> 00:01:17,000
+Let's go!
+
+31
+00:01:17,000 --> 00:01:19,000
+I hope the road isn't crowded.
+
+32
+00:01:19,000 --> 00:01:21,000
+Yes, I agree. I don't like traffic jams.
+
+33
+00:01:21,000 --> 00:01:23,000
+Shall we go by train?
+
+34
+00:01:23,000 --> 00:01:25,000
+Yes, that might be faster.
+
+35
+00:01:25,000 --> 00:01:27,000
+The station is this way.
+
+36
+00:01:27,000 --> 00:01:29,000
+I'll buy the tickets.
+
+37
+00:01:29,000 --> 00:01:31,000
+Thank you, I'll wait.
+
+38
+00:01:31,000 --> 00:01:33,000
+I've bought the tickets.
+
+39
+00:01:33,000 --> 00:01:35,000
+Thank you. Let's go.
+
+40
+00:01:35,000 --> 00:01:37,000
+The train will arrive in 5 minutes.
+
+41
+00:01:37,000 --> 00:01:39,000
+That's just right.
+
+42
+00:01:39,000 --> 00:01:41,000
+Oh, the train has arrived!
+
+43
+00:01:41,000 --> 00:01:43,000
+Let's get on.
+
+44
+00:01:43,000 --> 00:01:45,000
+There are empty seats.
+
+45
+00:01:45,000 --> 00:01:47,000
+Lucky us!
+
+46
+00:01:47,000 --> 00:01:49,000
+Where do we get off next?
+
+47
+00:01:49,000 --> 00:01:51,000
+It's the third station.
+
+48
+00:01:51,000 --> 00:01:53,000
+Got it.
+
+49
+00:01:53,000 --> 00:01:55,000
+What a beautiful view.
+
+50
+00:01:55,000 --> 00:01:57,000
+Indeed. Spring is beautiful.
+

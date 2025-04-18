@@ -1,0 +1,2000 @@
+1
+00:00:00,000 --> 00:00:02,000
+Good morning.
+
+2
+00:00:02,000 --> 00:00:05,000
+How are you?
+
+3
+00:00:05,000 --> 00:00:07,000
+I'm fine, thank you.
+
+4
+00:00:08,000 --> 00:00:12,000
+The weather is nice today.
+
+5
+00:00:12,000 --> 00:00:16,000
+Yes, it's very good weather.
+
+6
+00:00:17,000 --> 00:00:21,000
+What will you do today?
+
+7
+00:00:21,000 --> 00:00:24,000
+From the afternoon
+
+8
+00:00:24,000 --> 00:00:26,000
+With friends
+
+9
+00:00:26,000 --> 00:00:28,000
+Watch a movie.
+
+10
+00:00:28,000 --> 00:00:30,000
+That sounds nice.
+
+11
+00:00:30,000 --> 00:00:33,000
+What movie is it?
+
+12
+00:00:33,000 --> 00:00:37,000
+It's an action movie.
+
+13
+00:00:37,000 --> 00:00:40,000
+Me too, action.
+
+14
+00:00:40,000 --> 00:00:42,000
+I like movies.
+
+15
+00:00:42,000 --> 00:00:44,000
+That's something to look forward to.
+
+16
+00:00:45,000 --> 00:00:47,000
+But first, let's have lunch.
+
+17
+00:00:47,000 --> 00:00:49,000
+Let's eat.
+
+18
+00:00:49,000 --> 00:00:50,000
+Yes, that's a good idea.
+
+19
+00:00:55,000 --> 00:00:56,000
+What would you like to eat?
+
+20
+00:00:59,000 --> 00:01:00,000
+I want to eat sushi.
+
+21
+00:01:02,000 --> 00:01:03,000
+That's nice.
+
+22
+00:01:03,000 --> 00:01:04,000
+I also like sushi.
+
+23
+00:01:06,000 --> 00:01:07,000
+Do you have any recommended shops?
+
+24
+00:01:07,000 --> 00:01:08,000
+Do you have it?
+
+25
+00:01:09,000 --> 00:01:10,000
+Yes,
+
+26
+00:01:10,000 --> 00:01:11,000
+That place is very
+
+27
+00:01:11,000 --> 00:01:12,000
+It's delicious.
+
+28
+00:01:12,000 --> 00:01:13,000
+Thank you.
+
+29
+00:01:13,000 --> 00:01:14,000
+Let's go there.
+
+30
+00:01:14,000 --> 00:01:17,000
+Let's go!
+
+31
+00:01:17,000 --> 00:01:19,000
+I hope the road isn't crowded.
+
+32
+00:01:19,000 --> 00:01:21,000
+Yes, I agree. I don't like traffic jams.
+
+33
+00:01:21,000 --> 00:01:23,000
+Shall we go by train?
+
+34
+00:01:23,000 --> 00:01:25,000
+Yes, that might be faster.
+
+35
+00:01:25,000 --> 00:01:27,000
+The station is this way.
+
+36
+00:01:27,000 --> 00:01:29,000
+I'll buy the tickets.
+
+37
+00:01:29,000 --> 00:01:31,000
+Thank you, I'll wait.
+
+38
+00:01:31,000 --> 00:01:33,000
+I've bought the tickets.
+
+39
+00:01:33,000 --> 00:01:35,000
+Thank you. Let's go.
+
+40
+00:01:35,000 --> 00:01:37,000
+The train will arrive in 5 minutes.
+
+41
+00:01:37,000 --> 00:01:39,000
+That's just right.
+
+42
+00:01:39,000 --> 00:01:41,000
+Oh, the train has arrived!
+
+43
+00:01:41,000 --> 00:01:43,000
+Let's get on.
+
+44
+00:01:43,000 --> 00:01:45,000
+There are empty seats.
+
+45
+00:01:45,000 --> 00:01:47,000
+Lucky us!
+
+46
+00:01:47,000 --> 00:01:49,000
+Where do we get off next?
+
+47
+00:01:49,000 --> 00:01:51,000
+It's the third station.
+
+48
+00:01:51,000 --> 00:01:53,000
+Got it.
+
+49
+00:01:53,000 --> 00:01:55,000
+What a beautiful view.
+
+50
+00:01:55,000 --> 00:01:57,000
+Indeed. Spring is beautiful.
+
+51
+00:01:57,000 --> 00:01:59,000
+Oh, let's get off!
+
+52
+00:01:59,000 --> 00:02:01,000
+Yes, do you have everything?
+
+53
+00:02:01,000 --> 00:02:03,000
+I'm fine.
+
+54
+00:02:03,000 --> 00:02:05,000
+Is the store nearby?
+
+55
+00:02:05,000 --> 00:02:07,000
+Yes, it's a 5-minute walk.
+
+56
+00:02:07,000 --> 00:02:09,000
+I'm looking forward to it!
+
+57
+00:02:09,000 --> 00:02:11,000
+It's here!
+
+58
+00:02:11,000 --> 00:02:13,000
+Wow, what a beautiful store.
+
+59
+00:02:13,000 --> 00:02:15,000
+Let's go inside.
+
+60
+00:02:15,000 --> 00:02:17,000
+Welcome!
+
+61
+00:02:17,000 --> 00:02:19,000
+Hello, two people.
+
+62
+00:02:19,000 --> 00:02:21,000
+Please this way.
+
+63
+00:02:21,000 --> 00:02:23,000
+Thank you.
+
+64
+00:02:23,000 --> 00:02:25,000
+Here's the menu.
+
+65
+00:02:25,000 --> 00:02:27,000
+Thank you. It's hard to decide.
+
+66
+00:02:27,000 --> 00:02:29,000
+Everything looks delicious.
+
+67
+00:02:29,000 --> 00:02:31,000
+I'll have the tuna.
+
+68
+00:02:31,000 --> 00:02:33,000
+Then, I'll have the salmon.
+
+69
+00:02:33,000 --> 00:02:35,000
+May I place an order?
+
+70
+00:02:35,000 --> 00:02:37,000
+Yes, go ahead.
+
+71
+00:02:37,000 --> 00:02:39,000
+One tuna and one salmon, please.
+
+72
+00:02:39,000 --> 00:02:41,000
+Certainly.
+
+73
+00:02:41,000 --> 00:02:43,000
+It's exciting!
+
+74
+00:02:43,000 --> 00:02:45,000
+I'm hungry.
+
+75
+00:02:45,000 --> 00:02:47,000
+Oh, they've arrived!
+
+76
+00:02:47,000 --> 00:02:49,000
+Looks delicious!
+
+77
+00:02:49,000 --> 00:02:51,000
+Let's eat!
+
+78
+00:02:51,000 --> 00:02:53,000
+How is it?
+
+79
+00:02:53,000 --> 00:02:55,000
+It's very tasty!
+
+80
+00:02:55,000 --> 00:02:57,000
+That's good to hear.
+
+81
+00:02:57,000 --> 00:02:59,000
+After eating, it's the movie.
+
+82
+00:02:59,000 --> 00:03:01,000
+Yes, I'm looking forward to it.
+
+83
+00:03:01,000 --> 00:03:03,000
+Where is the venue?
+
+84
+00:03:03,000 --> 00:03:05,000
+It's near the station.
+
+85
+00:03:05,000 --> 00:03:07,000
+Then, we'll take the train again.
+
+86
+00:03:07,000 --> 00:03:09,000
+That's right. Let's walk after eating.
+
+87
+00:03:09,000 --> 00:03:11,000
+It will be good exercise.
+
+88
+00:03:11,000 --> 00:03:13,000
+I'm already full.
+
+89
+00:03:13,000 --> 00:03:15,000
+Shall we go now?
+
+90
+00:03:15,000 --> 00:03:17,000
+Could I have the bill, please?
+
+91
+00:03:17,000 --> 00:03:19,000
+Thank you very much!
+
+92
+00:03:19,000 --> 00:03:21,000
+Thanks for the meal!
+
+93
+00:03:21,000 --> 00:03:23,000
+The movie theater is this way.
+
+94
+00:03:23,000 --> 00:03:25,000
+We're almost there.
+
+95
+00:03:25,000 --> 00:03:27,000
+Oh, there are a lot of people.
+
+96
+00:03:27,000 --> 00:03:29,000
+It's a popular movie, isn't it?
+
+97
+00:03:29,000 --> 00:03:31,000
+I'm looking forward to it!
+
+98
+00:03:31,000 --> 00:03:33,000
+Do you have a reservation for the seats?
+
+99
+00:03:33,000 --> 00:03:35,000
+Yes, it's all set!
+
+100
+00:03:35,000 --> 00:03:37,000
+Let's go in!
+
+101
+00:03:37,000 --> 00:03:39,000
+Nice seats.
+
+102
+00:03:39,000 --> 00:03:41,000
+Not too close, not too far back.
+
+103
+00:03:41,000 --> 00:03:43,000
+The movie is about to start.
+
+104
+00:03:43,000 --> 00:03:45,000
+Do you have popcorn?
+
+105
+00:03:45,000 --> 00:03:47,000
+Of course, I bought some.
+
+106
+00:03:47,000 --> 00:03:49,000
+Thank you!
+
+107
+00:03:49,000 --> 00:03:51,000
+Let's be quiet now.
+
+108
+00:03:51,000 --> 00:03:53,000
+Yes, it's starting!
+
+109
+00:03:53,000 --> 00:03:55,000
+Wow, it's so powerful.
+
+110
+00:03:55,000 --> 00:03:57,000
+The sound is amazing!
+
+111
+00:03:57,000 --> 00:03:59,000
+Be quiet, other customers...
+
+112
+00:03:59,000 --> 00:04:01,000
+Sorry.
+
+113
+00:04:01,000 --> 00:04:03,000
+It's okay, let's enjoy it.
+
+114
+00:04:03,000 --> 00:04:05,000
+This scene is amazing!
+
+115
+00:04:05,000 --> 00:04:07,000
+I'm really on the edge of my seat.
+
+116
+00:04:07,000 --> 00:04:09,000
+Oh, it's over!
+
+117
+00:04:09,000 --> 00:04:11,000
+That was fantastic!
+
+118
+00:04:11,000 --> 00:04:13,000
+It's been a while since I enjoyed something this much.
+
+119
+00:04:13,000 --> 00:04:15,000
+Let's watch a movie together again.
+
+120
+00:04:15,000 --> 00:04:17,000
+Absolutely!
+
+121
+00:04:17,000 --> 00:04:19,000
+Well, shall we head home soon?
+
+122
+00:04:19,000 --> 00:04:21,000
+Yes, I think so.
+
+123
+00:04:21,000 --> 00:04:23,000
+It's already dark outside.
+
+124
+00:04:23,000 --> 00:04:25,000
+The night breeze feels nice.
+
+125
+00:04:25,000 --> 00:04:27,000
+Indeed it does.
+
+126
+00:04:27,000 --> 00:04:29,000
+I had a great day today.
+
+127
+00:04:29,000 --> 00:04:31,000
+I think so too.
+
+128
+00:04:31,000 --> 00:04:33,000
+Let's go out again next time.
+
+129
+00:04:33,000 --> 00:04:35,000
+Of course!
+
+130
+00:04:35,000 --> 00:04:37,000
+Where shall we go next?
+
+131
+00:04:37,000 --> 00:04:39,000
+How about an amusement park?
+
+132
+00:04:39,000 --> 00:04:41,000
+Sounds good! The thrill rides!
+
+133
+00:04:41,000 --> 00:04:43,000
+It's a bit scary, but it looks fun!
+
+134
+00:04:43,000 --> 00:04:45,000
+Then, let's make a plan.
+
+135
+00:04:45,000 --> 00:04:47,000
+Are you free next Saturday?
+
+136
+00:04:47,000 --> 00:04:49,000
+Yes, I'm available!
+
+137
+00:04:49,000 --> 00:04:51,000
+Alright, it's settled then.
+
+138
+00:04:51,000 --> 00:04:53,000
+I'm looking forward to it.
+
+139
+00:04:53,000 --> 00:04:55,000
+Me too!
+
+140
+00:04:55,000 --> 00:04:57,000
+We're arriving at the station soon.
+
+141
+00:04:57,000 --> 00:04:59,000
+Well then, it's time to say goodbye here.
+
+142
+00:04:59,000 --> 00:05:01,000
+Thank you for today!
+
+143
+00:05:01,000 --> 00:05:03,000
+You're welcome, I had a great time.
+
+144
+00:05:03,000 --> 00:05:05,000
+Please be careful on your way home.
+
+145
+00:05:05,000 --> 00:05:07,000
+Yes, good night.
+
+146
+00:05:07,000 --> 00:05:09,000
+Good night.
+
+147
+00:05:09,000 --> 00:05:11,000
+I'll contact you again.
+
+148
+00:05:11,000 --> 00:05:13,000
+I'm waiting!
+
+149
+00:05:13,000 --> 00:05:15,000
+Bye-bye!
+
+150
+00:05:15,000 --> 00:05:17,000
+Bye-bye!
+
+151
+00:05:17,000 --> 00:05:19,000
+(Sound of train)
+
+152
+00:05:19,000 --> 00:05:21,000
+Today was a good day again.
+
+153
+00:05:21,000 --> 00:05:23,000
+I hope another fun day will come.
+
+154
+00:05:23,000 --> 00:05:25,000
+(Music)
+
+155
+00:05:25,000 --> 00:05:27,000
+What should I do when I get home?
+
+156
+00:05:27,000 --> 00:05:29,000
+Take a shower...
+
+157
+00:05:29,000 --> 00:05:31,000
+And then, I'll play some games.
+
+158
+00:05:31,000 --> 00:05:33,000
+I bought a new game.
+
+159
+00:05:33,000 --> 00:05:35,000
+That sounds interesting.
+
+160
+00:05:35,000 --> 00:05:37,000
+Let's play together next time.
+
+161
+00:05:37,000 --> 00:05:39,000
+Absolutely!
+
+162
+00:05:39,000 --> 00:05:41,000
+Well, I've arrived home.
+
+163
+00:05:41,000 --> 00:05:43,000
+I'm home~
+
+164
+00:05:43,000 --> 00:05:45,000
+Welcome back!
+
+165
+00:05:45,000 --> 00:05:47,000
+Was it a good day?
+
+166
+00:05:47,000 --> 00:05:49,000
+Yes, it was really great.
+
+167
+00:05:49,000 --> 00:05:51,000
+That's good to hear.
+
+168
+00:05:51,000 --> 00:05:53,000
+I'm a bit tired though.
+
+169
+00:05:53,000 --> 00:05:55,000
+Take a good rest.
+
+170
+00:05:55,000 --> 00:05:57,000
+Thank you.
+
+171
+00:05:57,000 --> 00:05:59,000
+Well, I'm going to take a shower.
+
+172
+00:05:59,000 --> 00:06:01,000
+Okay.
+
+173
+00:06:01,000 --> 00:06:03,000
+(Sound of shower)
+
+174
+00:06:03,000 --> 00:06:05,000
+Phew, I feel refreshed!
+
+175
+00:06:05,000 --> 00:06:07,000
+Now, it's game time!
+
+176
+00:06:07,000 --> 00:06:09,000
+Power on!
+
+177
+00:06:09,000 --> 00:06:11,000
+(Game startup sound)
+
+178
+00:06:11,000 --> 00:06:13,000
+I'm so excited!
+
+179
+00:06:13,000 --> 00:06:15,000
+(Game play begins)
+
+180
+00:06:15,000 --> 00:06:17,000
+Wow, it's hard from the start!
+
+181
+00:06:17,000 --> 00:06:19,000
+Good luck!
+
+182
+00:06:19,000 --> 00:06:21,000
+Thank you!
+
+183
+00:06:21,000 --> 00:06:23,000
+...Oh, I got defeated!
+
+184
+00:06:23,000 --> 00:06:25,000
+Don't worry!
+
+185
+00:06:25,000 --> 00:06:27,000
+Let's retry!
+
+186
+00:06:27,000 --> 00:06:29,000
+This time for sure!
+
+187
+00:06:29,000 --> 00:06:31,000
+Go!
+
+188
+00:06:31,000 --> 00:06:33,000
+I cleared it!
+
+189
+00:06:33,000 --> 00:06:35,000
+Amazing!
+
+190
+00:06:35,000 --> 00:06:37,000
+Today was a good day.
+
+191
+00:06:37,000 --> 00:06:39,000
+Delicious food, fun movies,
+
+192
+00:06:39,000 --> 00:06:41,000
+and games!
+
+193
+00:06:41,000 --> 00:06:43,000
+It's time to sleep now.
+
+194
+00:06:43,000 --> 00:06:45,000
+Good night.
+
+195
+00:06:45,000 --> 00:06:47,000
+Hope tomorrow will be a good day too.
+
+196
+00:06:47,000 --> 00:06:49,000
+(Soft music)
+
+197
+00:06:49,000 --> 00:06:51,000
+Zzz...
+
+198
+00:06:51,000 --> 00:06:53,000
+(Night insects' sounds)
+
+199
+00:06:53,000 --> 00:06:55,000
+Good night.
+
+200
+00:06:55,000 --> 00:06:57,000
+(Fade out)
+
+201
+00:06:57,000 --> 00:06:59,000
+(Morning birds chirping)
+
+202
+00:06:59,000 --> 00:07:01,000
+Good morning.
+
+203
+00:07:01,000 --> 00:07:03,000
+Did you sleep well?
+
+204
+00:07:03,000 --> 00:07:05,000
+Yes, I slept soundly.
+
+205
+00:07:05,000 --> 00:07:07,000
+It's a beautiful weather today.
+
+206
+00:07:07,000 --> 00:07:09,000
+Indeed. Such a refreshing morning.
+
+207
+00:07:09,000 --> 00:07:11,000
+What shall we have for breakfast?
+
+208
+00:07:11,000 --> 00:07:13,000
+I want to eat pancakes.
+
+209
+00:07:13,000 --> 00:07:15,000
+Then shall we make them together?
+
+210
+00:07:15,000 --> 00:07:17,000
+Yes!
+
+211
+00:07:17,000 --> 00:07:19,000
+Do we have the ingredients?
+
+212
+00:07:19,000 --> 00:07:21,000
+Yes, everything is ready.
+
+213
+00:07:21,000 --> 00:07:23,000
+Then, let's get the eggs and milk...
+
+214
+00:07:23,000 --> 00:07:25,000
+The flour is here.
+
+215
+00:07:25,000 --> 00:07:27,000
+Leave the mixing to me!
+
+216
+00:07:27,000 --> 00:07:29,000
+Wow, you're good at this.
+
+217
+00:07:29,000 --> 00:07:31,000
+I'll heat up the frying pan.
+
+218
+00:07:31,000 --> 00:07:33,000
+It smells so good!
+
+219
+00:07:33,000 --> 00:07:35,000
+They're done!
+
+220
+00:07:35,000 --> 00:07:37,000
+Let's eat!
+
+221
+00:07:37,000 --> 00:07:39,000
+Yum, it's delicious!
+
+222
+00:07:39,000 --> 00:07:41,000
+The sweetness is just right.
+
+223
+00:07:41,000 --> 00:07:43,000
+Happy from the morning~
+
+224
+00:07:43,000 --> 00:07:45,000
+What are today's plans?
+
+225
+00:07:45,000 --> 00:07:47,000
+Cleaning and shopping.
+
+226
+00:07:47,000 --> 00:07:49,000
+I'll help too!
+
+227
+00:07:49,000 --> 00:07:51,000
+Thank you, that helps!
+
+228
+00:07:51,000 --> 00:07:53,000
+First, the vacuum cleaner.
+
+229
+00:07:53,000 --> 00:07:55,000
+Yes, turn it on!
+
+230
+00:07:55,000 --> 00:07:57,000
+(Vacuum cleaner sound)
+
+231
+00:07:57,000 --> 00:07:59,000
+Shall we wipe the windows too?
+
+232
+00:07:59,000 --> 00:08:01,000
+Sounds good, let's make them sparkling.
+
+233
+00:08:01,000 --> 00:08:03,000
+Finished!
+
+234
+00:08:03,000 --> 00:08:05,000
+Good job!
+
+235
+00:08:05,000 --> 00:08:07,000
+Shall we go shopping now?
+
+236
+00:08:07,000 --> 00:08:09,000
+Let's go!
+
+237
+00:08:09,000 --> 00:08:11,000
+Do you have the shopping list?
+
+238
+00:08:11,000 --> 00:08:13,000
+Yes, I wrote it on a note.
+
+239
+00:08:13,000 --> 00:08:15,000
+Then, no forgetfulness!
+
+240
+00:08:15,000 --> 00:08:17,000
+Yep, perfect!
+
+241
+00:08:17,000 --> 00:08:19,000
+The supermarket is just ahead.
+
+242
+00:08:19,000 --> 00:08:21,000
+It's quite crowded.
+
+243
+00:08:21,000 --> 00:08:23,000
+Maybe because it's a holiday.
+
+244
+00:08:23,000 --> 00:08:25,000
+I'll get the cart.
+
+245
+00:08:25,000 --> 00:08:27,000
+Thank you!
+
+246
+00:08:27,000 --> 00:08:29,000
+Let's start with the vegetables.
+
+247
+00:08:29,000 --> 00:08:31,000
+Tomatoes and lettuce.
+
+248
+00:08:31,000 --> 00:08:33,000
+And carrots too.
+
+249
+00:08:33,000 --> 00:08:35,000
+Got it!
+
+250
+00:08:35,000 --> 00:08:37,000
+Next is the meat section.
+
+251
+00:08:37,000 --> 00:08:39,000
+Let's buy chicken and pork.
+
+252
+00:08:39,000 --> 00:08:41,000
+Ingredients for dinner.
+
+253
+00:08:41,000 --> 00:08:43,000
+What shall we make today?
+
+254
+00:08:43,000 --> 00:08:45,000
+Maybe chicken teriyaki.
+
+255
+00:08:45,000 --> 00:08:47,000
+Sounds delicious!
+
+256
+00:08:47,000 --> 00:08:49,000
+Please tell me the recipe later.
+
+257
+00:08:49,000 --> 00:08:51,000
+Of course!
+
+258
+00:08:51,000 --> 00:08:53,000
+Shall we check out?
+
+259
+00:08:53,000 --> 00:08:55,000
+The register is over there.
+
+260
+00:08:55,000 --> 00:08:57,000
+Let's line up.
+
+261
+00:08:57,000 --> 00:08:59,000
+The line is quite long...
+
+262
+00:08:59,000 --> 00:09:01,000
+But it seems to be moving quickly.
+
+263
+00:09:01,000 --> 00:09:03,000
+Okay, payment complete!
+
+264
+00:09:03,000 --> 00:09:05,000
+Thank you~
+
+265
+00:09:05,000 --> 00:09:07,000
+Let's head home!
+
+266
+00:09:07,000 --> 00:09:09,000
+The bags are quite heavy.
+
+267
+00:09:09,000 --> 00:09:11,000
+Let's carry them carefully!
+
+268
+00:09:11,000 --> 00:09:13,000
+It's good exercise.
+
+269
+00:09:13,000 --> 00:09:15,000
+Let's rest a bit when we get home.
+
+270
+00:09:15,000 --> 00:09:17,000
+Yes, let's do that.
+
+271
+00:09:17,000 --> 00:09:19,000
+We're home!
+
+272
+00:09:19,000 --> 00:09:21,000
+I'm back~
+
+273
+00:09:21,000 --> 00:09:23,000
+I'll put away the groceries.
+
+274
+00:09:23,000 --> 00:09:25,000
+Thank you!
+
+275
+00:09:25,000 --> 00:09:27,000
+Would you like some tea?
+
+276
+00:09:27,000 --> 00:09:29,000
+Sounds good, a little break.
+
+277
+00:09:29,000 --> 00:09:31,000
+I'll make some tea.
+
+278
+00:09:31,000 --> 00:09:33,000
+Thank you. Today has been fulfilling.
+
+279
+00:09:33,000 --> 00:09:35,000
+Really, it's such a nice day.
+
+280
+00:09:35,000 --> 00:09:37,000
+I wish days like this would last forever.
+
+281
+00:09:37,000 --> 00:09:39,000
+Yes, I agree.
+
+282
+00:09:39,000 --> 00:09:41,000
+Now, let's start preparing dinner.
+
+283
+00:09:41,000 --> 00:09:43,000
+I'll help!
+
+284
+00:09:43,000 --> 00:09:45,000
+Please cut the vegetables.
+
+285
+00:09:45,000 --> 00:09:47,000
+Got it!
+
+286
+00:09:47,000 --> 00:09:49,000
+The rice is already cooked.
+
+287
+00:09:49,000 --> 00:09:51,000
+Everything's ready!
+
+288
+00:09:51,000 --> 00:09:53,000
+All that's left is to cook the chicken.
+
+289
+00:09:53,000 --> 00:09:55,000
+Sizzle...
+
+290
+00:09:55,000 --> 00:09:57,000
+It smells so good!
+
+291
+00:09:57,000 --> 00:09:59,000
+Pour the teriyaki sauce.
+
+292
+00:09:59,000 --> 00:10:01,000
+It's done!
+
+293
+00:10:01,000 --> 00:10:03,000
+Let's eat!
+
+294
+00:10:03,000 --> 00:10:05,000
+Wow, it's the best!
+
+295
+00:10:05,000 --> 00:10:07,000
+Thank you for today.
+
+296
+00:10:07,000 --> 00:10:09,000
+Likewise, I had fun.
+
+297
+00:10:09,000 --> 00:10:11,000
+Let's continue to do this.
+
+298
+00:10:11,000 --> 00:10:13,000
+I want to be with you forever.
+
+299
+00:10:13,000 --> 00:10:15,000
+Me too, forever.
+
+300
+00:10:15,000 --> 00:10:17,000
+(Fade out with gentle music)
+
+301
+00:10:17,000 --> 00:10:19,000
+Thank you for the meal.
+
+302
+00:10:19,000 --> 00:10:21,000
+It was delicious, wasn't it?
+
+303
+00:10:21,000 --> 00:10:23,000
+Yes, it's especially good when we make it ourselves.
+
+304
+00:10:23,000 --> 00:10:25,000
+Shall we clean up too?
+
+305
+00:10:25,000 --> 00:10:27,000
+Yes, let's do it together.
+
+306
+00:10:27,000 --> 00:10:29,000
+I'll carry the dishes.
+
+307
+00:10:29,000 --> 00:10:31,000
+Thank you, I'll wash them.
+
+308
+00:10:31,000 --> 00:10:33,000
+The sponge is here.
+
+309
+00:10:33,000 --> 00:10:35,000
+That helps a lot!
+
+310
+00:10:35,000 --> 00:10:37,000
+It's clean now.
+
+311
+00:10:37,000 --> 00:10:39,000
+Cleaning up feels so refreshing.
+
+312
+00:10:39,000 --> 00:10:41,000
+Well then, shall we relax a bit?
+
+313
+00:10:41,000 --> 00:10:43,000
+Yes, relaxing on the sofa.
+
+314
+00:10:43,000 --> 00:10:45,000
+Shall we watch TV?
+
+315
+00:10:45,000 --> 00:10:47,000
+Sounds good. I wonder what's on?
+
+316
+00:10:47,000 --> 00:10:49,000
+Here's the remote.
+
+317
+00:10:49,000 --> 00:10:51,000
+Thank you.
+
+318
+00:10:51,000 --> 00:10:53,000
+The drama has started.
+
+319
+00:10:53,000 --> 00:10:55,000
+I like this actor.
+
+320
+00:10:55,000 --> 00:10:57,000
+Their acting is natural and good.
+
+321
+00:10:57,000 --> 00:10:59,000
+The story is interesting too.
+
+322
+00:10:59,000 --> 00:11:01,000
+I look forward to it every week.
+
+323
+00:11:01,000 --> 00:11:03,000
+Let's watch it again next week!
+
+324
+00:11:03,000 --> 00:11:05,000
+Of course!
+
+325
+00:11:05,000 --> 00:11:07,000
+Oh, it's bath time.
+
+326
+00:11:07,000 --> 00:11:09,000
+Yes, it is. Who goes first?
+
+327
+00:11:09,000 --> 00:11:11,000
+You go ahead.
+
+328
+00:11:11,000 --> 00:11:13,000
+Thank you. I'll go now.
+
+329
+00:11:13,000 --> 00:11:15,000
+(Sound of bath)
+
+330
+00:11:15,000 --> 00:11:17,000
+Phew, that was a nice bath!
+
+331
+00:11:17,000 --> 00:11:19,000
+I'm going in next.
+
+332
+00:11:19,000 --> 00:11:21,000
+Take care!
+
+333
+00:11:21,000 --> 00:11:23,000
+(Relaxing music)
+
+334
+00:11:23,000 --> 00:11:25,000
+Today went by so quickly.
+
+335
+00:11:25,000 --> 00:11:27,000
+I wish every day was like this.
+
+336
+00:11:27,000 --> 00:11:29,000
+(Coming back from the bath)
+
+337
+00:11:29,000 --> 00:11:31,000
+I feel refreshed~
+
+338
+00:11:31,000 --> 00:11:33,000
+I've changed into pajamas!
+
+339
+00:11:33,000 --> 00:11:35,000
+Let's go to bed soon.
+
+340
+00:11:35,000 --> 00:11:37,000
+Yes, I think so.
+
+341
+00:11:37,000 --> 00:11:39,000
+We have an early day tomorrow.
+
+342
+00:11:39,000 --> 00:11:41,000
+I'll brush my teeth.
+
+343
+00:11:41,000 --> 00:11:43,000
+I'll do it later.
+
+344
+00:11:43,000 --> 00:11:45,000
+(Sound of brushing teeth)
+
+345
+00:11:45,000 --> 00:11:47,000
+Good night first.
+
+346
+00:11:47,000 --> 00:11:49,000
+Good night.
+
+347
+00:11:49,000 --> 00:11:51,000
+Sweet dreams.
+
+348
+00:11:51,000 --> 00:11:53,000
+You too.
+
+349
+00:11:53,000 --> 00:11:55,000
+(Quiet night sounds)
+
+350
+00:11:55,000 --> 00:11:57,000
+See you tomorrow.
+
+351
+00:11:57,000 --> 00:11:59,000
+Zzz...
+
+352
+00:11:59,000 --> 00:12:01,000
+(Morning after night)
+
+353
+00:12:01,000 --> 00:12:03,000
+A new morning has come.
+
+354
+00:12:03,000 --> 00:12:05,000
+The alarm is ringing.
+
+355
+00:12:05,000 --> 00:12:07,000
+Good morning~
+
+356
+00:12:07,000 --> 00:12:09,000
+I'm still sleepy…
+
+357
+00:12:09,000 --> 00:12:11,000
+But I have to get up.
+
+358
+00:12:11,000 --> 00:12:13,000
+Let's do our best today!
+
+359
+00:12:13,000 --> 00:12:15,000
+What shall we have for breakfast?
+
+360
+00:12:15,000 --> 00:12:17,000
+Just toast and coffee, simple.
+
+361
+00:12:17,000 --> 00:12:19,000
+Okay, I'll prepare it!
+
+362
+00:12:19,000 --> 00:12:21,000
+Thank you!
+
+363
+00:12:21,000 --> 00:12:23,000
+The aroma of coffee is the best.
+
+364
+00:12:23,000 --> 00:12:25,000
+I'm waking up now.
+
+365
+00:12:25,000 --> 00:12:27,000
+What's today's plan?
+
+366
+00:12:27,000 --> 00:12:29,000
+Work in the morning, free in the afternoon.
+
+367
+00:12:29,000 --> 00:12:31,000
+Let's meet again in the afternoon!
+
+368
+00:12:31,000 --> 00:12:33,000
+Yes, looking forward to it!
+
+369
+00:12:33,000 --> 00:12:35,000
+See you!
+
+370
+00:12:35,000 --> 00:12:37,000
+I'm off!
+
+371
+00:12:37,000 --> 00:12:39,000
+(Sound of the front door)
+
+372
+00:12:39,000 --> 00:12:41,000
+Let's do our best today!
+
+373
+00:12:41,000 --> 00:12:43,000
+(Sound of commuting)
+
+374
+00:12:43,000 --> 00:12:45,000
+Caught the train just in time.
+
+375
+00:12:45,000 --> 00:12:47,000
+Lucky to get a seat!
+
+376
+00:12:47,000 --> 00:12:49,000
+Hope today's work goes well.
+
+377
+00:12:49,000 --> 00:12:51,000
+Arrived~
+
+378
+00:12:51,000 --> 00:12:53,000
+Good morning!
+
+379
+00:12:53,000 --> 00:12:55,000
+Thanks for your help today.
+
+380
+00:12:55,000 --> 00:12:57,000
+Likewise!
+
+381
+00:12:57,000 --> 00:12:59,000
+(At work)
+
+382
+00:12:59,000 --> 00:13:01,000
+Where was this document?
+
+383
+00:13:01,000 --> 00:13:03,000
+It was attached to the email.
+
+384
+00:13:03,000 --> 00:13:05,000
+Oh, thank you!
+
+385
+00:13:05,000 --> 00:13:07,000
+No problem~
+
+386
+00:13:07,000 --> 00:13:09,000
+It's progressing smoothly.
+
+387
+00:13:09,000 --> 00:13:11,000
+Almost done.
+
+388
+00:13:11,000 --> 00:13:13,000
+Let's do our best!
+
+389
+00:13:13,000 --> 00:13:15,000
+Yes!
+
+390
+00:13:15,000 --> 00:13:17,000
+It's lunchtime~
+
+391
+00:13:17,000 --> 00:13:19,000
+What shall we eat?
+
+392
+00:13:19,000 --> 00:13:21,000
+Let's go to a nearby cafe!
+
+393
+00:13:21,000 --> 00:13:23,000
+Sounds good!
+
+394
+00:13:23,000 --> 00:13:25,000
+(Cafe sounds)
+
+395
+00:13:25,000 --> 00:13:27,000
+I'll order pasta.
+
+396
+00:13:27,000 --> 00:13:29,000
+I'll have a sandwich.
+
+397
+00:13:29,000 --> 00:13:31,000
+That looks delicious!
+
+398
+00:13:31,000 --> 00:13:33,000
+I think I can do well in the afternoon.
+
+399
+00:13:33,000 --> 00:13:35,000
+Me too!
+
+400
+00:13:35,000 --> 00:13:37,000
+Let's go back now.
+
+401
+00:13:37,000 --> 00:13:39,000
+Yeah, let's stay focused in the afternoon too!
+
+402
+00:13:39,000 --> 00:13:41,000
+(Office sounds)
+
+403
+00:13:41,000 --> 00:13:43,000
+It's already evening in no time.
+
+404
+00:13:43,000 --> 00:13:45,000
+Good job today!
+
+405
+00:13:45,000 --> 00:13:47,000
+See you tomorrow~
+
+406
+00:13:47,000 --> 00:13:49,000
+Well then, let's go home.
+
+407
+00:13:49,000 --> 00:13:51,000
+The train is coming.
+
+408
+00:13:51,000 --> 00:13:53,000
+Just in time!
+
+409
+00:13:53,000 --> 00:13:55,000
+I wonder what I'll do when I get home.
+
+410
+00:13:55,000 --> 00:13:57,000
+Maybe have dinner and relax.
+
+411
+00:13:57,000 --> 00:13:59,000
+I'm home!
+
+412
+00:13:59,000 --> 00:14:01,000
+Welcome back!
+
+413
+00:14:01,000 --> 00:14:03,000
+Thanks for your hard work today.
+
+414
+00:14:03,000 --> 00:14:05,000
+Thank you. What should we have for dinner?
+
+415
+00:14:05,000 --> 00:14:07,000
+There's leftover curry in the fridge!
+
+416
+00:14:07,000 --> 00:14:09,000
+Great!
+
+417
+00:14:09,000 --> 00:14:11,000
+I'll warm it up.
+
+418
+00:14:11,000 --> 00:14:13,000
+Let's eat!
+
+419
+00:14:13,000 --> 00:14:15,000
+It's delicious again today~
+
+420
+00:14:15,000 --> 00:14:17,000
+I'm happy.
+
+421
+00:14:17,000 --> 00:14:19,000
+Really.
+
+422
+00:14:19,000 --> 00:14:21,000
+(Soft background music)
+
+423
+00:14:21,000 --> 00:14:23,000
+Let's do our best together again tomorrow.
+
+424
+00:14:23,000 --> 00:14:25,000
+Yeah!
+
+425
+00:14:25,000 --> 00:14:27,000
+I'm starting to feel sleepy.
+
+426
+00:14:27,000 --> 00:14:29,000
+Then, it's time to get ready for bed.
+
+427
+00:14:29,000 --> 00:14:31,000
+Brush your teeth, change into pajamas...
+
+428
+00:14:31,000 --> 00:14:33,000
+Get into bed...
+
+429
+00:14:33,000 --> 00:14:35,000
+Good night.
+
+430
+00:14:35,000 --> 00:14:37,000
+See you tomorrow.
+
+431
+00:14:37,000 --> 00:14:39,000
+Zzz...
+
+432
+00:14:39,000 --> 00:14:41,000
+(Quiet night)
+
+433
+00:14:41,000 --> 00:14:43,000
+(Sound of stars shining)
+
+434
+00:14:43,000 --> 00:14:45,000
+The end credits roll.
+
+435
+00:14:45,000 --> 00:14:47,000
+Thank you for today as well.
+
+436
+00:14:47,000 --> 00:14:49,000
+May another wonderful day begin.
+
+437
+00:14:49,000 --> 00:14:51,000
+(Background music fades out)
+
+438
+00:14:51,000 --> 00:14:53,000
+To be continued...
+
+439
+00:14:53,000 --> 00:14:55,000
+Special thanks to you.
+
+440
+00:14:55,000 --> 00:14:57,000
+Good night.
+
+441
+00:14:57,000 --> 00:14:59,000
+🌙
+
+442
+00:14:59,000 --> 00:15:01,000
+(Morning sun shining in)
+
+443
+00:15:01,000 --> 00:15:03,000
+Good morning, it's a new day again.
+
+444
+00:15:03,000 --> 00:15:05,000
+Let's start together today.
+
+445
+00:15:05,000 --> 00:15:07,000
+Shall we do a little stretch?
+
+446
+00:15:07,000 --> 00:15:09,000
+Yes, it makes my body feel refreshed.
+
+447
+00:15:09,000 --> 00:15:11,000
+(Sound of stretching)
+
+448
+00:15:11,000 --> 00:15:13,000
+Alright, morning preparations!
+
+449
+00:15:13,000 --> 00:15:15,000
+I'm going to take a shower.
+
+450
+00:15:15,000 --> 00:15:17,000
+See you later.
+
+451
+00:15:17,000 --> 00:15:19,000
+(Sound of shower)
+
+452
+00:15:19,000 --> 00:15:21,000
+Phew, I feel refreshed!
+
+453
+00:15:21,000 --> 00:15:23,000
+What shall we have for breakfast?
+
+454
+00:15:23,000 --> 00:15:25,000
+Today, toast and fried eggs.
+
+455
+00:15:25,000 --> 00:15:27,000
+Yes, I'll prepare it!
+
+456
+00:15:27,000 --> 00:15:29,000
+I'll also make some coffee.
+
+457
+00:15:29,000 --> 00:15:31,000
+That would be helpful~
+
+458
+00:15:31,000 --> 00:15:33,000
+Let's eat!
+
+459
+00:15:33,000 --> 00:15:35,000
+Yes, a good start to the day!
+
+460
+00:15:35,000 --> 00:15:37,000
+Thank you for the meal!
+
+461
+00:15:37,000 --> 00:15:39,000
+Well, let's get ready to go out.
+
+462
+00:15:39,000 --> 00:15:41,000
+What was today's schedule again?
+
+463
+00:15:41,000 --> 00:15:43,000
+Shopping in the morning, a walk in the afternoon!
+
+464
+00:15:43,000 --> 00:15:45,000
+Sounds nice, a relaxing day.
+
+465
+00:15:45,000 --> 00:15:47,000
+The weather looks good too.
+
+466
+00:15:47,000 --> 00:15:49,000
+Alright, let's prepare and head out.
+
+467
+00:15:49,000 --> 00:15:51,000
+Wallet, smartphone, keys, got it!
+
+468
+00:15:51,000 --> 00:15:53,000
+I'm off!
+
+469
+00:15:53,000 --> 00:15:55,000
+Take care!
+
+470
+00:15:55,000 --> 00:15:57,000
+(Lively outdoor sounds)
+
+471
+00:15:57,000 --> 00:15:59,000
+The city is lively again today.
+
+472
+00:15:59,000 --> 00:16:01,000
+Many people are walking around.
+
+473
+00:16:01,000 --> 00:16:03,000
+It seems this cafe just opened.
+
+474
+00:16:03,000 --> 00:16:05,000
+Shall we stop by later?
+
+475
+00:16:05,000 --> 00:16:07,000
+Sounds good!
+
+476
+00:16:07,000 --> 00:16:09,000
+First, let's go to the supermarket.
+
+477
+00:16:09,000 --> 00:16:11,000
+Let's look at the list and shop.
+
+478
+00:16:11,000 --> 00:16:13,000
+Vegetables, milk, bread...
+
+479
+00:16:13,000 --> 00:16:15,000
+And some sweets too.
+
+480
+00:16:15,000 --> 00:16:17,000
+And maybe some ice cream as well!
+
+481
+00:16:17,000 --> 00:16:19,000
+Sounds good!
+
+482
+00:16:19,000 --> 00:16:21,000
+Let's line up at the register.
+
+483
+00:16:21,000 --> 00:16:23,000
+It looks like it will be quick.
+
+484
+00:16:23,000 --> 00:16:25,000
+Payment is complete!
+
+485
+00:16:25,000 --> 00:16:27,000
+Thank you very much!
+
+486
+00:16:27,000 --> 00:16:29,000
+Now, to that new cafe!
+
+487
+00:16:29,000 --> 00:16:31,000
+The menu looks stylish.
+
+488
+00:16:31,000 --> 00:16:33,000
+Maybe I'll try the matcha latte.
+
+489
+00:16:33,000 --> 00:16:35,000
+I'll have a caramel macchiato!
+
+490
+00:16:35,000 --> 00:16:37,000
+I'll place the order.
+
+491
+00:16:37,000 --> 00:16:39,000
+The staff is also very kind.
+
+492
+00:16:39,000 --> 00:16:41,000
+It's a nice atmosphere in this shop.
+
+493
+00:16:41,000 --> 00:16:43,000
+I want to come here again.
+
+494
+00:16:43,000 --> 00:16:45,000
+Really!
+
+495
+00:16:45,000 --> 00:16:47,000
+I'll enjoy this delicious drink!
+
+496
+00:16:47,000 --> 00:16:49,000
+It's so relaxing.
+
+497
+00:16:49,000 --> 00:16:51,000
+Well then, shall we go for an afternoon walk?
+
+498
+00:16:51,000 --> 00:16:53,000
+Let's go to the park!
+
+499
+00:16:53,000 --> 00:16:55,000
+The spring breeze feels so good.
+
+500
+00:16:55,000 --> 00:16:57,000
+Let's chat while walking.
+

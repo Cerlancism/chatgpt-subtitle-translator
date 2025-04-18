@@ -1,14 +1,15 @@
 # ChatGPT API SRT Subtitle Translator
 ChatGPT has also demonstrated its capabilities as a [robust translator](https://towardsdatascience.com/translate-with-chatgpt-f85609996a7f), capable of handling not just common languages, but also unconventional forms of writing like emojis and [word scrambling](https://www.mrc-cbu.cam.ac.uk/people/matt.davis/cmabridge/). However, it may not always produce a deterministic output and adhere to line-to-line correlation, potentially disrupting the timing of subtitles, even when instructed to follow precise instructions and setting the model `temperature` parameter to [`0`](https://cobusgreyling.medium.com/example-code-implementation-considerations-for-gpt-3-5-turbo-chatml-whisper-e61f8703c5db).
 
-This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead, grouping text into batches, resulting in arbitrary length translations without excessive [token consumption](https://openai.com/pricing) while ensuring a one-to-one match between line input and output.
+This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead, grouping text into batches, resulting in arbitrary length translations without excessive [token consumption](https://openai.com/api/pricing/) while ensuring a one-to-one match between line input and output.
 
 ## Web Interface: <https://cerlancism.github.io/chatgpt-subtitle-translator>  
 
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
-- **New**: Supports [Structured output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--experimental-structured-mode`.
-- **New**: Supports [Prompt caching](https://openai.com/index/api-prompt-caching/), by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--experimental-use-full-context` (CLI only).
+- **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--experimental-structured-mode`.
+- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--experimental-use-full-context` (CLI only).
+- Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
 - Line-based batching: avoiding token limit per request, reducing overhead token wastage, maintaining translation context to certain extent  
 - Checking with the free OpenAI Moderation tool: prevent token wastage if the model is highly likely to refuse to translate  
 - Streaming process output  
@@ -19,10 +20,14 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
 - Node.js version `>= 16.13.0` required. This README assumes `bash` shell environment
-- Clone this repository and navigate into the directory
+- Clone this repository and 
   ```bash
-  git clone https://github.com/Cerlancism/chatgpt-subtitle-translator && cd chatgpt-subtitle-translator
+  git clone https://github.com/Cerlancism/chatgpt-subtitle-translator
   ``` 
+- Navigate into the directory
+  ```bash
+  cd chatgpt-subtitle-translator
+  ```
 - Install the requirements
   ```bash
   npm install
@@ -81,9 +86,9 @@ Options:
     Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
   - `--experimental-structured-mode [mode]`  
-    Enable [structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/). (default: `array`, choices `array`, `object`)
+    Enable [structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/). (default: `array`, choices `array`)
       - `--experimental-structured-mode array` Structures the input and output into a plain array format. This option is more concise compared to base mode, though it uses slightly more tokens per batch.
-      - `--experimental-structured-mode object` Structures both the input and output into a dynamically generated object schema based on input values. This option is even more concise and uses fewer tokens, but requires smaller batch sizes and can be slow and unreliable. Due to its unreliability, it may lead to more resubmission retries, potentially wasting more tokens in the process.
+
   - `--experimental-use-full-context`  
     Include the full context of translated data to work well with [prompt caching](https://openai.com/index/api-prompt-caching/).  
     
@@ -218,9 +223,9 @@ Yes, it's very nice weather.
 ## How it works
 ### Token Reductions
 **System Instruction**  
-Tokens: `5`
+Tokens: `4`
 ```
-Translate Japanese to English
+Translate to English
 ```  
 <table>
 <tr>
@@ -330,13 +335,15 @@ Yes, it's very nice weather.
 ### Token Usage Comparison and Analysis
 
 
-| Lines | Plain Text | No Batching | ChatGPT Subtitle Translator |
-|-------|------------|-------------|-----------------------------|
-| 5     | 205        | 445         | 89                          |
-| 50    | 2494       | 2075        | 594                         |
-| 100   | 4987       | 3514        | 1187                        |
-| 500   | 25376      | 66910       | 6396                        |
-| 1000  | 52964      | 170349      | 15007                       |
+| Lines | SRT Text Format | No Batching | ChatGPT Subtitle Translator |
+|-------|-----------------|-------------|-----------------------------|
+| 5     | 280             | 309         | 133                         |
+| 10    | 511             | 380         | 171                         |
+| 50    | 2518            | 2001        | 818                         |
+| 100   | 5011            | 3980        | 1611                        |
+| 500   | 25400           | 21263       | 9025                        |
+| 1000  | 52988           | 49168       | 20593                       |
+
 
 ![comparison analysis chart](./docs/comparison_analysis_chart.png)
 **Plain Text**: Plain text including SRT formating and timestamps input/output  

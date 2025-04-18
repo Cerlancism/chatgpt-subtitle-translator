@@ -1,0 +1,40 @@
+1
+00:00:00,000 --> 00:00:02,000
+Good morning.
+
+2
+00:00:02,000 --> 00:00:05,000
+How are you?
+
+3
+00:00:05,000 --> 00:00:07,000
+I'm fine, thank you.
+
+4
+00:00:08,000 --> 00:00:12,000
+The weather is nice today.
+
+5
+00:00:12,000 --> 00:00:16,000
+Yes, it's very good weather.
+
+6
+00:00:17,000 --> 00:00:21,000
+What will you do today?
+
+7
+00:00:21,000 --> 00:00:24,000
+From the afternoon
+
+8
+00:00:24,000 --> 00:00:26,000
+With friends
+
+9
+00:00:26,000 --> 00:00:28,000
+We will watch a movie.
+
+10
+00:00:28,000 --> 00:00:30,000
+That sounds nice.
+
