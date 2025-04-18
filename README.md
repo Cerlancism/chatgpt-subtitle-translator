@@ -333,11 +333,10 @@ Yes, it's very nice weather.
 | Lines | Plain Text | No Batching | ChatGPT Subtitle Translator |
 |-------|------------|-------------|-----------------------------|
 | 5     | 205        | 445         | 89                          |
-| 30    | 1460       | 5662        | 320                         |
-| 100   | 4987       | 62555       | 1187                        |
-| 500   | 25376      | 79589       | 6396                        |
-| 1000  | 52964      | 110446      | 15007                       |
-
+| 50    | 2494       | 2075        | 594                         |
+| 100   | 4987       | 3514        | 1187                        |
+| 500   | 25376      | 66910       | 6396                        |
+| 1000  | 52964      | 170349      | 15007                       |
 
 ![comparison analysis chart](./docs/comparison_analysis_chart.png)
 **Plain Text**: Plain text including SRT formating and timestamps input/output  
