@@ -345,8 +345,8 @@ Yes, it's very nice weather.
 *Test data can be found in the [test/data](./test/data) directory. Token count also roughly includes message payload structure and prompt token overheads.*
 
 ![comparison analysis chart](./docs/comparison_analysis_chart.png)
-**SRT Text Format**: Full SRT text format, including timestamps for input/output.
-**No Batching**: SRT formatting and timestamp stripping, but one line per prompt with system instruction overhead, including up to `10` historical entries for context per prompt.
-**ChatGPT Subtitle Translator**: SRT formatting and timestamp stripping, with line batching of `100`, including up to `10` historical entries for context per batch.
+**SRT Text Format**: Full SRT text format, including timestamps for input/output.  
+**No Batching**: SRT formatting and timestamp stripping, but one line per prompt with system instruction overhead, including up to `10` historical entries for context per prompt.  
+**ChatGPT Subtitle Translator**: SRT formatting and timestamp stripping, with line batching of `100`, including up to `10` historical entries for context per batch.  
 
 *This analysis assumes perfect input/output quantity matching. In reality, this depends on model and subtitle quality. Typically, buffer an additional 20%~30% token usage for retries, refer to the `--batch-sizes` CLI option.*
