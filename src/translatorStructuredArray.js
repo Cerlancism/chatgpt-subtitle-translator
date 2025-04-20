@@ -165,13 +165,13 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                 writeBuffer = `${output}\n`
             } catch (err)
             {
-                log.error("[TranslatorStructuredBase]", "Parsing error:", err)
+                log.error("[TranslatorStructuredArray]", "Parsing error:", err)
             }
         })
 
         parser.on("error", (err) =>
         {
-            log.error("[TranslatorStructuredBase]", "JSONStream parsing error:", err)
+            log.error("[TranslatorStructuredArray]", "JSONStream parsing error:", err)
         })
 
         passThroughStream.pipe(parser)
