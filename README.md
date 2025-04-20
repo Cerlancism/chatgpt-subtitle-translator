@@ -1,20 +1,20 @@
 # ChatGPT API SRT Subtitle Translator
-ChatGPT has also demonstrated its capabilities as a [robust translator](https://towardsdatascience.com/translate-with-chatgpt-f85609996a7f), capable of handling not just common languages, but also unconventional forms of writing like emojis and [word scrambling](https://www.mrc-cbu.cam.ac.uk/people/matt.davis/cmabridge/). However, it may not always produce a deterministic output and adhere to line-to-line correlation, potentially disrupting the timing of subtitles, even when instructed to follow precise instructions and setting the model `temperature` parameter to [`0`](https://cobusgreyling.medium.com/example-code-implementation-considerations-for-gpt-3-5-turbo-chatml-whisper-e61f8703c5db).
+ChatGPT has also demonstrated its capabilities as a [robust translator](https://towardsdatascience.com/translate-with-chatgpt-f85609996a7f), capable of handling not just common languages, but also unconventional forms of writing like emojis and [word scrambling](https://www.mrc-cbu.cam.ac.uk/people/matt.davis/cmabridge/). However, it may not always produce a deterministic output or adhere to line-to-line correlation, potentially disrupting the timing of subtitles, even when instructed to follow precise instructions and with the model `temperature` parameter set to [`0`](https://cobusgreyling.medium.com/example-code-implementation-considerations-for-gpt-3-5-turbo-chatml-whisper-e61f8703c5db).
 
-This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead, grouping text into batches, resulting in arbitrary length translations without excessive [token consumption](https://openai.com/api/pricing/) while ensuring a one-to-one match between line input and output.
+This utility uses the OpenAI ChatGPT API to translate text, with a specific focus on line-based translation, especially for SRT subtitles. The translator optimizes token usage by removing SRT overhead and grouping text into batches, resulting in arbitrary length translations without excessive [token consumption](https://openai.com/api/pricing/) while ensuring a one-to-one match between line input and output.
 
 ## Web Interface: <https://cerlancism.github.io/chatgpt-subtitle-translator>  
 
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
-- **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--experimental-structured-mode`.
-- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--experimental-use-full-context` (CLI only).
+- **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--experimental-structured-mode`
+- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--experimental-use-full-context` (CLI only)
 - Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
-- Line-based batching: avoiding token limit per request, reducing overhead token wastage, maintaining translation context to certain extent  
-- Checking with the free OpenAI Moderation tool: prevent token wastage if the model is highly likely to refuse to translate  
+- Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent  
+- Checks with the free OpenAI Moderation tool: prevents token wastage if the model is highly likely to refuse to translate  
 - Streaming process output  
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview)  
-- Progress resumption (CLI  Only)  
+- Progress resumption (CLI only)
 
 
 ## Setup
@@ -80,10 +80,10 @@ Options:
   - `-b, --batch-sizes <sizes>` 
     Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10,100]"`)  
 
-    The number of lines to include in each translation prompt, provided that they are estimated to within the token limit. 
-    In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
-    
-    Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
+    The number of lines to include in each translation prompt, provided that they are estimated to be within the token limit.  
+    In case of mismatched output line quantities, this number will be decreased step by step according to the values in the array, ultimately reaching one.
+
+    Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.  
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
   - `--experimental-structured-mode [mode]`  
     Enable [structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/). (default: `array`, choices `array`)
@@ -342,12 +342,11 @@ Yes, it's very nice weather.
 | 500   | 25,400          | 79,297      | 9,025                       |
 | 1000  | 52,988          | 184,596     | 20,593                      |
 
-*Test data can be found in [test/data](./test/data) directory. Token count also roughly included chat structure and prime token overheads*
-
+*Test data can be found in the [test/data](./test/data) directory. Token count also roughly includes message payload structure and prompt token overheads.*
 
 ![comparison analysis chart](./docs/comparison_analysis_chart.png)
-**SRT Text Format**: Full SRT text format including timestamps for input/output  
-**No Batching**: SRT formating and timestamps stripping, but one line per prompt with system instruction overhead, including up to `10` historical data for context per prompt  
-**ChatGPT Subtitle Translator**: SRT formating and timestamps stripping, line batching of `100`, including up to `10` historical data for context per batch
+**SRT Text Format**: Full SRT text format, including timestamps for input/output.
+**No Batching**: SRT formatting and timestamp stripping, but one line per prompt with system instruction overhead, including up to `10` historical entries for context per prompt.
+**ChatGPT Subtitle Translator**: SRT formatting and timestamp stripping, with line batching of `100`, including up to `10` historical entries for context per batch.
 
 *This analysis assumes perfect input/output quantity matching. In reality, this depends on model and subtitle quality. Typically, buffer an additional 20%~30% token usage for retries, refer to the `--batch-sizes` CLI option.*
