@@ -50,7 +50,7 @@ export class TranslatorStructuredBase extends Translator
     {
         if (params.stream)
         {
-            const runner = this.services.openai.beta.chat.completions.stream({
+            const runner = this.services.openai.chat.completions.stream({
                 ...params,
                 response_format: zodResponseFormat(zFormat.structure, zFormat.name),
                 stream: true,
@@ -82,7 +82,7 @@ export class TranslatorStructuredBase extends Translator
 
         } else
         {
-            const output = await this.services.openai.beta.chat.completions.parse({
+            const output = await this.services.openai.chat.completions.parse({
                 ...params,
                 response_format: zodResponseFormat(zFormat.structure, zFormat.name),
                 stream: false,

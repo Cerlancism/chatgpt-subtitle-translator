@@ -60,7 +60,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
 
             const translationCandidate = output.choices[0].message
 
-            const getLinesOutput = async (/** @type {import("openai/resources/beta/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) =>
+            const getLinesOutput = async (/** @type {import("openai/resources/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) =>
             {
                 if (lines.length === 1 && translation.refusal && this.options.fallbackModel)
                 {
