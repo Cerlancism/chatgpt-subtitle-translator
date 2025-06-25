@@ -3,9 +3,9 @@ import fs from 'node:fs'
 import path from 'node:path';
 import url from 'url'
 import readline from 'readline'
+import * as undici from 'undici';
 
 import { Command, Option } from "commander"
-import { ProxyAgent } from 'proxy-agent';
 import log from 'loglevel'
 
 import
@@ -22,14 +22,12 @@ import
 
 import 'dotenv/config'
 
-const openai = createOpenAIClient(process.env.OPENAI_API_KEY, undefined, process.env.OPENAI_BASE_URL)
+const proxyAgent = getProxyAgent()
+const openai = createOpenAIClient(process.env.OPENAI_API_KEY, undefined, process.env.OPENAI_BASE_URL, proxyAgent)
 const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
 
-/**
- * @param {readonly string[]} args
- */
-export function createInstance(args)
+function getProxyAgent()
 {
     const httpProxyConfig = process.env.http_proxy ?? process.env.HTTP_PROXY
     const httpsProxyConfig = process.env.https_proxy ?? process.env.HTTPS_PROXY
@@ -37,9 +35,18 @@ export function createInstance(args)
     if (httpProxyConfig || httpsProxyConfig)
     {
         log.debug("[CLI HTTP/HTTPS PROXY]", "Using HTTP/HTTPS Proxy from ENV Detected", { httpProxyConfig, httpsProxyConfig })
-        openai.httpAgent = new ProxyAgent()
+        const proxyAgent = new undici.EnvHttpProxyAgent();
+        return proxyAgent
     }
 
+    return undefined
+}
+
+/**
+ * @param {readonly string[]} args
+ */
+export function createInstance(args)
+{
     const program = new Command()
         .description("Translation tool based on ChatGPT API")
         .option("--from <language>", "Source language")

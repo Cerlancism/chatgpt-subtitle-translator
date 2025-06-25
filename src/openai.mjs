@@ -6,23 +6,23 @@ import { retryWrapper, sleep } from './helpers.mjs';
  * In USD per 1000 tokens
  */
 export const ModelPricing = {
-    "gpt-3.5-turbo"             : { prompt: 0.50 / 1000000 * 1000,  completion: 1.50 / 1000000 * 1000 },
-    "gpt-3.5-turbo-1106"        : { prompt: 0.001,                  completion: 0.002 },
-    "gpt-4"                     : { prompt: 0.03,                   completion: 0.06 },
-    "gpt-4-32k"                 : { prompt: 0.06,                   completion: 0.12 },
-    "gpt-4-1106-preview"        : { prompt: 0.01,                   completion: 0.03 },
-    "gpt-4o"                    : { prompt: 5.00 / 1000000 * 1000,  completion: 15.00 / 1000000 * 1000 },
-    "gpt-4o-mini"               : { prompt: 0.150 / 1000000 * 1000, completion: 0.600 / 1000000 * 1000 },
+    "gpt-3.5-turbo": { prompt: 0.50 / 1000000 * 1000, completion: 1.50 / 1000000 * 1000 },
+    "gpt-3.5-turbo-1106": { prompt: 0.001, completion: 0.002 },
+    "gpt-4": { prompt: 0.03, completion: 0.06 },
+    "gpt-4-32k": { prompt: 0.06, completion: 0.12 },
+    "gpt-4-1106-preview": { prompt: 0.01, completion: 0.03 },
+    "gpt-4o": { prompt: 5.00 / 1000000 * 1000, completion: 15.00 / 1000000 * 1000 },
+    "gpt-4o-mini": { prompt: 0.150 / 1000000 * 1000, completion: 0.600 / 1000000 * 1000 },
 }
 
 export const ModelPricingAlias = {
-    "gpt-3.5-turbo-0301"        : "gpt-3.5-turbo",
-    "gpt-3.5-turbo-0613"        : "gpt-3.5-turbo",
-    "gpt-3.5-turbo-16k"         : "gpt-3.5-turbo-1106",
-    "gpt-3.5-turbo-16k-0613"    : "gpt-3.5-turbo-1106",
-    "gpt-4-0613"                : "gpt-4",
-    "gpt-4o-2024-05-13"         : "gpt-4o",
-    "gpt-4o-mini-2024-07-18"    : "gpt-4o-mini"
+    "gpt-3.5-turbo-0301": "gpt-3.5-turbo",
+    "gpt-3.5-turbo-0613": "gpt-3.5-turbo",
+    "gpt-3.5-turbo-16k": "gpt-3.5-turbo-1106",
+    "gpt-3.5-turbo-16k-0613": "gpt-3.5-turbo-1106",
+    "gpt-4-0613": "gpt-4",
+    "gpt-4o-2024-05-13": "gpt-4o",
+    "gpt-4o-mini-2024-07-18": "gpt-4o-mini"
 }
 
 /**
@@ -49,14 +49,16 @@ export function getPricingModel(model)
  * @param {string} apiKey
  * @param {boolean} [dangerouslyAllowBrowser]
  * @param {string} [baseURL]
+ * @param {import('undici').ProxyAgent} proxyAgent
  */
-export function createOpenAIClient(apiKey, dangerouslyAllowBrowser = undefined, baseURL = undefined)
+export function createOpenAIClient(apiKey, dangerouslyAllowBrowser = undefined, baseURL = undefined, proxyAgent = undefined)
 {
     return new OpenAI({
         apiKey,
         baseURL,
         dangerouslyAllowBrowser: dangerouslyAllowBrowser,
-        maxRetries: 3
+        maxRetries: 3,
+        fetchOptions: proxyAgent === undefined ? undefined : { dispatcher: proxyAgent},
     });
 }
 
