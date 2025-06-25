@@ -4,7 +4,7 @@ import JSONStream from "JSONStream";
 import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
-import { TranslatorStructuredBase } from "./translatorStructuredBase.js";
+import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
 
 export class TranslatorStructuredArray extends TranslatorStructuredBase
 {

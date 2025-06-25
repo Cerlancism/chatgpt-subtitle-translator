@@ -2,7 +2,7 @@ import { z } from "zod";
 import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
-import { TranslatorStructuredBase } from "./translatorStructuredBase.js";
+import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
 
 const NestedPlaceholder = "nested_"
 

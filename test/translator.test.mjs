@@ -7,7 +7,7 @@ import { subtitleParser, Translator, CooldownContext, createOpenAIClient } from 
 import { wrapQuotes } from '../src/helpers.mjs';
 
 import 'dotenv/config'
-import { TranslatorStructuredArray } from '../src/translatorStructuredArray.js';
+import { TranslatorStructuredArray } from '../src/translatorStructuredArray.mjs';
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY)
 const coolerChatGPTAPI = new CooldownContext(2, 2000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(2, 2000, "OpenAIModerator")

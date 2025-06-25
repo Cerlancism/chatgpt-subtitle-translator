@@ -8,5 +8,7 @@
         ],
         "checkJs": true
     },
-    "exclude": ["./web"]
+    "exclude": [
+        "./web"
+    ]
 }
