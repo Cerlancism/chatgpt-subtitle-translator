@@ -17,7 +17,8 @@ const OPENAI_BASE_URL = "OPENAI_BASE_URL"
 const RATE_LIMIT = "RATE_LIMIT"
 const MODEL = "MODEL"
 
-const DefaultModel = "gpt-4o-mini"
+const DefaultModel = "gpt-5-nano"
+const DefaultTemperature = 1
 
 export function TranslatorApplication() {
   // Translator Configuration
@@ -27,7 +28,7 @@ export function TranslatorApplication() {
   const [toLanguage, setToLanguage] = useState("English")
   const [systemInstruction, setSystemInstruction] = useState("")
   const [model, setModel] = useState(DefaultModel)
-  const [temperature, setTemperature] = useState(0)
+  const [temperature, setTemperature] = useState(DefaultTemperature)
   const [batchSizes, setBatchSizes] = useState([10, 50])
   const [useModerator, setUseModerator] = useState(true)
   const [useStructuredMode, setUseStructuredMode] = useState(true)
