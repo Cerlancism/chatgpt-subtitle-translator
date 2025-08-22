@@ -17,8 +17,8 @@ const OPENAI_BASE_URL = "OPENAI_BASE_URL"
 const RATE_LIMIT = "RATE_LIMIT"
 const MODEL = "MODEL"
 
-const DefaultModel = "gpt-5-nano"
-const DefaultTemperature = 1
+const DefaultModel = "gpt-4o-mini"
+const DefaultTemperature = 0
 
 export function TranslatorApplication() {
   // Translator Configuration
