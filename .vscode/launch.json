@@ -21,8 +21,9 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/cli/translator.mjs",
+            "args": ["--stream", "--to", "Chinese", "--input", "test/data/test_ja.srt", "-t", "1", "--batch-sizes", "[5]", "--history-prompt-length", "5", "--model", "gpt-5-nano", "--reasoning_effort", "low"],
             // "args": ["--plain-text", "你好"]
-            "args": ["--no-use-moderator", "--model", "deepseek-r1:14b", "--stream", "--to", "Chinese", "--input", "test/data/test_ja.srt", "-t", "0", "--batch-sizes", "[5]", "--history-prompt-length", "10"],
+            // "args": ["--no-use-moderator", "--model", "deepseek-r1:14b", "--stream", "--to", "Chinese", "--input", "test/data/test_ja.srt", "-t", "0", "--batch-sizes", "[5]", "--history-prompt-length", "10"],
             // "args": ["--stream", "--to", "Chinese", "--input", "test/data/test_ja.srt", "-t", "0", "--batch-sizes", "[5]", "--history-prompt-length", "1", "--experimental-use-full-context"],
             // "args": ["-i", "./test/data/test_cn_multiline.srt", "--stream", "--batch-sizes", "[5, 10]"],
             // "args": ["-i", "./test/data/test_cn_multiline.srt", "--stream", "--experimental-structured-mode", "--experimental-max_token", "4096", "--experimental-input-multiplier", "2", "--batch-sizes", "[5, 10]", "--experimental-fallback-model", "gpt-3.5-turbo-0613"],

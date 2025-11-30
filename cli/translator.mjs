@@ -81,6 +81,7 @@ export function createInstance(args)
         .option("--presence_penalty <presence_penalty>", "Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-presence_penalty", parseFloat)
         .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat/create-frequency_penalty", parseFloat)
         .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias", JSON.parse)
+        .option("--reasoning_effort <reasoning_effort>", "Constrains effort on reasoning for reasoning models https://platform.openai.com/docs/api-reference/chat/create#chat_create-reasoning_effort")
         // .option("--user <user>", "A unique identifier representing your end-user")
         .addOption(new Option("--log-level <level>", "Log level").choices(["trace", "debug", "info", "warn", "error", "silent"]))
         .option("--silent", "Same as --log-level silent")
@@ -103,6 +104,7 @@ export function createInstance(args)
             ...(opts.presence_penalty !== undefined && { presence_penalty: opts.presence_penalty }),
             ...(opts.frequency_penalty !== undefined && { frequency_penalty: opts.frequency_penalty }),
             ...(opts.logit_bias && { logit_bias: opts.logit_bias }),
+            ...(opts.reasoning_effort && { reasoning_effort: opts.reasoning_effort }),
             // ...(opts.user && { user: opts.user }),
         },
         ...(opts.initialPrompts && { initialPrompts: opts.initialPrompts }),
