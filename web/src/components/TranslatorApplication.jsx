@@ -280,7 +280,7 @@ export function TranslatorApplication() {
                   </div>
 
                   <div className='flex flex-wrap md:flex-nowrap w-full gap-4'>
-                    <div className='w-full md:w-1/6'>
+                    <div className='w-full md:w-1/5'>
                       <Input
                         size='sm'
                         type="text"
@@ -292,7 +292,7 @@ export function TranslatorApplication() {
                       />
                     </div>
 
-                    <div className='w-full md:w-1/6 flex'>
+                    <div className='w-full md:w-1/5 flex'>
                       <Switch
                         size='sm'
                         isSelected={useStructuredMode}
@@ -309,7 +309,7 @@ export function TranslatorApplication() {
                       </div>
                     </div>
 
-                    <div className='w-full md:w-1/6'>
+                    <div className='w-full md:w-1/5'>
                       <Slider
                         label="Temperature"
                         size="md"
@@ -322,7 +322,7 @@ export function TranslatorApplication() {
                       />
                     </div>
 
-                    <div className='w-full md:w-1/6'>
+                    <div className='w-full md:w-1/5'>
                       <Slider
                         label="Batch Sizes"
                         size="md"
@@ -334,7 +334,7 @@ export function TranslatorApplication() {
                       />
                     </div>
 
-                    <div className='w-full md:w-2/6'>
+                    <div className='w-full md:w-1/5'>
                       <Input
                         size='sm'
                         type="number"
