@@ -30,7 +30,6 @@ export function TranslatorApplication() {
   const [model, setModel] = useState(DefaultModel)
   const [temperature, setTemperature] = useState(DefaultTemperature)
   const [batchSizes, setBatchSizes] = useState([10, 50])
-  const [useModerator, setUseModerator] = useState(true)
   const [useStructuredMode, setUseStructuredMode] = useState(true)
   const [rateLimit, setRateLimit] = useState(60)
 
@@ -78,9 +77,6 @@ export function TranslatorApplication() {
 
   function setBaseUrlWithModerator(value) {
     if (!baseUrlValue && value) {
-      if (useModerator) {
-        setUseModerator(false)
-      }
       if (useStructuredMode) {
         setUseStructuredMode(false)
       }
@@ -123,7 +119,6 @@ export function TranslatorApplication() {
     const openai = createOpenAIClient(APIvalue, true, baseUrlValue)
 
     const coolerChatGPTAPI = new CooldownContext(rateLimit, 60000, "ChatGPTAPI")
-    const coolerOpenAIModerator = new CooldownContext(rateLimit, 60000, "OpenAIModerator")
 
     const TranslatorImplementation = useStructuredMode ? TranslatorStructuredArray : Translator
 
@@ -155,13 +150,9 @@ export function TranslatorApplication() {
           currentStream = ""
         }
         setStreamOutput(currentStream)
-      },
-      moderationService: {
-        openai,
-        cooler: coolerOpenAIModerator
       }
     }, {
-      useModerator: useModerator,
+      useModerator: false,
       batchSizes: batchSizes, //[10, 50],
       createChatCompletionRequest: {
         model: model,
@@ -343,26 +334,8 @@ export function TranslatorApplication() {
                       />
                     </div>
 
-                    <div className='w-full md:w-2/6 gap-4 flex flex-wrap md:flex-nowrap'>
-                      <div className='w-full md:w-6/12 flex'>
-                        <Switch
-                          size='sm'
-                          isSelected={useModerator}
-                          onValueChange={setUseModerator}
-                        >
-                        </Switch>
-                        <div className="flex flex-col place-content-center gap-1">
-                          <p className="text-small">Use Moderator</p>
-                          {baseUrlValue && (
-                            <p className="text-tiny text-default-400">
-                              Base URL is set, disable moderator for compatibility.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
+                    <div className='w-full md:w-2/6'>
                       <Input
-                        className='w-full md:w-6/12'
                         size='sm'
                         type="number"
                         min="1"
