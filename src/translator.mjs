@@ -20,26 +20,26 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * @type {TranslatorOptions}
  * @typedef TranslatorOptions
  * @property {Pick<Partial<import('openai').OpenAI.Chat.ChatCompletionCreateParams>, "messages" | "model"> & Omit<import('openai').OpenAI.Chat.ChatCompletionCreateParams, "messages" | "model">} createChatCompletionRequest
- * Moderation model
+ * Options for ChatGPT besides the messages; it is recommended to set `temperature: 0` for an almost deterministic translation
  * @property {import('openai').OpenAI.ModerationModel} moderationModel
- * Options to ChatGPT besides the messages, it is recommended to set `temperature: 0` for a (almost) deterministic translation
- * @property {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} initialPrompts 
- * Initiation prompt messages before the translation request messages
+ * Moderation model
+ * @property {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} initialPrompts
+ * Initial prompt messages before the translation request messages
  * @property {boolean} useModerator `true` \
- * Verify with the free OpenAI Moderation tool prior to submitting the prompt to ChatGPT model
+ * Verify with the free OpenAI Moderation tool before submitting the prompt to the ChatGPT model
  * @property {boolean} prefixNumber `true` \
- * Label lines with numerical prefixes to improve the one-to-one correlation between line quantities for input and output
+ * Label lines with numerical prefixes to improve the one-to-one correlation between input and output line quantities
  * @property {boolean} lineMatching `true`
- * Enforce one to one line quantity input output matching
+ * Enforce one-to-one line quantity matching between input and output
  * @property {number} historyPromptLength `10` \
- * Length of the prompt history to be retained and passed over to the next translation request in order to maintain some context.
+ * Length of the prompt history to be retained and passed on to the next translation request in order to maintain some context.
  * @property {boolean} useFullContext
  * Use the full history, chunked by historyPromptLength, to work better with prompt caching.
  * @property {number[]} batchSizes `[10, 100]` \
- * The number of lines to include in each translation prompt, provided that they are estimated to within the token limit. 
+ * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
- * 
- * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation. 
+ *
+ * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
  * @property {boolean | "array" | "object" } structuredMode
  * @property {number} max_token

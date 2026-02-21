@@ -22,7 +22,7 @@ export function createInstance(args) {
         .action((files) => mergeFiles(files))
 
     const program = new Command()
-        .description("Subtitle ultilities")
+        .description("Subtitle utilities")
         .addCommand(commandOffsetFile)
         .addCommand(commandMergeFiles)
         .parse(args)

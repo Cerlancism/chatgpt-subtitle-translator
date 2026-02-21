@@ -62,7 +62,7 @@ export function createInstance(args) {
         .addOption(new Option("--experimental-structured-mode [mode]", "Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
         .option("--experimental-use-full-context", "Use the full history, chunked by historyPromptLength, to work better with prompt caching.")
 
-        .option("--initial-prompts <prompts>", "Initiation prompt messages before the translation request messages in JSON Array", JSON.parse, DefaultOptions.initialPrompts)
+        .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
         .option("--no-prefix-number", "Don't prefix lines with numerical indices")
         .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
