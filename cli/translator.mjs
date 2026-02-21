@@ -66,7 +66,6 @@ export function createInstance(args) {
         .option("--use-moderator", "Use the OpenAI Moderation tool")
         .option("--no-prefix-number", "Don't prefix lines with numerical indices")
         .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
-        .option("-l, --history-prompt-length <length>", "Length of prompt history to retain", parseInt, DefaultOptions.historyPromptLength)
         .option("-b, --batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, DefaultOptions.batchSizes)
         .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic", parseFloat)
         .option("--stream", "Enable stream mode for partial message deltas")
@@ -108,7 +107,6 @@ export function createInstance(args) {
         ...(opts.useModerator !== undefined && { useModerator: opts.useModerator }),
         ...(opts.prefixNumber !== undefined && { prefixNumber: opts.prefixNumber }),
         ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
-        ...(opts.historyPromptLength !== undefined && { historyPromptLength: opts.historyPromptLength }),
         ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
         ...(opts.structuredMode && opts.structuredMode !== "none" && { structuredMode: opts.structuredMode }),
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),

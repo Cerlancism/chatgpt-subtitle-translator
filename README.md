@@ -75,9 +75,7 @@ Options:
     Don't prefix lines with numerical indices
   - `--no-line-matching`  
     Don't enforce one to one line quantity input output matching
-  - `-l, --history-prompt-length <length>`  
-    Length of prompt history to retain for next request batch (default: 10)
-  - `-b, --batch-sizes <sizes>` 
+  - `-b, --batch-sizes <sizes>`
     Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10,100]"`)  
 
     The number of lines to include in each translation prompt, provided that they are estimated to be within the token limit.  
@@ -94,7 +92,7 @@ Options:
   - `--use-full-context <tokens>`
     Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Disabled by default.
 
-    The token budget is tracked from actual model response token counts. The history is chunked by `--history-prompt-length` into user/assistant message pairs — it is recommended to set `--history-prompt-length` to the largest batch size (e.g. `--history-prompt-length 100`).
+    The token budget is tracked from actual model response token counts. The history is chunked into user/assistant message pairs using the last value in `--batch-sizes`.
 
     Recommended value: set `<tokens>` to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--use-full-context 90000`.
   - `--log-level <level>`  
