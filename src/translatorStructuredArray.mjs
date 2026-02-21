@@ -1,6 +1,8 @@
 import { PassThrough } from "stream";
 import { z } from "zod";
-import JSONStream from "JSONStream";
+import { parser as jsonParser } from "stream-json";
+import { pick } from "stream-json/filters/Pick.js";
+import { streamArray } from "stream-json/streamers/StreamArray.js";
 import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
@@ -140,9 +142,12 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             this.services.onClearLine?.()
         })
 
-        const parser = JSONStream.parse(["outputs", true])
+        const pipeline = passThroughStream
+            .pipe(jsonParser())
+            .pipe(pick({ filter: "outputs" }))
+            .pipe(streamArray())
 
-        parser.on("data", (output) => {
+        pipeline.on("data", (/** @type {{ value: string }} */ { value: output }) => {
             try {
                 this.services.onClearLine?.()
                 writeBuffer = `${output}\n`
@@ -151,10 +156,8 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             }
         })
 
-        parser.on("error", (err) => {
-            log.error("[TranslatorStructuredArray]", "JSONStream parsing error:", err)
+        pipeline.on("error", (/** @type {Error} */ err) => {
+            log.error("[TranslatorStructuredArray]", "stream-json parsing error:", err)
         })
-
-        passThroughStream.pipe(parser)
     }
 }

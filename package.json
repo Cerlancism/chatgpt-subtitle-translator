@@ -14,11 +14,10 @@
     "@types/node": "^24.10.13",
     "commander": "^14.0.3",
     "dotenv": "^17.3.1",
-    "JSONStream": "^1.3.5",
     "loglevel": "^1.9.2",
     "openai": "^6.22.0",
-    "readline": "^1.3.0",
     "srt-parser-2": "^1.2.3",
+    "stream-json": "^1.9.1",
     "undici": "^7.22.0",
     "zod": "^4.3.6"
   },
@@ -29,6 +28,7 @@
     "chatgpt-subtitle-translator": "./cli/translator.mjs"
   },
   "devDependencies": {
+    "@types/stream-json": "^1.7.8",
     "typescript": "^5.9.3"
   }
 }
