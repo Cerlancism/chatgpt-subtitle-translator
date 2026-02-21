@@ -91,12 +91,12 @@ Options:
       - `object` Structures the input and output as a keyed object.
       - `none` Disables structured output.
 
-  - `--experimental-use-full-context`  
-    Include the full context of translated data to work well with [prompt caching](https://openai.com/index/api-prompt-caching/).  
-    
-    The translated lines per user and assistant message pairs are sliced as defined by `--history-prompt-length` (by default `--history-prompt-length 10`), it is recommended to set this to the largest batch size (by default `--batch-sizes "[10,100]"`): `--history-prompt-length 100`.  
-    
-    Enabling this may risk running into the model's context window limit, typically `128K`, but should be sufficient for most cases.
+  - `--use-full-context <tokens>`
+    Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Disabled by default.
+
+    The token budget is tracked from actual model response token counts. The history is chunked by `--history-prompt-length` into user/assistant message pairs — it is recommended to set `--history-prompt-length` to the largest batch size (e.g. `--history-prompt-length 100`).
+
+    Recommended value: set `<tokens>` to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--use-full-context 90000`.
   - `--log-level <level>`  
     Log level (default: `debug`, choices: `trace`, `debug`, `info`, `warn`, `error`, `silent`)
   - `--silent`  
