@@ -11,7 +11,6 @@
   "author": "Cerlancism",
   "license": "MIT",
   "dependencies": {
-    "@types/node": "^24.10.13",
     "commander": "^14.0.3",
     "dotenv": "^17.3.1",
     "loglevel": "^1.9.2",
@@ -22,12 +21,13 @@
     "zod": "^4.3.6"
   },
   "engines": {
-    "node": ">=16.13.0"
+    "node": ">=20.0.0"
   },
   "bin": {
     "chatgpt-subtitle-translator": "./cli/translator.mjs"
   },
   "devDependencies": {
+    "@types/node": "^20",
     "@types/stream-json": "^1.7.8",
     "typescript": "^5.9.3"
   }
