@@ -19,7 +19,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
-- Node.js version `>= 16.13.0` required. This README assumes `bash` shell environment
+- Node.js version `>= 20` required. This README assumes `bash` shell environment
 - Clone this repository and 
   ```bash
   git clone https://github.com/Cerlancism/chatgpt-subtitle-translator
@@ -69,8 +69,8 @@ Options:
     Initial prompts for the translation in JSON (default: `"[]"`) 
   - `--use-moderator`
     Use the OpenAI API Moderation endpoint
-  - `--moderation-model`  
-    (default: `"omni-moderation-latest"`) https://platform.openai.com/docs/models/moderation
+  - `--moderation-model <model>`
+    (default: `"omni-moderation-latest"`) https://developers.openai.com/api/docs/models  
   - `--no-prefix-number`  
     Don't prefix lines with numerical indices
   - `--no-line-matching`  
@@ -104,21 +104,23 @@ Options:
   - `--quiet`  
     Same as `--log-level silent`  
 
-Additional Options for GPT:  
-  - `-m, --model <model>`  
-    (default: `"gpt-4o-mini"`) https://platform.openai.com/docs/api-reference/chat/create
-  - `--stream`  
-    Stream progress output to terminal https://platform.openai.com/docs/api-reference/chat/create#chat-create-stream
-  - `-t, --temperature <temperature>`  
-    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`) https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature
-  - `--top_p <top_p>`  
-    Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat-create-top_p
-  - `--presence_penalty <presence_penalty>`  
-    Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat-create-presence_penalty
-  - `--frequency_penalty <frequency_penalty`  
-    Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat-create-frequency_penalty
-  - `--logit_bias <logit_bias>`  
-    Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat-create-logit_bias
+Additional Options for GPT: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
+  - `-m, --model <model>`
+    (default: `"gpt-4o-mini"`) https://developers.openai.com/api/docs/models  
+  - `--stream`
+    Stream progress output to terminal
+  - `-t, --temperature <temperature>`
+    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`)
+  - `--top_p <top_p>`
+    Nucleus sampling parameter, top_p probability mass
+  - `--presence_penalty <presence_penalty>`
+    Penalty for new tokens based on their presence in the text so far
+  - `--frequency_penalty <frequency_penalty>`
+    Penalty for new tokens based on their frequency in the text so far
+  - `--logit_bias <logit_bias>`
+    Modify the likelihood of specified tokens appearing in the completion
+  - `--reasoning_effort <reasoning_effort>`
+    Constrains effort on reasoning for reasoning models
 
 
 ## Examples

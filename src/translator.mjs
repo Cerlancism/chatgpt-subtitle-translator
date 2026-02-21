@@ -33,7 +33,7 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Enforce one-to-one line quantity matching between input and output
  * @property {number} historyPromptLength `10` \
  * Length of the prompt history to be retained and passed on to the next translation request in order to maintain some context.
- * @property {boolean} useFullContext
+ * @property {boolean} useFullContext `false` \
  * Use the full history, chunked by historyPromptLength, to work better with prompt caching.
  * @property {number[]} batchSizes `[10, 100]` \
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
@@ -59,7 +59,7 @@ export const DefaultOptions = {
     historyPromptLength: 10,
     useFullContext: false,
     batchSizes: [10, 100],
-    structuredMode: false,
+    structuredMode: "array",
     max_token: 0,
     inputMultiplier: 0,
     fallbackModel: undefined,
