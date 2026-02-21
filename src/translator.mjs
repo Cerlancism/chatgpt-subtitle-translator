@@ -33,8 +33,8 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Enforce one-to-one line quantity matching between input and output
  * @property {number} historyPromptLength `10` \
  * Length of the prompt history to be retained and passed on to the next translation request in order to maintain some context.
- * @property {boolean} useFullContext `false` \
- * Use the full history, chunked by historyPromptLength, to work better with prompt caching.
+ * @property {number} useFullContext `0` \
+ * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by historyPromptLength, to work better with prompt caching. Set to 0 to disable.
  * @property {number[]} batchSizes `[10, 100]` \
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
@@ -57,7 +57,7 @@ export const DefaultOptions = {
     prefixNumber: true,
     lineMatching: true,
     historyPromptLength: 10,
-    useFullContext: false,
+    useFullContext: 0,
     batchSizes: [10, 100],
     structuredMode: "array",
     max_token: 0,
@@ -85,7 +85,10 @@ export class Translator {
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         this.promptContext = []
 
-        /** @type {{ source: string; transform: string; }[]} */
+        /**
+         * @type {{ source: string; transform: string; promptTokens?: number; completionTokens?: number; }[]}
+         * token counts are the total request cost averaged per entry for batch requests
+         */
         this.workingProgress = []
         this.promptTokensUsed = 0
         this.promptTokensWasted = 0
@@ -267,7 +270,7 @@ export class Translator {
             this.buildContext()
             const output = await this.translatePrompt([input])
             const writeOut = output.content[0]
-            yield* this.yieldOutput([batch[x]], [writeOut])
+            yield* this.yieldOutput([batch[x]], [writeOut], output.promptTokens, output.completionTokens)
         }
     }
 
@@ -334,7 +337,11 @@ export class Translator {
                 }
             }
             else {
-                yield* this.yieldOutput(batch, outputs)
+                // Lines are translated in batches but the model returns a single token count
+                // for the whole batch request. Since workingProgress is stored per entry and
+                // buildContext() slices and sums costs per entry, we divide evenly so that
+                // summing any subset of entries approximates the proportional token cost.
+                yield* this.yieldOutput(batch, outputs, output.promptTokens / outputs.length, output.completionTokens / outputs.length)
             }
 
             this.printUsage()
@@ -351,8 +358,10 @@ export class Translator {
     /**
      * @param {string[]} promptSources
      * @param {string[]} promptTransforms
+     * @param {number} [promptTokensPerEntry] Prompt token cost per entry from the model response, for context budget tracking
+     * @param {number} [completionTokensPerEntry] Completion token cost per entry from the model response, for context budget tracking
      */
-    * yieldOutput(promptSources, promptTransforms) {
+    * yieldOutput(promptSources, promptTransforms, promptTokensPerEntry, completionTokensPerEntry) {
         for (let index = 0; index < promptSources.length; index++) {
             const promptSource = promptSources[index];
             const promptTransform = promptTransforms[index] ?? ""
@@ -378,7 +387,7 @@ export class Translator {
             else {
                 finalTransform = this.postprocessLine(finalTransform)
             }
-            this.workingProgress.push({ source: promptSource, transform: promptTransform })
+            this.workingProgress.push({ source: promptSource, transform: promptTransform, promptTokens: promptTokensPerEntry, completionTokens: completionTokensPerEntry })
             const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform, finalTransform }
             yield output
         }
@@ -449,9 +458,26 @@ export class Translator {
         }
 
         let sliced;
-        if (this.options.useFullContext) {
-            // Use the entire workingProgress if useFullContext is true
-            sliced = this.workingProgress;
+        if (this.options.useFullContext > 0) {
+            // Slice workingProgress to fit within the token budget using tracked token counts
+            // from actual model responses. Entries without token data are included without
+            // contributing to the budget. Allows the first entry that crosses the budget to
+            // still be included, since the specified budget is intentionally a buffer below
+            // the model's limit.
+            const maxTokens = this.options.useFullContext;
+            let tokenCount = 0;
+            let startIndex = this.workingProgress.length;
+            for (let i = this.workingProgress.length - 1; i >= 0; i--) {
+                const entry = this.workingProgress[i];
+                tokenCount += (entry.promptTokens ?? 0) + (entry.completionTokens ?? 0);
+                startIndex = i;
+                if (tokenCount > maxTokens) break; // include this entry, then stop
+            }
+            sliced = this.workingProgress.slice(startIndex);
+            const logSliceContext = sliced.length < this.workingProgress.length
+                ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ~${Math.round(tokenCount)} tokens)`
+                : `full (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
+            log.debug("[Translator]", "Context:", logSliceContext)
         } else {
             // Otherwise, slice based on historyPromptLength
             sliced = this.workingProgress.slice(-this.options.historyPromptLength);
