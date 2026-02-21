@@ -59,7 +59,7 @@ export function createInstance(args) {
         .option("--experimental-max_token <value>", "", parseInt, 0)
         .option("--experimental-input-multiplier <value>", "", parseInt, 0)
         .option("--experimental-fallback-model <value>", "Model to be used for refusal fallback")
-        .addOption(new Option("--experimental-structured-mode [mode]", "Enable structured response formats as outlined by https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object"]))
+        .addOption(new Option("--structured-mode <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object", "none"]).default("array"))
         .option("--experimental-use-full-context", "Use the full history, chunked by historyPromptLength, to work better with prompt caching.")
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
@@ -110,7 +110,7 @@ export function createInstance(args) {
         ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
         ...(opts.historyPromptLength !== undefined && { historyPromptLength: opts.historyPromptLength }),
         ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
-        ...(opts.experimentalStructuredMode && { structuredMode: opts.experimentalStructuredMode }),
+        ...(opts.structuredMode && opts.structuredMode !== "none" && { structuredMode: opts.structuredMode }),
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
         ...(opts.experimentalFallbackModel && { fallbackModel: opts.experimentalFallbackModel }),
@@ -169,9 +169,6 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     }
 
     function getTranslator() {
-        if (options.structuredMode === true) {
-            options.structuredMode = "array"
-        }
         if (options.structuredMode == "array") {
             return new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
         }

@@ -41,7 +41,7 @@ import { TranslationOutput } from './translatorOutput.mjs';
  *
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
- * @property {boolean | "array" | "object" } structuredMode
+ * @property {"array" | "object" | "none" | false} structuredMode
  * @property {number} max_token
  * @property {number} inputMultiplier
  * @property {string} fallbackModel
