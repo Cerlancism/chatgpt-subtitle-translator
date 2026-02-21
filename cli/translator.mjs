@@ -8,8 +8,7 @@ import * as undici from 'undici';
 import { Command, Option } from "commander"
 import log from 'loglevel'
 
-import
-{
+import {
     DefaultOptions,
     Translator,
     TranslatorStructuredObject,
@@ -27,13 +26,11 @@ const openai = createOpenAIClient(process.env.OPENAI_API_KEY, undefined, process
 const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
 
-function getProxyAgent()
-{
+function getProxyAgent() {
     const httpProxyConfig = process.env.http_proxy ?? process.env.HTTP_PROXY
     const httpsProxyConfig = process.env.https_proxy ?? process.env.HTTPS_PROXY
 
-    if (httpProxyConfig || httpsProxyConfig)
-    {
+    if (httpProxyConfig || httpsProxyConfig) {
         log.debug("[CLI HTTP/HTTPS PROXY]", "Using HTTP/HTTPS Proxy from ENV Detected", { httpProxyConfig, httpsProxyConfig })
         const proxyAgent = new undici.EnvHttpProxyAgent();
         return proxyAgent
@@ -45,8 +42,7 @@ function getProxyAgent()
 /**
  * @param {readonly string[]} args
  */
-export function createInstance(args)
-{
+export function createInstance(args) {
     const program = new Command()
         .description("Translation tool based on ChatGPT API")
         .option("--from <language>", "Source language")
@@ -124,26 +120,22 @@ export function createInstance(args)
 
     log.setDefaultLevel("debug")
 
-    if (opts.silent || opts.quiet)
-    {
+    if (opts.silent || opts.quiet) {
         options.logLevel = "silent"
     }
 
-    if (options.logLevel)
-    {
+    if (options.logLevel) {
         log.setLevel(options.logLevel)
     }
 
     log.debug("[CLI]", "Log level", Object.entries(log.levels).find(x => x[1] === log.getLevel())?.[0])
 
-    if (opts.file && !opts.input)
-    {
+    if (opts.file && !opts.input) {
         log.warn("[CLI]", "[WARNING]", "-f, --file is deprecated, use -i, --input")
         opts.input = opts.file
     }
 
-    if (options.inputMultiplier && !options.max_token)
-    {
+    if (options.inputMultiplier && !options.max_token) {
         log.error("[CLI]", "[ERROR]", "--experimental-input-multiplier must be set with --experimental-max_token")
         process.exit(1)
     }
@@ -151,8 +143,7 @@ export function createInstance(args)
     return { opts, options }
 }
 
-if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
-{
+if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     const { opts, options } = createInstance(process.argv)
 
     /**
@@ -161,16 +152,13 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
     const services = {
         openai,
         cooler: coolerChatGPTAPI,
-        onStreamChunk: log.getLevel() === log.levels.SILENT ? () => { } : (data) =>
-        {
+        onStreamChunk: log.getLevel() === log.levels.SILENT ? () => { } : (data) => {
             return process.stdout.write(data);
         },
-        onStreamEnd: log.getLevel() === log.levels.SILENT ? () => { } : () =>
-        {
+        onStreamEnd: log.getLevel() === log.levels.SILENT ? () => { } : () => {
             return process.stdout.write("\n");
         },
-        onClearLine: log.getLevel() === log.levels.SILENT ? () => { } : () =>
-        {
+        onClearLine: log.getLevel() === log.levels.SILENT ? () => { } : () => {
             readline.clearLine(process.stdout, 0)
             readline.cursorTo(process.stdout, 0)
         },
@@ -180,41 +168,32 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
         }
     }
 
-    function getTranslator()
-    {
-        if (options.structuredMode === true)
-        {
+    function getTranslator() {
+        if (options.structuredMode === true) {
             options.structuredMode = "array"
         }
-        if (options.structuredMode == "array")
-        {
+        if (options.structuredMode == "array") {
             return new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
         }
-        else if (options.structuredMode == "object")
-        {
+        else if (options.structuredMode == "object") {
             return new TranslatorStructuredObject({ from: opts.from, to: opts.to }, services, options);
         }
-        else
-        {
+        else {
             return new Translator({ from: opts.from, to: opts.to }, services, options);
         }
     }
 
     const translator = getTranslator()
 
-    if (opts.systemInstruction)
-    {
+    if (opts.systemInstruction) {
         translator.systemInstruction = opts.systemInstruction
     }
 
-    if (opts.plainText)
-    {
+    if (opts.plainText) {
         await translatePlainText(translator, opts.plainText)
     }
-    else if (opts.input)
-    {
-        if (opts.input.endsWith(".srt"))
-        {
+    else if (opts.input) {
+        if (opts.input.endsWith(".srt")) {
             log.debug("[CLI]", "Assume SRT file", opts.input)
             const text = fs.readFileSync(opts.input, 'utf-8')
             const srtArraySource = subtitleParser.fromSrt(text)
@@ -226,31 +205,25 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
             const progressFile = `${opts.input}.progress_${fileTag}.csv`
             const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}.srt`
 
-            if (await checkFileExists(progressFile))
-            {
+            if (await checkFileExists(progressFile)) {
                 const progress = await getProgress(progressFile)
 
-                if (progress.length === sourceLines.length)
-                {
+                if (progress.length === sourceLines.length) {
                     log.debug("[CLI]", `Progress already completed ${progressFile}`)
                     log.debug("[CLI]", `Overwriting ${progressFile}`)
                     fs.writeFileSync(progressFile, '')
                     log.debug("[CLI]", `Overwriting ${outputFile}`)
                     fs.writeFileSync(outputFile, '')
                 }
-                else
-                {
+                else {
                     log.debug("[CLI]", `Resuming from ${progressFile}`, progress.length)
                     const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
-                    for (let index = 0; index < progress.length; index++)
-                    {
+                    for (let index = 0; index < progress.length; index++) {
                         let transform = progress[index]
-                        if (transform.startsWith("[Flagged]"))
-                        {
+                        if (transform.startsWith("[Flagged]")) {
                             translator.moderatorFlags.set(index, transform)
                         }
-                        else
-                        {
+                        else {
                             transform = translator.preprocessLine(transform, index, 0)
                         }
                         translator.workingProgress.push({ source: sourceProgress[index], transform })
@@ -258,15 +231,12 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
                     translator.offset = progress.length
                 }
             }
-            else
-            {
+            else {
                 fs.writeFileSync(outputFile, '')
             }
 
-            try
-            {
-                for await (const output of translator.translateLines(sourceLines))
-                {
+            try {
+                for await (const output of translator.translateLines(sourceLines)) {
                     const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
                     const srtEntry = srtArrayWorking[output.index - 1]
                     srtEntry.text = output.finalTransform
@@ -277,14 +247,12 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
                         fs.promises.appendFile(outputFile, outSrt)
                     ])
                 }
-            } catch (error)
-            {
+            } catch (error) {
                 log.error("[CLI]", "Error", error)
                 process.exit(1)
             }
         }
-        else
-        {
+        else {
             log.debug("[CLI]", "Assume plain text file", opts.input)
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
             const ext = path.extname(opts.input)
@@ -301,28 +269,21 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
  * @param {string} text
  * @param {import('node:fs').PathLike} [outfile]
  */
-async function translatePlainText(translator, text, outfile)
-{
+async function translatePlainText(translator, text, outfile) {
     const lines = text.split(/\r?\n/)
-    if (lines[lines.length - 1].length === 0)
-    {
+    if (lines[lines.length - 1].length === 0) {
         lines.pop()
     }
-    try
-    {
-        for await (const output of translator.translateLines(lines))
-        {
-            if (!translator.options.createChatCompletionRequest.stream)
-            {
+    try {
+        for await (const output of translator.translateLines(lines)) {
+            if (!translator.options.createChatCompletionRequest.stream) {
                 log.info(output.transform)
             }
-            if (outfile)
-            {
+            if (outfile) {
                 fs.appendFileSync(outfile, output.transform + "\n")
             }
         }
-    } catch (error)
-    {
+    } catch (error) {
         log.error("[CLI]", "Error", error)
         process.exit(1)
     }
@@ -332,29 +293,24 @@ async function translatePlainText(translator, text, outfile)
 /**
  * @param {string} progressFile
  */
-async function getProgress(progressFile)
-{
+async function getProgress(progressFile) {
     const content = await fs.promises.readFile(progressFile, "utf-8")
     const lines = content.split(/\r?\n/)
     const progress = []
 
-    for (let index = 0; index < lines.length; index++)
-    {
+    for (let index = 0; index < lines.length; index++) {
         const line = lines[index];
-        if (line.trim() === '')
-        {
+        if (line.trim() === '') {
             continue
         }
         const splits = line.split(",")
         const id = Number(splits[0])
         const text = splits[1].trim()
         const expectedId = index + 1
-        if (id === expectedId)
-        {
+        if (id === expectedId) {
             progress.push(text.substring(1, text.length - 1))
         }
-        else
-        {
+        else {
             throw `Progress csv file not in order. Expected index ${expectedId}, got ${id}, text: ${text}`
         }
     }
@@ -364,14 +320,11 @@ async function getProgress(progressFile)
 /**
  * @param {fs.PathLike} filePath
  */
-async function checkFileExists(filePath)
-{
-    try
-    {
+async function checkFileExists(filePath) {
+    try {
         await fs.promises.access(filePath);
         return true; // file exists
-    } catch (error)
-    {
+    } catch (error) {
         return false // file does not exist
     }
 }

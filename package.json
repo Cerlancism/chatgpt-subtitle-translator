@@ -5,6 +5,7 @@
   "main": "src/main.mjs",
   "type": "module",
   "scripts": {
+    "typecheck": "npx tsc --noEmit -p jsconfig.json",
     "test": "node --test"
   },
   "author": "Cerlancism",
@@ -26,5 +27,8 @@
   },
   "bin": {
     "chatgpt-subtitle-translator": "./cli/translator.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

@@ -8,8 +8,7 @@ import { offsetSrt, parseTimeOffset, parser } from '../src/subtitle.mjs'
 /**
  * @param {readonly string[]} args
  */
-export function createInstance(args)
-{
+export function createInstance(args) {
     const commandOffsetFile = new Command("offset")
         .description("Offsets all timestamps in .srt file, currently implemented using floating points, sub-second operations will have precision issues\n"
             + "For negative offsets, pass -- first, eg: \n./subtitle.mjs -- offset file.srt -01:02:03.456")
@@ -37,12 +36,10 @@ export function createInstance(args)
  * @param {string} file
  * @param {string} offset
  */
-export function offsetFile(file, offset)
-{
+export function offsetFile(file, offset) {
     const offsetSeconds = parseTimeOffset(offset)
 
-    if (isNaN(offsetSeconds))
-    {
+    if (isNaN(offsetSeconds)) {
         console.error("Bad format", offset)
         return
     }
@@ -62,16 +59,13 @@ export function offsetFile(file, offset)
  * 
  * @param {string[]} files 
  */
-export function mergeFiles(files)
-{
+export function mergeFiles(files) {
     let output = []
 
-    for (const file of files)
-    {
+    for (const file of files) {
         const content = fs.readFileSync(file, 'utf-8')
         const srt = parser.fromSrt(content)
-        for (let index = 0, id = output.length; index < srt.length; index++, id++)
-        {
+        for (let index = 0, id = output.length; index < srt.length; index++, id++) {
             const item = srt[index]
             item.id = (id + 1).toString()
             output.push(item)
@@ -84,8 +78,7 @@ export function mergeFiles(files)
 }
 
 
-if (import.meta.url === url.pathToFileURL(process.argv[1]).href)
-{
+if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     const { opts } = createInstance(process.argv)
 
     // console.log(opts)

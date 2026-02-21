@@ -1,5 +1,4 @@
-export class TranslationOutput
-{
+export class TranslationOutput {
     /**
      * @param {string[]} content
      * @param {number} promptTokens
@@ -7,8 +6,7 @@ export class TranslationOutput
      * @param {number} cachedTokens
      * @param {number} [totalTokens]
      */
-    constructor(content, promptTokens, completionTokens, cachedTokens, totalTokens, refusal = "")
-    {
+    constructor(content, promptTokens, completionTokens, cachedTokens, totalTokens, refusal = "") {
         this.content = content
         this.promptTokens = promptTokens ?? 0
         this.completionTokens = completionTokens ?? 0

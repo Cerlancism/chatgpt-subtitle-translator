@@ -5,8 +5,7 @@ import assert from 'node:assert';
 
 import { subtitleParser } from "../src/main.mjs";
 
-test('should correctly modify and convert SRT data', () =>
-{
+test('should correctly modify and convert SRT data', () => {
   const srtString = "1\n00:00:00,000 --> 00:00:02,000\nHello, world!\n";
   const parsedSrt = subtitleParser.fromSrt(srtString);
 

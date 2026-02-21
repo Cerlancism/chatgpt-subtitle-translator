@@ -3,8 +3,7 @@ export const genRanHex = (/** @type {number} */ size) => [...Array(size)].map(()
 /**
  * @param {number} ms
  */
-export async function sleep(ms)
-{
+export async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -23,36 +22,29 @@ export async function sleep(ms)
  * @param {(retryContext: RetryContext) => Promise} [onFail] Called when the maximum number of retries is reached and the function has not yet succeeded
  * @returns {Promise<T>} A promise that resolves to the result of the function if it succeeded within the maximum number of retries, or rejects with an error otherwise
  */
-export async function retryWrapper(func, maxRetries, onRetry, onFail)
-{
+export async function retryWrapper(func, maxRetries, onRetry, onFail) {
     const retryContext = { currentTry: 1, error: undefined, maxRetries }
 
-    while (retryContext.currentTry <= retryContext.maxRetries)
-    {
-        try
-        {
+    while (retryContext.currentTry <= retryContext.maxRetries) {
+        try {
             return await func();
-        } catch (error)
-        {
+        } catch (error) {
             retryContext.error = error;
-            if (onRetry)
-            {
+            if (onRetry) {
                 await onRetry(retryContext);
             }
         }
         retryContext.currentTry++;
     }
 
-    if (onFail)
-    {
+    if (onFail) {
         await onFail(retryContext);
     }
 
     // throw new Error(`retryWrapper: function failed after ${maxRetries} retries`);
 }
 
-export function wrapQuotes(text)
-{
+export function wrapQuotes(text) {
     return `"${text.replaceAll("\"", "\\\"")}"`
 }
 
@@ -60,8 +52,7 @@ export function wrapQuotes(text)
  * @param {number} num
  * @param {number} precision
  */
-export function roundWithPrecision(num, precision)
-{
+export function roundWithPrecision(num, precision) {
     var multiplier = Math.pow(10, precision);
     return Math.round(num * multiplier) / multiplier;
 }

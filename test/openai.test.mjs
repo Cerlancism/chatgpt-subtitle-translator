@@ -6,13 +6,11 @@ import { createOpenAIClient } from "../src/main.mjs";
 import 'dotenv/config'
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY)
 
-test("should list available openai models", async () =>
-{
+test("should list available openai models", async () => {
   const models = await openai.models.list()
   const gptModels = models.data.filter(x => x.id.startsWith("gpt") && !x.id.includes("instruct") && !x.id.includes("vision"))
 
-  for (const model of gptModels)
-  {
+  for (const model of gptModels) {
     // console.log(model)
   }
   const gptList = gptModels.map(x => x.id).sort().join(" ")

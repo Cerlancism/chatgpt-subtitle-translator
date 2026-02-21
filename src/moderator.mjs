@@ -19,16 +19,13 @@ import { openaiRetryWrapper } from "./openai.mjs"
  * @param {ModerationServiceContext} services
  * @param {import('openai').OpenAI.ModerationModel} model
  */
-export async function checkModeration(input, services, model = undefined)
-{
-    return await openaiRetryWrapper(async () =>
-    {
+export async function checkModeration(input, services, model = undefined) {
+    return await openaiRetryWrapper(async () => {
         await services.cooler?.cool()
         const moderation = await services.openai.moderations.create({ input, model })
         const moderationData = moderation.results[0]
 
-        if (moderationData.flagged)
-        {
+        if (moderationData.flagged) {
             log.debug("[CheckModeration]", "flagged", getModeratorResults(moderationData))
         }
 
@@ -41,8 +38,7 @@ export async function checkModeration(input, services, model = undefined)
 /**
  * @param {import("openai").OpenAI.Moderation} moderatorOutput
  */
-export function getModeratorResults(moderatorOutput)
-{
+export function getModeratorResults(moderatorOutput) {
     return Object.keys(moderatorOutput.categories)
         .filter(x => moderatorOutput.categories[x])
         .map(x => ({ catergory: x, value: Number(moderatorOutput.category_scores[x]) }))
@@ -51,7 +47,6 @@ export function getModeratorResults(moderatorOutput)
 /**
  * @param {ModerationResult[]} moderatorResults
  */
-export function getModeratorDescription(moderatorResults)
-{
+export function getModeratorDescription(moderatorResults) {
     return moderatorResults.map(x => `${x.catergory}: ${x.value.toFixed(3)}`).join(" ")
 }

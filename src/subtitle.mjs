@@ -7,16 +7,14 @@ export const parser = new srtParser2();
  * @param {string} text
  * @param {string} label
  */
-export function lineLabeler(text, label)
-{
+export function lineLabeler(text, label) {
     return `${label}. ${text}`
 }
 
 /**
  * @param {string} str
  */
-export function splitStringByNumberLabel(str)
-{
+export function splitStringByNumberLabel(str) {
     const regex = /^(\d+\.)?\s*(.*)/;
     const matches = str.match(regex);
     const number = matches[1] ? parseInt(matches[1]) : undefined;
@@ -27,8 +25,7 @@ export function splitStringByNumberLabel(str)
 /**
  * @param {number} seconds
  */
-export function secondsToTimestamp(seconds)
-{
+export function secondsToTimestamp(seconds) {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
@@ -40,13 +37,10 @@ export function secondsToTimestamp(seconds)
 /**
  * @param {string | number} timeOffset
  */
-export function parseTimeOffset(timeOffset)
-{
-    if (typeof timeOffset === "string")
-    {
+export function parseTimeOffset(timeOffset) {
+    if (typeof timeOffset === "string") {
         let negative = false;
-        if (timeOffset.startsWith("-"))
-        {
+        if (timeOffset.startsWith("-")) {
             negative = true;
             timeOffset = timeOffset.substring(1);
         }
@@ -56,20 +50,17 @@ export function parseTimeOffset(timeOffset)
 
         log.debug(timeParts)
 
-        if (timeParts.length === 1)
-        {
+        if (timeParts.length === 1) {
             // if only seconds given
             timeOffset = parseFloat(timeParts[0]);
-        } else if (timeParts.length === 4)
-        {
+        } else if (timeParts.length === 4) {
             // if hours, minutes, and seconds given
             const hours = parseInt(timeParts[0]);
             const minutes = parseInt(timeParts[1]);
             const seconds = parseInt(timeParts[2]);
             const subseconds = parseFloat(timeParts[3]) / 1000;
             timeOffset = hours * 3600 + minutes * 60 + seconds + (Math.round(subseconds * 1000) / 1000);
-        } else
-        {
+        } else {
             // invalid time format
             timeOffset = NaN;
         }
@@ -82,12 +73,10 @@ export function parseTimeOffset(timeOffset)
  * @param {string} srtString
  * @param {number} seconds
  */
-export function offsetSrt(srtString, seconds)
-{
+export function offsetSrt(srtString, seconds) {
     const srt = parser.fromSrt(srtString)
 
-    for (const item of srt)
-    {
+    for (const item of srt) {
         item.startSeconds += seconds
         item.startTime = secondsToTimestamp(item.startSeconds)
         item.endSeconds += seconds

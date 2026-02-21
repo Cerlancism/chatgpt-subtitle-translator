@@ -1,4 +1,3 @@
 {
-  "javascript.format.placeOpenBraceOnNewLineForFunctions": true,
-  "javascript.format.placeOpenBraceOnNewLineForControlBlocks": true
+    "typescript.tsdk": "node_modules\\typescript\\lib"
 }

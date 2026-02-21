@@ -4,15 +4,13 @@ import { sleep } from "./helpers.mjs"
 /**
  * Simple rate limiter
  */
-export class CooldownContext
-{
+export class CooldownContext {
     /**
      * @param {number} limit
      * @param {number} duration
      * @param {string} description
      */
-    constructor(limit, duration, description)
-    {
+    constructor(limit, duration, description) {
         this.limit = limit
         this.duration = duration
         this.description = description
@@ -26,8 +24,7 @@ export class CooldownContext
      * 
      * @return {number} 
      */
-    cooldown()
-    {
+    cooldown() {
         // Remove any requests from the requests array that are older than the duration
         // log.debug("[CooldownContext]", this.description, this.requests.length)
         const now = Date.now();
@@ -35,8 +32,7 @@ export class CooldownContext
         this.rate = this.requests.length
 
         // Check if the number of requests made within the duration has reached the limit
-        if (this.rate >= this.limit)
-        {
+        if (this.rate >= this.limit) {
             // The limit has been reached, so we cannot make another request yet
             const nextRequestTime = this.requests[0] + this.duration;
             return nextRequestTime - now;
@@ -46,12 +42,10 @@ export class CooldownContext
         return 0;
     }
 
-    async cool()
-    {
+    async cool() {
         const cooldown = this.cooldown()
 
-        if (cooldown === 0)
-        {
+        if (cooldown === 0) {
             this.requests.push(Date.now());
             return false
         }

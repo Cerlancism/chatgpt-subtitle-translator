@@ -65,18 +65,17 @@ export const DefaultOptions = {
     fallbackModel: undefined,
     logLevel: undefined
 }
+
 /**
  * Translator using ChatGPT
  */
-export class Translator
-{
+export class Translator {
     /**
      * @param {{from?: string, to: string}} language
      * @param {TranslationServiceContext} services
      * @param {Partial<TranslatorOptions>} [options]
      */
-    constructor(language, services, options)
-    {
+    constructor(language, services, options) {
         options.createChatCompletionRequest = { ...DefaultOptions.createChatCompletionRequest, ...options.createChatCompletionRequest }
 
         this.language = language
@@ -110,8 +109,7 @@ export class Translator
             end: "</think>"
         }
 
-        if (options.logLevel)
-        {
+        if (options.logLevel) {
             log.setLevel(options.logLevel)
         }
     }
@@ -119,14 +117,11 @@ export class Translator
     /**
      * @param {string[]} lines 
      */
-    getMaxToken(lines)
-    {
-        if (this.options.max_token && !this.options.inputMultiplier)
-        {
+    getMaxToken(lines) {
+        if (this.options.max_token && !this.options.inputMultiplier) {
             return this.options.max_token
         }
-        else if (this.options.max_token && this.options.inputMultiplier)
-        {
+        else if (this.options.max_token && this.options.inputMultiplier) {
             const max = JSON.stringify(lines).length * this.options.inputMultiplier
             return Math.min(this.options.max_token, max)
         }
@@ -137,29 +132,23 @@ export class Translator
      * @param {string[]} inputLines
      * @param {string} rawContent
      */
-    getOutput(inputLines, rawContent)
-    {
+    getOutput(inputLines, rawContent) {
         rawContent = rawContent.trim()
-        if (rawContent.startsWith(this.thinkTags.start))
-        {
+        if (rawContent.startsWith(this.thinkTags.start)) {
             const endTagIndex = rawContent.indexOf(this.thinkTags.end)
-            if (endTagIndex > 0)
-            {
+            if (endTagIndex > 0) {
                 const endIndex = endTagIndex + this.thinkTags.end.length
                 const thinkBlock = rawContent.slice(0, endIndex).trim()
-                if (thinkBlock)
-                {
+                if (thinkBlock) {
                     log.debug("[Translator]", "[ThinkBlock] Detected\n", thinkBlock)
                 }
                 rawContent = rawContent.slice(endIndex)
             }
         }
-        if (inputLines.length === 1)
-        {
+        if (inputLines.length === 1) {
             return [rawContent.split("\n").join(" ")]
         }
-        else
-        {
+        else {
             return rawContent.split("\n").filter(x => x.trim().length > 0)
         }
     }
@@ -168,8 +157,7 @@ export class Translator
      * @param {string[]} lines
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(lines)
-    {
+    async translatePrompt(lines) {
         const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: `${text}` }
@@ -182,12 +170,10 @@ export class Translator
 
         let startTime = 0, endTime = 0
         const streamMode = this.options.createChatCompletionRequest.stream
-        const response = await openaiRetryWrapper(async () =>
-        {
+        const response = await openaiRetryWrapper(async () => {
             await this.services.cooler?.cool()
             startTime = Date.now()
-            if (!streamMode)
-            {
+            if (!streamMode) {
                 const promptResponse = await this.services.openai.chat.completions.create({
                     messages,
                     ...this.options.createChatCompletionRequest,
@@ -210,8 +196,7 @@ export class Translator
                 )
                 return output
             }
-            else
-            {
+            else {
                 const promptResponse = await this.services.openai.chat.completions.create({
                     messages,
                     ...this.options.createChatCompletionRequest,
@@ -227,28 +212,23 @@ export class Translator
                 let writeQueue = ''
                 /** @type {import('openai').OpenAI.Completions.CompletionUsage} */
                 let usage
-                const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) =>
-                {
+                const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) => {
                     const hasNewline = data.includes("\n")
-                    if (writeQueue.length === 0 && !hasNewline)
-                    {
+                    if (writeQueue.length === 0 && !hasNewline) {
                         // process.stdout.write(data)
                         this.services.onStreamChunk?.(data)
                     }
-                    else if (hasNewline)
-                    {
+                    else if (hasNewline) {
                         writeQueue += data
                         writeQueue = writeQueue.replaceAll("\n\n", "\n")
                     }
-                    else
-                    {
+                    else {
                         writeQueue += data
                         // process.stdout.write(writeQueue)
                         this.services.onStreamChunk?.(writeQueue)
                         writeQueue = ''
                     }
-                }, (u) =>
-                {
+                }, (u) => {
                     endTime = Date.now()
                     usage = u
                     // process.stdout.write("\n")
@@ -279,12 +259,10 @@ export class Translator
     /**
      * @param {string[]} batch
      */
-    async * translateSingle(batch)
-    {
+    async * translateSingle(batch) {
         log.debug(`[Translator]`, "Single line mode")
         batch = batch.slice(-this.currentBatchSize)
-        for (let x = 0; x < batch.length; x++)
-        {
+        for (let x = 0; x < batch.length; x++) {
             const input = batch[x]
             this.buildContext()
             const output = await this.translatePrompt([input])
@@ -297,34 +275,28 @@ export class Translator
      * 
      * @param {string[]} lines 
      */
-    async * translateLines(lines)
-    {
+    async * translateLines(lines) {
         log.debug("[Translator]", "System Instruction:", this.systemInstruction)
         this.aborted = false
         this.workingLines = lines
         const theEnd = this.end ?? lines.length
 
-        for (let index = this.offset, reducedBatchSessions = 0; index < theEnd; index += this.currentBatchSize)
-        {
+        for (let index = this.offset, reducedBatchSessions = 0; index < theEnd; index += this.currentBatchSize) {
             let batch = lines.slice(index, index + this.currentBatchSize).map((x, i) => this.preprocessLine(x, i, index))
 
-            if (this.options.useModerator && !this.services.moderationService)
-            {
+            if (this.options.useModerator && !this.services.moderationService) {
                 log.warn("[Translator]", "Moderation service requested but not configured, no moderation applied")
             }
 
-            if (this.options.useModerator && this.services.moderationService)
-            {
+            if (this.options.useModerator && this.services.moderationService) {
                 const inputForModeration = batch.join("\n\n")
                 const moderationData = await checkModeration(inputForModeration, this.services.moderationService, this.options.moderationModel)
-                if (moderationData.flagged)
-                {
+                if (moderationData.flagged) {
                     if (!this.changeBatchSize('decrease')) // Already at smallest batch size
                     {
                         yield* this.translateSingle(batch)
                     }
-                    else
-                    {
+                    else {
                         index -= this.currentBatchSize
                     }
                     continue
@@ -333,49 +305,41 @@ export class Translator
             this.buildContext()
             const output = await this.translatePrompt(batch)
 
-            if (this.aborted)
-            {
+            if (this.aborted) {
                 log.debug("[Translator]", "Aborted")
                 return
             }
 
             let outputs = output.content
 
-            if ((this.options.lineMatching && batch.length !== outputs.length) || (batch.length > 1 && output.refusal))
-            {
+            if ((this.options.lineMatching && batch.length !== outputs.length) || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
                 this.completionTokensWasted += output.completionTokens
 
-                if (output.refusal) 
-                {
+                if (output.refusal) {
                     log.debug(`[Translator]`, "Refusal: ", output.refusal)
                 }
-                else
-                {
+                else {
                     log.debug(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
                 }
 
                 log.debug(`[Translator]`, "batch", batch)
                 log.debug(`[Translator]`, "transformed", outputs)
 
-                if (this.changeBatchSize("decrease"))
-                {
+                if (this.changeBatchSize("decrease")) {
                     index -= this.currentBatchSize
                 }
-                else
-                {
+                else {
                     yield* this.translateSingle(batch)
                 }
             }
-            else
-            {
+            else {
                 yield* this.yieldOutput(batch, outputs)
             }
 
             this.printUsage()
 
-            if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold)
-            {
+            if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
                 reducedBatchSessions = 0
                 const old = this.currentBatchSize
                 this.changeBatchSize("increase")
@@ -388,10 +352,8 @@ export class Translator
      * @param {string[]} promptSources
      * @param {string[]} promptTransforms
      */
-    * yieldOutput(promptSources, promptTransforms)
-    {
-        for (let index = 0; index < promptSources.length; index++)
-        {
+    * yieldOutput(promptSources, promptTransforms) {
+        for (let index = 0; index < promptSources.length; index++) {
             const promptSource = promptSources[index];
             const promptTransform = promptTransforms[index] ?? ""
             const workingIndex = this.workingProgress.length
@@ -399,25 +361,21 @@ export class Translator
             let finalTransform = promptTransform
             let outTransform = promptTransform
 
-            if (this.moderatorFlags.has(workingIndex))
-            {
+            if (this.moderatorFlags.has(workingIndex)) {
                 finalTransform = `[Flagged][Moderator] ${originalSource} -> ${finalTransform} `
             }
-            else if (this.options.prefixNumber)
-            {
+            else if (this.options.prefixNumber) {
                 const splits = this.postprocessNumberPrefixedLine(finalTransform)
                 finalTransform = splits.text
                 outTransform = splits.text
                 const expectedLabel = workingIndex + 1
-                if (expectedLabel !== splits.number)
-                {
+                if (expectedLabel !== splits.number) {
                     log.warn("[Translator]", "Label mismatch", expectedLabel, splits.number)
                     this.moderatorFlags.set(workingIndex, { remarks: "Label Mismatch", outIndex: splits.number })
                     finalTransform = `[Flagged][Model] ${originalSource} -> ${finalTransform}`
                 }
             }
-            else
-            {
+            else {
                 finalTransform = this.postprocessLine(finalTransform)
             }
             this.workingProgress.push({ source: promptSource, transform: promptTransform })
@@ -431,11 +389,9 @@ export class Translator
      * @param {number} index
      * @param {number} offset
      */
-    preprocessLine(line, index, offset)
-    {
+    preprocessLine(line, index, offset) {
         line = line.replaceAll("\n", " \\N ")
-        if (this.options.prefixNumber)
-        {
+        if (this.options.prefixNumber) {
             line = `${offset + index + 1}. ${line}`
         }
         return line
@@ -444,8 +400,7 @@ export class Translator
     /**
      * @param {string} line
      */
-    postprocessNumberPrefixedLine(line)
-    {
+    postprocessNumberPrefixedLine(line) {
         const splits = splitStringByNumberLabel(line.trim())
         splits.text = this.postprocessLine(splits.text)
         return splits
@@ -454,8 +409,7 @@ export class Translator
     /**
      * @param {string} line
      */
-    postprocessLine(line)
-    {
+    postprocessLine(line) {
         line = line.replaceAll(" \\N ", "\n")
         line = line.replaceAll("\\N", "\n")
         return line
@@ -464,52 +418,41 @@ export class Translator
     /**
      * @param {"increase" | "decrease"} mode
      */
-    changeBatchSize(mode)
-    {
+    changeBatchSize(mode) {
         const old = this.currentBatchSize
-        if (mode === "decrease")
-        {
-            if (this.currentBatchSize === this.options.batchSizes[0])
-            {
+        if (mode === "decrease") {
+            if (this.currentBatchSize === this.options.batchSizes[0]) {
                 return false
             }
             this.workingBatchSizes.unshift(this.workingBatchSizes.pop())
         }
-        else if (mode === "increase")
-        {
-            if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1])
-            {
+        else if (mode === "increase") {
+            if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1]) {
                 return false
             }
             this.workingBatchSizes.push(this.workingBatchSizes.shift())
         }
         this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
-        if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1])
-        {
+        if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1]) {
             this.batchSizeThreshold = undefined
         }
-        else
-        {
+        else {
             this.batchSizeThreshold = Math.floor(Math.max(old, this.currentBatchSize) / Math.min(old, this.currentBatchSize))
         }
         log.debug("[Translator]", "BatchSize", mode, old, "->", this.currentBatchSize, "SizeThreshold", this.batchSizeThreshold)
         return true
     }
 
-    buildContext()
-    {
-        if (this.workingProgress.length === 0 || this.options.historyPromptLength === 0)
-        {
+    buildContext() {
+        if (this.workingProgress.length === 0 || this.options.historyPromptLength === 0) {
             return;
         }
 
         let sliced;
-        if (this.options.useFullContext)
-        {
+        if (this.options.useFullContext) {
             // Use the entire workingProgress if useFullContext is true
             sliced = this.workingProgress;
-        } else
-        {
+        } else {
             // Otherwise, slice based on historyPromptLength
             sliced = this.workingProgress.slice(-this.options.historyPromptLength);
         }
@@ -519,11 +462,9 @@ export class Translator
          * @param {string} text
          * @param {number} index
          */
-        const checkFlaggedMapper = (text, index) =>
-        {
+        const checkFlaggedMapper = (text, index) => {
             const id = index + (offset < 0 ? 0 : offset);
-            if (this.moderatorFlags.has(id))
-            {
+            if (this.moderatorFlags.has(id)) {
                 // log.warn("[Translator]", "Prompt Flagged", id, text)
                 return this.preprocessLine("-", id, 0);
             }
@@ -539,12 +480,10 @@ export class Translator
      * @param {string[]} sourceLines
      * @param {string[]} transformLines
      */
-    getContext(sourceLines, transformLines)
-    {
+    getContext(sourceLines, transformLines) {
         const chunks = [];
         const chunkSize = this.options.historyPromptLength;
-        for (let i = 0; i < sourceLines.length; i += chunkSize)
-        {
+        for (let i = 0; i < sourceLines.length; i += chunkSize) {
             const sourceChunk = sourceLines.slice(i, i + chunkSize);
             const transformChunk = transformLines.slice(i, i + chunkSize);
             chunks.push({
@@ -565,15 +504,12 @@ export class Translator
      * @param {"user" | "assistant" } role
      * @returns {string}
      */
-    getContextLines(lines, role)
-    {
+    getContextLines(lines, role) {
         return lines.join("\n\n")
     }
 
-    get usage()
-    {
-        if (!this.pricingModel)
-        {
+    get usage() {
+        if (!this.pricingModel) {
             log.warn("[Translator]", `Cost computation not supported for ${this.options.createChatCompletionRequest.model}`)
         }
 
@@ -598,8 +534,7 @@ export class Translator
         }
     }
 
-    async printUsage()
-    {
+    async printUsage() {
         const usage = this.usage
 
         await sleep(10)
@@ -623,8 +558,7 @@ export class Translator
         )
     }
 
-    abort()
-    {
+    abort() {
         log.warn("[Translator]", "Aborting")
         this.streamController?.abort()
         this.aborted = true

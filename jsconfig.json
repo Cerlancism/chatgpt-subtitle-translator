@@ -1,14 +1,22 @@
 {
-    "compilerOptions": {
-        "target": "ESNext",
-        "module": "NodeNext",
-        "moduleResolution": "NodeNext",
-        "lib": [
-            "ESNext"
-        ],
-        "checkJs": true
-    },
-    "exclude": [
-        "./web"
-    ]
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": [
+      "ESNext"
+    ],
+    "checkJs": true,
+    "skipLibCheck": true,
+    "strict": false
+  },
+  "include": [
+    "src/**/*",
+    "cli/**/*",
+    "test/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "./web"
+  ]
 }

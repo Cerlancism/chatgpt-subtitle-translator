@@ -3,10 +3,8 @@ import assert from 'node:assert';
 import { CooldownContext } from "../src/main.mjs";
 import { sleep } from "../src/helpers.mjs";
 
-function testCooldown(burstCount, totalCount, waitTime)
-{
-    test(`CooldownContext should handle ${burstCount} bursts correctly`, async () =>
-    {
+function testCooldown(burstCount, totalCount, waitTime) {
+    test(`CooldownContext should handle ${burstCount} bursts correctly`, async () => {
         const description = `tester ${burstCount}/${totalCount} ${waitTime}ms`;
         const cooler = new CooldownContext(burstCount, waitTime, description);
         cooler.baseDelay = 15
@@ -15,12 +13,10 @@ function testCooldown(burstCount, totalCount, waitTime)
 
         let workDone = 0
 
-        for (let index = 0; index < totalCount; index++)
-        {
+        for (let index = 0; index < totalCount; index++) {
             const cooled = await cooler.cool();
             // Check if the cooldown is respecting the burst count and wait time
-            if (cooled)
-            {
+            if (cooled) {
                 const currentTime = Date.now();
                 const timeDiff = currentTime - lastTime;
                 // console.log({ timeDiff, waitTime, index })
@@ -29,7 +25,7 @@ function testCooldown(burstCount, totalCount, waitTime)
                 lastTime = currentTime;
                 workDone = 0
             }
-            
+
             await sleep(10); // simulate some work
             // console.log({ index })
             workDone++

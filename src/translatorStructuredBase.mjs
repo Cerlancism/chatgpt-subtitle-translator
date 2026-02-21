@@ -3,20 +3,20 @@ import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import log from "loglevel"
 import { Translator } from "./translator.mjs";
 
-export class TranslatorStructuredBase extends Translator
-{
+/**
+ * @abstract
+ */
+export class TranslatorStructuredBase extends Translator {
     /**
      * @param {{from?: string, to: string}} language
      * @param {import("./translator.mjs").TranslationServiceContext} services
      * @param {Partial<import("./translator.mjs").TranslatorOptions>} [options]
      */
-    constructor(language, services, options)
-    {
+    constructor(language, services, options) {
         log.debug(`[TranslatorStructuredBase]`, "Structured Mode:", options.structuredMode)
         const optionsBackup = {}
         optionsBackup.stream = options.createChatCompletionRequest?.stream
-        if (options.prefixNumber)
-        {
+        if (options.prefixNumber) {
             log.warn("[TranslatorStructuredBase]", "--no-prefix-number must be used in structured mode, overriding.")
         }
         options.prefixNumber = false
@@ -29,10 +29,8 @@ export class TranslatorStructuredBase extends Translator
      * @param {string[]} lines 
      * @param {Error} error
      */
-    async translateBaseFallback(lines, error)
-    {
-        if (error && error instanceof APIUserAbortError)
-        {
+    async translateBaseFallback(lines, error) {
+        if (error && error instanceof APIUserAbortError) {
             return
         }
         log.warn("[TranslatorStructuredBase]", "Fallback to base mode")
@@ -46,10 +44,8 @@ export class TranslatorStructuredBase extends Translator
      * @param {{structure: ZodInput, name: string}} zFormat
      * @param {boolean} jsonStream
      */
-    async streamParse(params, zFormat, jsonStream = false)
-    {
-        if (params.stream)
-        {
+    async streamParse(params, zFormat, jsonStream = false) {
+        if (params.stream) {
             const runner = this.services.openai.chat.completions.stream({
                 ...params,
                 response_format: zodResponseFormat(zFormat.structure, zFormat.name),
@@ -61,14 +57,11 @@ export class TranslatorStructuredBase extends Translator
 
             this.streamController = runner.controller
 
-            if (jsonStream)
-            {
+            if (jsonStream) {
                 this.jsonStreamParse(runner)
             }
-            else
-            {
-                runner.on("content.delta", (e) =>
-                {
+            else {
+                runner.on("content.delta", (e) => {
                     this.services.onStreamChunk?.(e.delta)
                 })
             }
@@ -80,8 +73,7 @@ export class TranslatorStructuredBase extends Translator
 
             return final
 
-        } else
-        {
+        } else {
             const output = await this.services.openai.chat.completions.parse({
                 ...params,
                 response_format: zodResponseFormat(zFormat.structure, zFormat.name),
@@ -96,8 +88,7 @@ export class TranslatorStructuredBase extends Translator
      * @template T
      * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<T>} runner 
      */
-    jsonStreamParse(runner)
-    {
+    jsonStreamParse(runner) {
 
     }
 }

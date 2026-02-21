@@ -6,23 +6,19 @@ import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
 
 const NestedPlaceholder = "nested_"
 
-export class TranslatorStructuredObject extends TranslatorStructuredBase
-{
+export class TranslatorStructuredObject extends TranslatorStructuredBase {
     /**
      * @param {{from?: string, to: string}} language
      * @param {import("./translator.mjs").TranslationServiceContext} services
      * @param {Partial<import("./translator.mjs").TranslatorOptions>} [options]
      */
-    constructor(language, services, options)
-    {
-        if (options.batchSizes[0] === 10 && options.batchSizes[1] === 100)
-        {
+    constructor(language, services, options) {
+        if (options.batchSizes[0] === 10 && options.batchSizes[1] === 100) {
             const reducedBatchSizes = [10, 20]
             log.warn("[TranslatorStructuredObject]", "--batch-sizes is to be reduced to", JSON.stringify(reducedBatchSizes))
             options.batchSizes = reducedBatchSizes
         }
-        else if (options.batchSizes.some(x => x > 100))
-        {
+        else if (options.batchSizes.some(x => x > 100)) {
             throw new Error("[TranslatorStructuredObject] Batch sizes should not exceed 100")
         }
 
@@ -34,10 +30,8 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
      * @param {[string]} lines
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(lines)
-    {
-        if (lines.length === 1)
-        {
+    async translatePrompt(lines) {
+        if (lines.length === 1) {
             return await this.translateBaseFallback(lines, undefined)
         }
         // const text = lines.join("\n\n")
@@ -49,26 +43,21 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
         const max_tokens = this.getMaxToken(lines)
 
         const structuredObject = {}
-        for (const [key, value] of lines.entries())
-        {
-            if (value.includes("\\N"))
-            {
+        for (const [key, value] of lines.entries()) {
+            if (value.includes("\\N")) {
                 const nestedObject = {}
-                for (const [nestedKey, nestedValue] of value.split("\\N").entries())
-                {
+                for (const [nestedKey, nestedValue] of value.split("\\N").entries()) {
                     nestedObject[nestedValue.replaceAll("\\", "").trim()] = z.string()
                 }
                 structuredObject[NestedPlaceholder + key] = z.object({ ...nestedObject })
             }
-            else 
-            {
+            else {
                 structuredObject[value.replaceAll("\\", "")] = z.string()
             }
         }
         const translationBatch = z.object({ ...structuredObject })
 
-        try
-        {
+        try {
             let startTime = 0, endTime = 0
             startTime = Date.now()
 
@@ -90,34 +79,26 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
 
             const translation = output.choices[0].message
 
-            function getLinesOutput() 
-            {
-                if (translation.refusal)
-                {
+            function getLinesOutput() {
+                if (translation.refusal) {
                     return [translation.refusal]
                 }
-                else
-                {
+                else {
                     const parsed = output.choices[0].message.parsed
                     const linesOut = []
 
                     let expectedIndex = 0
-                    for (const [key, value] of Object.entries(parsed))
-                    {
-                        if (key.startsWith(NestedPlaceholder))
-                        {
+                    for (const [key, value] of Object.entries(parsed)) {
+                        if (key.startsWith(NestedPlaceholder)) {
                             let multilineOutput = []
-                            for (const [nestedKey, nestedValue] of Object.entries(value))
-                            {
+                            for (const [nestedKey, nestedValue] of Object.entries(value)) {
                                 multilineOutput.push(nestedValue)
                             }
                             linesOut.push(multilineOutput.join("\\N"))
                         }
-                        else
-                        {
+                        else {
                             const expectedKey = lines[expectedIndex]
-                            if (key != expectedKey)
-                            {
+                            if (key != expectedKey) {
                                 log.warn("[TranslatorStructuredObject]", "Unexpected key", "Expected", expectedKey, "Received", key)
                             }
                             const element = parsed[key]
@@ -145,8 +126,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
             this.tokensProcessTimeMs += (endTime - startTime)
 
             return translationOutput
-        } catch (error)
-        {
+        } catch (error) {
             log.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
             return await this.translateBaseFallback(lines, error)
         }
@@ -158,12 +138,10 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase
      * @param {string[]} sourceLines
      * @param {string[]} transformLines
      */
-    getContext(sourceLines, transformLines)
-    {
+    getContext(sourceLines, transformLines) {
         const output = {}
 
-        for (let index = 0; index < sourceLines.length; index++)
-        {
+        for (let index = 0; index < sourceLines.length; index++) {
             const source = sourceLines[index]
             const transform = transformLines[index]
             output[source] = transform

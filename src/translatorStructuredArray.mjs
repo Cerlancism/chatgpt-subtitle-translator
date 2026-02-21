@@ -6,15 +6,13 @@ import log from "loglevel"
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
 
-export class TranslatorStructuredArray extends TranslatorStructuredBase
-{
+export class TranslatorStructuredArray extends TranslatorStructuredBase {
     /**
      * @param {{from?: string, to: string}} language
      * @param {import("./translator.mjs").TranslationServiceContext} services
      * @param {Partial<import("./translator.mjs").TranslatorOptions>} [options]
      */
-    constructor(language, services, options)
-    {
+    constructor(language, services, options) {
         super(language, services, options)
     }
 
@@ -23,8 +21,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
      * @param {[string]} lines
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(lines)
-    {
+    async translatePrompt(lines) {
         // const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: JSON.stringify({ inputs: lines }) }
@@ -37,8 +34,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
             outputs: z.array(z.string())
         })
 
-        try
-        {
+        try {
             let startTime = 0, endTime = 0
             startTime = Date.now()
 
@@ -60,10 +56,8 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
 
             const translationCandidate = output.choices[0].message
 
-            const getLinesOutput = async (/** @type {import("openai/resources/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) =>
-            {
-                if (lines.length === 1 && translation.refusal && this.options.fallbackModel)
-                {
+            const getLinesOutput = async (/** @type {import("openai/resources/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) => {
+                if (lines.length === 1 && translation.refusal && this.options.fallbackModel) {
                     log.debug("[TranslatorStructuredArray] Refusal Fallback", this.options.fallbackModel)
                     const requestOptions = { ...this.options.createChatCompletionRequest }
                     requestOptions.model = this.options.fallbackModel
@@ -79,8 +73,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
                     translation = fallBackOutput.choices[0].message
                 }
 
-                if (translation.refusal)
-                {
+                if (translation.refusal) {
                     return [translation.refusal]
                 }
 
@@ -104,8 +97,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
             this.tokensProcessTimeMs += (endTime - startTime)
 
             return translationOutput
-        } catch (error)
-        {
+        } catch (error) {
             log.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
             return await this.translateBaseFallback(lines, error)
         }
@@ -116,14 +108,11 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
      * @param {string[]} lines 
      * @param {"user" | "assistant" } role
      */
-    getContextLines(lines, role)
-    {
-        if (role === "user")
-        {
+    getContextLines(lines, role) {
+        if (role === "user") {
             return JSON.stringify({ inputs: lines })
         }
-        else
-        {
+        else {
             return JSON.stringify({ outputs: lines })
         }
     }
@@ -133,44 +122,36 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase
      * @template T
      * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<T>} runner 
      */
-    jsonStreamParse(runner)
-    {
+    jsonStreamParse(runner) {
         this.services.onStreamChunk?.("\n")
         const passThroughStream = new PassThrough()
         let writeBuffer = ''
-        runner.on("content.delta", (e) =>
-        {
+        runner.on("content.delta", (e) => {
             writeBuffer += e.delta
             passThroughStream.write(e.delta)
-            if (writeBuffer)
-            {
+            if (writeBuffer) {
                 this.services.onStreamChunk?.(writeBuffer)
                 writeBuffer = ''
             }
         })
 
-        runner.on("content.done", () =>
-        {
+        runner.on("content.done", () => {
             passThroughStream.end()
             this.services.onClearLine?.()
         })
 
         const parser = JSONStream.parse(["outputs", true])
 
-        parser.on("data", (output) =>
-        {
-            try
-            {
+        parser.on("data", (output) => {
+            try {
                 this.services.onClearLine?.()
                 writeBuffer = `${output}\n`
-            } catch (err)
-            {
+            } catch (err) {
                 log.error("[TranslatorStructuredArray]", "Parsing error:", err)
             }
         })
 
-        parser.on("error", (err) =>
-        {
+        parser.on("error", (err) => {
             log.error("[TranslatorStructuredArray]", "JSONStream parsing error:", err)
         })
 
