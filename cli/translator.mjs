@@ -63,7 +63,7 @@ export function createInstance(args) {
         .option("--experimental-use-full-context", "Use the full history, chunked by historyPromptLength, to work better with prompt caching.")
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
-        .option("--no-use-moderator", "Don't use the OpenAI Moderation tool")
+        .option("--use-moderator", "Use the OpenAI Moderation tool")
         .option("--no-prefix-number", "Don't prefix lines with numerical indices")
         .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
         .option("-l, --history-prompt-length <length>", "Length of prompt history to retain", parseInt, DefaultOptions.historyPromptLength)

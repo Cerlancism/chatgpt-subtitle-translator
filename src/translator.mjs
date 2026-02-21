@@ -25,7 +25,7 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Moderation model
  * @property {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} initialPrompts
  * Initial prompt messages before the translation request messages
- * @property {boolean} useModerator `true` \
+ * @property {boolean} useModerator `false` \
  * Verify with the free OpenAI Moderation tool before submitting the prompt to the ChatGPT model
  * @property {boolean} prefixNumber `true` \
  * Label lines with numerical prefixes to improve the one-to-one correlation between input and output line quantities
@@ -53,7 +53,7 @@ export const DefaultOptions = {
     },
     moderationModel: "omni-moderation-latest",
     initialPrompts: [],
-    useModerator: true,
+    useModerator: false,
     prefixNumber: true,
     lineMatching: true,
     historyPromptLength: 10,
