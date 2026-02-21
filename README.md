@@ -67,8 +67,8 @@ Options:
     Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text, ignoring `--from` and `--to` options
   - `--initial-prompts <prompts>`  
     Initial prompts for the translation in JSON (default: `"[]"`) 
-  - `--no-use-moderator`  
-    Don't use the OpenAI API Moderation endpoint
+  - `--use-moderator`
+    Use the OpenAI API Moderation endpoint
   - `--moderation-model`  
     (default: `"omni-moderation-latest"`) https://platform.openai.com/docs/models/moderation
   - `--no-prefix-number`  
@@ -85,9 +85,11 @@ Options:
 
     Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.  
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
-  - `--experimental-structured-mode [mode]`  
-    Enable [structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/). (default: `array`, choices `array`)
-      - `--experimental-structured-mode array` Structures the input and output into a plain array format. This option is more concise compared to base mode, though it uses slightly more tokens per batch.
+  - `--structured-mode <mode>`
+    [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode. (default: `array`, choices: `array`, `object`, `none`)
+      - `array` Structures the input and output into a plain array format. More concise than base mode, though uses slightly more tokens per batch.
+      - `object` Structures the input and output as a keyed object.
+      - `none` Disables structured output.
 
   - `--experimental-use-full-context`  
     Include the full context of translated data to work well with [prompt caching](https://openai.com/index/api-prompt-caching/).  
