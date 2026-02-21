@@ -31,10 +31,8 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Label lines with numerical prefixes to improve the one-to-one correlation between input and output line quantities
  * @property {boolean} lineMatching `true`
  * Enforce one-to-one line quantity matching between input and output
- * @property {number} historyPromptLength `10` \
- * Length of the prompt history to be retained and passed on to the next translation request in order to maintain some context.
  * @property {number} useFullContext `0` \
- * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by historyPromptLength, to work better with prompt caching. Set to 0 to disable.
+ * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to disable.
  * @property {number[]} batchSizes `[10, 100]` \
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
@@ -56,7 +54,6 @@ export const DefaultOptions = {
     useModerator: false,
     prefixNumber: true,
     lineMatching: true,
-    historyPromptLength: 10,
     useFullContext: 0,
     batchSizes: [10, 100],
     structuredMode: "array",
@@ -453,7 +450,7 @@ export class Translator {
     }
 
     buildContext() {
-        if (this.workingProgress.length === 0 || this.options.historyPromptLength === 0) {
+        if (this.workingProgress.length === 0) {
             return;
         }
 
@@ -479,8 +476,7 @@ export class Translator {
                 : `full (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
             log.debug("[Translator]", "Context:", logSliceContext)
         } else {
-            // Otherwise, slice based on historyPromptLength
-            sliced = this.workingProgress.slice(-this.options.historyPromptLength);
+            sliced = this.workingProgress.slice(-this.options.batchSizes[this.options.batchSizes.length - 1]);
         }
         const offset = this.workingProgress.length - sliced.length;
 
@@ -508,7 +504,7 @@ export class Translator {
      */
     getContext(sourceLines, transformLines) {
         const chunks = [];
-        const chunkSize = this.options.historyPromptLength;
+        const chunkSize = this.options.batchSizes[this.options.batchSizes.length - 1];
         for (let i = 0; i < sourceLines.length; i += chunkSize) {
             const sourceChunk = sourceLines.slice(i, i + chunkSize);
             const transformChunk = transformLines.slice(i, i + chunkSize);
