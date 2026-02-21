@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path';
 import url from 'url'
-import readline from 'readline'
+import readline from 'node:readline'
 import * as undici from 'undici';
 
 import { Command, Option } from "commander"
