@@ -57,22 +57,6 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             const translationCandidate = output.choices[0].message
 
             const getLinesOutput = async (/** @type {import("openai/resources/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) => {
-                if (lines.length === 1 && translation.refusal && this.options.fallbackModel) {
-                    log.debug("[TranslatorStructuredArray] Refusal Fallback", this.options.fallbackModel)
-                    const requestOptions = { ...this.options.createChatCompletionRequest }
-                    requestOptions.model = this.options.fallbackModel
-                    const fallBackOutput = await this.streamParse({
-                        messages,
-                        ...requestOptions,
-                        stream: requestOptions.stream,
-                        max_tokens
-                    }, {
-                        structure: structuredArray,
-                        name: "translation_array"
-                    })
-                    translation = fallBackOutput.choices[0].message
-                }
-
                 if (translation.refusal) {
                     return [translation.refusal]
                 }
@@ -100,7 +84,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             return translationOutput
         } catch (error) {
             log.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
-            return await this.translateBaseFallback(lines, error)
+            return this.handleTranslateError(error, lines.length)
         }
     }
 

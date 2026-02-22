@@ -1,7 +1,8 @@
-import { APIUserAbortError } from "openai";
+import { APIUserAbortError } from "openai/error.mjs";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import log from "loglevel"
 import { Translator } from "./translator.mjs";
+import { TranslationOutput } from "./translatorOutput.mjs";
 
 /**
  * @abstract
@@ -26,16 +27,18 @@ export class TranslatorStructuredBase extends Translator {
     }
 
     /**
-     * @param {string[]} lines 
      * @param {Error} error
+     * @param {number} lineCount
+     * @returns {TranslationOutput | undefined}
      */
-    async translateBaseFallback(lines, error) {
-        if (error && error instanceof APIUserAbortError) {
-            return
+    handleTranslateError(error, lineCount) {
+        if (error instanceof APIUserAbortError) {
+            return undefined
         }
-        log.warn("[TranslatorStructuredBase]", "Fallback to base mode")
-        const output = await super.translatePrompt(lines)
-        return output
+        if (lineCount > 1) {
+            return new TranslationOutput([], 0, 0, 0, 0)
+        }
+        throw error
     }
 
     /**
