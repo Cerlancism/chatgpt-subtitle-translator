@@ -272,7 +272,7 @@ export class Translator {
             this.buildContext()
             const output = await this.translatePrompt([input])
             const writeOut = output.content[0]
-            yield* this.yieldOutput([batch[x]], [writeOut], output.promptTokens, output.completionTokens)
+            yield* this.yieldOutput([batch[x]], [writeOut], output.completionTokens)
         }
     }
 
@@ -343,7 +343,7 @@ export class Translator {
                 // for the whole batch request. Since workingProgress is stored per entry and
                 // buildContext() slices and sums costs per entry, we divide evenly so that
                 // summing any subset of entries approximates the proportional token cost.
-                yield* this.yieldOutput(batch, outputs, output.promptTokens / outputs.length, output.completionTokens / outputs.length)
+                yield* this.yieldOutput(batch, outputs, output.completionTokens / outputs.length)
             }
 
             this.printUsage()
@@ -360,10 +360,9 @@ export class Translator {
     /**
      * @param {string[]} promptSources
      * @param {string[]} promptTransforms
-     * @param {number} [promptTokensPerEntry] Prompt token cost per entry from the model response, for context budget tracking
      * @param {number} [completionTokensPerEntry] Completion token cost per entry from the model response, for context budget tracking
      */
-    * yieldOutput(promptSources, promptTransforms, promptTokensPerEntry, completionTokensPerEntry) {
+    * yieldOutput(promptSources, promptTransforms, completionTokensPerEntry) {
         for (let index = 0; index < promptSources.length; index++) {
             const promptSource = promptSources[index];
             const promptTransform = promptTransforms[index] ?? ""
@@ -389,7 +388,7 @@ export class Translator {
             else {
                 finalTransform = this.postprocessLine(finalTransform)
             }
-            this.workingProgress.push({ source: promptSource, transform: promptTransform, promptTokens: promptTokensPerEntry, completionTokens: completionTokensPerEntry })
+            this.workingProgress.push({ source: promptSource, transform: promptTransform, completionTokens: completionTokensPerEntry })
             const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform, finalTransform }
             yield output
         }
