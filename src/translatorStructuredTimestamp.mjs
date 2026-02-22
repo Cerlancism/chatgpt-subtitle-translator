@@ -193,7 +193,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 const mergeEntry = batch[mergeStart]
                 const mergeOutput = outputEntries[mergeStart]
                 log.debug("[TranslatorStructuredTimestamp]",
-                    "Merging detected from entry", mergeStart,
+                    "Merging detected",
                     `(input: ${batch.length}, output: ${outputEntries.length})`,
                     mergeEntry ? `\n  input:  ${mergeEntry.startTime}: "${mergeEntry.text}"` : "",
                     mergeOutput ? `\n  output: ${secondsToTimestamp(mergeOutput.start)}: "${mergeOutput.text}"` : ""
