@@ -21,7 +21,7 @@
                 "<node_internals>/**"
             ],
             // "command": "./cli/translator.mjs --stream --to Chinese --input test/data/test_ja.srt -t 1 --batch-sizes '[5]' --model gpt-5-nano --reasoning_effort low",
-            "command": "./cli/translator.mjs --stream --to Chinese --input test/data/test_ja.srt -t 0 --batch-sizes '[5,10]' --model vera-8192",
+            "command": "./cli/translator.mjs --stream --to Chinese --input test/data/test_ja.srt -t 0 --batch-sizes '[5,10]' --model vera-8192 --use-full-context 2000",
             // "command": "./cli/translator.mjs --plain-text 你好",
             // "command": "./cli/translator.mjs --model deepseek-r1:14b --stream --to Chinese --input test/data/test_ja.srt -t 0 --batch-sizes '[5]'",
             // "command": "./cli/translator.mjs --stream --to Chinese --input test/data/test_ja.srt -t 0 --batch-sizes '[5]' --use-full-context 90000",
