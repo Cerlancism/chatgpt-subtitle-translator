@@ -1,5 +1,5 @@
 import log from "loglevel"
-import { openaiRetryWrapper, completeChatStream, getPricingModel } from './openai.mjs';
+import { openaiRetryWrapper, completeChatStream } from './openai.mjs';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
@@ -7,13 +7,17 @@ import { CooldownContext } from './cooldown.mjs';
 import { TranslationOutput } from './translatorOutput.mjs';
 
 /**
+ * Runtime context passed to translation service functions.
+ * Holds the OpenAI client, optional rate-limit cooldown state,
+ * and UI callbacks for streaming output.
+ *
  * @typedef TranslationServiceContext
- * @property {import("openai").OpenAI} openai
- * @property {CooldownContext} [cooler]
- * @property {(data: string) => void} [onStreamChunk]
- * @property {() => void} [onStreamEnd]
- * @property {() => void} [onClearLine]
- * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService]
+ * @property {import("openai").OpenAI} openai - Configured OpenAI client instance
+ * @property {CooldownContext} [cooler] - Optional cooldown controller for rate-limit back-off
+ * @property {(data: string) => void} [onStreamChunk] - Called for each streamed token chunk
+ * @property {() => void} [onStreamEnd] - Called when a stream response finishes
+ * @property {() => void} [onClearLine] - Called to erase the current console line (progress UI)
+ * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService] - Optional moderation service context
  */
 
 /**
@@ -93,6 +97,7 @@ export class Translator {
         this.completionTokensUsed = 0
         this.completionTokensWasted = 0
         this.tokensProcessTimeMs = 0
+        this.contextTokens = 0
 
         this.offset = 0
         this.end = undefined
@@ -101,7 +106,6 @@ export class Translator {
         this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
         this.moderatorFlags = new Map()
 
-        this.pricingModel = getPricingModel(this.options.createChatCompletionRequest.model)
         this.aborted = false
 
         this.thinkTags = {
@@ -471,6 +475,7 @@ export class Translator {
                 if (tokenCount > maxTokens) break; // include this entry, then stop
             }
             sliced = this.workingProgress.slice(startIndex);
+            this.contextTokens = tokenCount;
             const logSliceContext = sliced.length < this.workingProgress.length
                 ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ~${Math.round(tokenCount)} tokens)`
                 : `full (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
@@ -531,27 +536,18 @@ export class Translator {
     }
 
     get usage() {
-        if (!this.pricingModel) {
-            log.warn("[Translator]", `Cost computation not supported for ${this.options.createChatCompletionRequest.model}`)
-        }
-
-        const pricePrompt = this.pricingModel?.prompt
-        const priceCompletion = this.pricingModel?.completion
-
         const usedTokens = this.promptTokensUsed + this.completionTokensUsed
         const wastedTokens = this.promptTokensWasted + this.completionTokensWasted
-        const usedTokensPricing = pricePrompt ? roundWithPrecision(pricePrompt * (this.promptTokensUsed / 1000) + priceCompletion * (this.completionTokensUsed / 1000), 3) : NaN
-        const wastedTokensPricing = priceCompletion ? roundWithPrecision(pricePrompt * (this.promptTokensWasted / 1000) + priceCompletion * (this.completionTokensWasted / 1000), 3) : NaN
         const rate = roundWithPrecision(usedTokens / (this.tokensProcessTimeMs / 1000 / 60), 2)
         const wastedPercent = (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 })
         const cachedTokens = this.cachedTokens
+        const contextTokens = this.contextTokens
         return {
             usedTokens,
             wastedTokens,
-            usedTokensPricing,
-            wastedTokensPricing,
             wastedPercent,
             cachedTokens,
+            contextTokens,
             rate,
         }
     }
@@ -564,18 +560,18 @@ export class Translator {
         const {
             usedTokens,
             wastedTokens,
-            usedTokensPricing,
-            wastedTokensPricing,
             wastedPercent,
             cachedTokens,
+            contextTokens,
             rate,
         } = usage
 
         log.debug(
             `[Translator] Estimated Usage -`,
-            "Tokens:", usedTokens, "$", usedTokensPricing >= 0 ? usedTokensPricing : "-",
-            "Wasted:", wastedTokens, "$", wastedTokensPricing >= 0 ? wastedTokensPricing : "-", wastedPercent,
+            "Tokens:", usedTokens,
+            "Wasted:", wastedTokens, wastedPercent,
             "Cached:", cachedTokens >= 0 ? cachedTokens : "-",
+            "Context:", contextTokens >= 0 ? `~${Math.round(contextTokens)}/${this.options.useFullContext} (${Math.round(contextTokens / this.options.useFullContext * 100)}%)` : "-",
             "Rate:", rate, "TPM", this.services.cooler?.rate, "RPM",
         )
     }
