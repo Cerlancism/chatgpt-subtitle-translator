@@ -1,8 +1,6 @@
 import { PassThrough } from "stream";
 import { z } from "zod";
-import { parser as jsonParser } from "stream-json";
-import { pick } from "stream-json/filters/Pick.js";
-import { streamArray } from "stream-json/streamers/StreamArray.js";
+import { JSONParser } from "@streamparser/json-node";
 import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
@@ -33,7 +31,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
         const max_tokens = this.getMaxToken(lines)
 
         const structuredArray = z.object({
-            outputs: z.array(z.string())
+            outputs: z.array(z.string()).describe(`to expect ${lines.length} items`)
         })
 
         try {
@@ -143,9 +141,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
         })
 
         const pipeline = passThroughStream
-            .pipe(jsonParser())
-            .pipe(pick({ filter: "outputs" }))
-            .pipe(streamArray())
+            .pipe(new JSONParser({ paths: ['$.outputs.*'], keepStack: false }))
 
         pipeline.on("data", (/** @type {{ value: string }} */ { value: output }) => {
             try {
