@@ -108,7 +108,7 @@ Additional Options for GPT: https://developers.openai.com/api/reference/resource
   - `-m, --model <model>`
     (default: `"gpt-4o-mini"`) https://developers.openai.com/api/docs/models
   - `-t, --temperature <temperature>`
-    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`)
+    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `0`)
   - `--top_p <top_p>`
     Nucleus sampling parameter, top_p probability mass
   - `--presence_penalty <presence_penalty>`
