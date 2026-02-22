@@ -11,12 +11,12 @@
   "author": "Cerlancism",
   "license": "MIT",
   "dependencies": {
+    "@streamparser/json-node": "^0.0.22",
     "commander": "^14.0.3",
     "dotenv": "^17.3.1",
     "loglevel": "^1.9.2",
     "openai": "^6.22.0",
     "srt-parser-2": "^1.2.3",
-    "stream-json": "^1.9.1",
     "undici": "^7.22.0",
     "zod": "^4.3.6"
   },
@@ -28,7 +28,6 @@
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/stream-json": "^1.7.8",
     "typescript": "^5.9.3"
   }
 }
