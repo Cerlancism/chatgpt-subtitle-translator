@@ -31,9 +31,6 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
      * @returns {Promise<TranslationOutput>}
      */
     async translatePrompt(lines) {
-        if (lines.length === 1) {
-            return await this.translateBaseFallback(lines, undefined)
-        }
         // const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         // const userMessage = { role: "user", content: `Translate from given schema` }
@@ -130,7 +127,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
             return translationOutput
         } catch (error) {
             log.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
-            return await this.translateBaseFallback(lines, error)
+            return this.handleTranslateError(error, lines.length)
         }
     }
 

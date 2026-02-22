@@ -46,7 +46,6 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * @property {"array" | "object" | "none" | false} structuredMode
  * @property {number} max_token
  * @property {number} inputMultiplier
- * @property {string} fallbackModel
  * @property {import('loglevel').LogLevelDesc} logLevel
  */
 export const DefaultOptions = {
@@ -63,7 +62,6 @@ export const DefaultOptions = {
     structuredMode: "array",
     max_token: 0,
     inputMultiplier: 0,
-    fallbackModel: undefined,
     logLevel: undefined
 }
 
