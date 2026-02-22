@@ -43,7 +43,7 @@ import { TranslationOutput } from './translatorOutput.mjs';
  *
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
- * @property {"array" | "object" | "none" | false} structuredMode
+ * @property {"array" | "object" | "none" | "timestamp" | false} structuredMode
  * @property {number} max_token
  * @property {number} inputMultiplier
  * @property {import('loglevel').LogLevelDesc} logLevel
@@ -68,6 +68,7 @@ export const DefaultOptions = {
 
 /**
  * Translator using ChatGPT
+ * @template {any[]} [TLines=string[]]
  */
 export class Translator {
     /**
@@ -118,7 +119,7 @@ export class Translator {
     }
 
     /**
-     * @param {string[]} lines 
+     * @param {any[]} lines
      */
     getMaxToken(lines) {
         if (this.options.max_token && !this.options.inputMultiplier) {
@@ -132,7 +133,7 @@ export class Translator {
     }
 
     /**
-     * @param {string[]} inputLines
+     * @param {any[]} inputLines
      * @param {string} rawContent
      */
     getOutput(inputLines, rawContent) {
@@ -157,7 +158,7 @@ export class Translator {
     }
 
     /**
-     * @param {string[]} lines
+     * @param {TLines} lines
      * @returns {Promise<TranslationOutput>}
      */
     async translatePrompt(lines) {
@@ -269,7 +270,7 @@ export class Translator {
         for (let x = 0; x < batch.length; x++) {
             const input = batch[x]
             this.buildContext()
-            const output = await this.translatePrompt([input])
+            const output = await this.translatePrompt(/** @type {any} */ ([input]))
             const writeOut = output.content[0]
             yield* this.yieldOutput([batch[x]], [writeOut], output.completionTokens)
         }
@@ -307,7 +308,7 @@ export class Translator {
                 }
             }
             this.buildContext()
-            const output = await this.translatePrompt(batch)
+            const output = await this.translatePrompt(/** @type {any} */ (batch))
 
             if (this.aborted) {
                 log.debug("[Translator]", "Aborted")

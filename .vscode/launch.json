@@ -21,7 +21,8 @@
                 "<node_internals>/**"
             ],
             // "command": "cli/translator.mjs --to Chinese --input test/data/test_ja.srt --batch-sizes '[5]' --model gpt-5-nano --reasoning_effort low",
-            "command": "cli/translator.mjs --to Chinese --input test/data/test_ja.srt --batch-sizes '[5,10]' --model vera-8192 --use-full-context 2000",
+            // "command": "cli/translator.mjs --to Chinese --input test/data/test_ja.srt --batch-sizes '[5,10]' --model vera-8192 --use-full-context 2000",
+            "command": "cli/translator.mjs --to Chinese --input test/data/test_ja_500.srt --batch-sizes '[10,25]' --model vera-8192 --structured-mode timestamp"
             // "command": "cli/translator.mjs --plain-text 你好",
             // "command": "cli/translator.mjs --model deepseek-r1:14b --to Chinese --input test/data/test_ja.srt --batch-sizes '[5]'",
             // "command": "cli/translator.mjs --to Chinese --input test/data/test_ja.srt --batch-sizes '[5]' --use-full-context 90000",
@@ -29,7 +30,7 @@
             // "command": "cli/translator.mjs -i ./test/data/test_cn_multiline.srt --structured-mode array --experimental-max_token 4096 --experimental-input-multiplier 2 --batch-sizes '[5, 10]' --experimental-fallback-model gpt-3.5-turbo-0613",
             // "command": "cli/translator.mjs -i ./test/data/test_cn_multiline.srt --structured-mode object --experimental-max_token 4096 --experimental-input-multiplier 2 --batch-sizes '[5, 10]'",
             // "command": "cli/translator.mjs --to Chinese --input test/data/test_ja_small.srt -t 1 --initial-prompts '[{\"role\": \"user\", \"content\": \"Translate to Chinese with Chinese Explaination\"}]' --batch-sizes '[2, 10]'",
-            // "command": "cli/translator.mjs --temperature 0.1 --no-prefix-line-with-number --top_p 1 --frequency_penalty 1 --presence_penalty 1"
+            // "command": "cli/translator.mjs --temperature 0.1 --no-prefix-line-with-number --top_p 1 --frequency_penalty 1 --presence_penalty 1",
         }
     ]
 }

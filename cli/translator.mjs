@@ -13,6 +13,7 @@ import {
     Translator,
     TranslatorStructuredObject,
     TranslatorStructuredArray,
+    TranslatorStructuredTimestamp,
     createOpenAIClient,
     CooldownContext,
     subtitleParser,
@@ -58,7 +59,7 @@ export function createInstance(args) {
 
         .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
         .option("--experimental-input-multiplier <value>", "", val => parseInt(val, 10), 0)
-        .addOption(new Option("--structured-mode <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object", "none"]).default("array"))
+        .addOption(new Option("--structured-mode <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object", "none", "timestamp"]).default("array"))
         .option("--use-full-context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by historyPromptLength, to work better with prompt caching. Set to 0 to disable. Recommended: set to 30% less than the model's max context length.", val => parseInt(val, 10), DefaultOptions.useFullContext)
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
@@ -171,6 +172,9 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
         else if (options.structuredMode == "object") {
             return new TranslatorStructuredObject({ from: opts.from, to: opts.to }, services, options);
         }
+        else if (options.structuredMode == "timestamp") {
+            return new TranslatorStructuredTimestamp({ from: opts.from, to: opts.to }, services, options);
+        }
         else {
             return new Translator({ from: opts.from, to: opts.to }, services, options);
         }
@@ -183,66 +187,85 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     }
 
     if (opts.plainText) {
-        await translatePlainText(translator, opts.plainText)
+        await translatePlainText(/** @type {import('../src/translator.mjs').Translator} */ (translator), opts.plainText)
     }
     else if (opts.input) {
         if (opts.input.endsWith(".srt")) {
             log.debug("[CLI]", "Assume SRT file", opts.input)
             const text = fs.readFileSync(opts.input, 'utf-8')
             const srtArraySource = subtitleParser.fromSrt(text)
-            const srtArrayWorking = subtitleParser.fromSrt(text)
-
-            const sourceLines = srtArraySource.map(x => x.text)
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
-
-            const progressFile = `${opts.input}.progress_${fileTag}.csv`
             const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}.srt`
 
-            if (await checkFileExists(progressFile)) {
-                const progress = await getProgress(progressFile)
-
-                if (progress.length === sourceLines.length) {
-                    log.debug("[CLI]", `Progress already completed ${progressFile}`)
-                    log.debug("[CLI]", `Overwriting ${progressFile}`)
-                    fs.writeFileSync(progressFile, '')
-                    log.debug("[CLI]", `Overwriting ${outputFile}`)
-                    fs.writeFileSync(outputFile, '')
-                }
-                else {
-                    log.debug("[CLI]", `Resuming from ${progressFile}`, progress.length)
-                    const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
-                    for (let index = 0; index < progress.length; index++) {
-                        let transform = progress[index]
-                        if (transform.startsWith("[Flagged]")) {
-                            translator.moderatorFlags.set(index, transform)
-                        }
-                        else {
-                            transform = translator.preprocessLine(transform, index, 0)
-                        }
-                        translator.workingProgress.push({ source: sourceProgress[index], transform })
+            if (options.structuredMode === "timestamp") {
+                // Timestamp mode: model receives start/end seconds and may merge entries.
+                // Output count can differ from input, so progress file resume is not supported.
+                log.warn("[CLI]", "Timestamp mode: progress resumption is not supported, starting from beginning.")
+                fs.writeFileSync(outputFile, '')
+                let outputId = 1
+                try {
+                    for await (const srtOut of /** @type {import('../src/translatorStructuredTimestamp.mjs').TranslatorStructuredTimestamp} */ (translator).translateSrtLines(srtArraySource)) {
+                        const entry = { ...srtOut, id: String(outputId++) }
+                        const outSrt = subtitleParser.toSrt([entry])
+                        log.info(entry.id, wrapQuotes(entry.startTime), "->", wrapQuotes(entry.endTime), wrapQuotes(entry.text))
+                        await fs.promises.appendFile(outputFile, outSrt)
                     }
-                    translator.offset = progress.length
+                } catch (error) {
+                    log.error("[CLI]", "Error", error)
+                    process.exit(1)
                 }
             }
             else {
-                fs.writeFileSync(outputFile, '')
-            }
+                const srtArrayWorking = subtitleParser.fromSrt(text)
+                const sourceLines = srtArraySource.map(x => x.text)
+                const progressFile = `${opts.input}.progress_${fileTag}.csv`
 
-            try {
-                for await (const output of translator.translateLines(sourceLines)) {
-                    const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
-                    const srtEntry = srtArrayWorking[output.index - 1]
-                    srtEntry.text = output.finalTransform
-                    const outSrt = subtitleParser.toSrt([srtEntry])
-                    log.info(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
-                    await Promise.all([
-                        fs.promises.appendFile(progressFile, csv),
-                        fs.promises.appendFile(outputFile, outSrt)
-                    ])
+                if (await checkFileExists(progressFile)) {
+                    const progress = await getProgress(progressFile)
+
+                    if (progress.length === sourceLines.length) {
+                        log.debug("[CLI]", `Progress already completed ${progressFile}`)
+                        log.debug("[CLI]", `Overwriting ${progressFile}`)
+                        fs.writeFileSync(progressFile, '')
+                        log.debug("[CLI]", `Overwriting ${outputFile}`)
+                        fs.writeFileSync(outputFile, '')
+                    }
+                    else {
+                        log.debug("[CLI]", `Resuming from ${progressFile}`, progress.length)
+                        const sourceProgress = sourceLines.slice(0, progress.length).map((x, i) => translator.preprocessLine(x, i, 0))
+                        for (let index = 0; index < progress.length; index++) {
+                            let transform = progress[index]
+                            if (transform.startsWith("[Flagged]")) {
+                                translator.moderatorFlags.set(index, transform)
+                            }
+                            else {
+                                transform = translator.preprocessLine(transform, index, 0)
+                            }
+                            translator.workingProgress.push({ source: sourceProgress[index], transform })
+                        }
+                        translator.offset = progress.length
+                    }
                 }
-            } catch (error) {
-                log.error("[CLI]", "Error", error)
-                process.exit(1)
+                else {
+                    fs.writeFileSync(outputFile, '')
+                }
+
+                try {
+                    for await (const output of translator.translateLines(sourceLines)) {
+                        const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
+                        const srtEntry = srtArrayWorking[output.index - 1]
+                        srtEntry.text = output.finalTransform
+                        const outSrt = subtitleParser.toSrt([srtEntry])
+                        log.info(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
+                        await Promise.all([
+                            fs.promises.appendFile(progressFile, csv),
+                            fs.promises.appendFile(outputFile, outSrt)
+                        ])
+                    }
+                } catch (error) {
+                    log.error("[CLI]", "Error", error)
+                    process.exit(1)
+                }
             }
         }
         else {
@@ -252,7 +275,7 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
             const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}${ext}`
             const text = fs.readFileSync(opts.input, 'utf-8')
             fs.writeFileSync(outputFile, '')
-            await translatePlainText(translator, text, outputFile)
+            await translatePlainText(/** @type {import('../src/translator.mjs').Translator} */ (translator), text, outputFile)
         }
     }
 }
