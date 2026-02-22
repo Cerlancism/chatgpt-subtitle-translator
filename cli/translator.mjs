@@ -56,11 +56,10 @@ export function createInstance(args) {
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
 
-        .option("--experimental-max_token <value>", "", parseInt, 0)
-        .option("--experimental-input-multiplier <value>", "", parseInt, 0)
-        .option("--experimental-fallback-model <value>", "Model to be used for refusal fallback")
+        .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
+        .option("--experimental-input-multiplier <value>", "", val => parseInt(val, 10), 0)
         .addOption(new Option("--structured-mode <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object", "none"]).default("array"))
-        .option("--use-full-context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by historyPromptLength, to work better with prompt caching. Set to 0 to disable. Recommended: set to 30% less than the model's max context length.", parseInt, DefaultOptions.useFullContext)
+        .option("--use-full-context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by historyPromptLength, to work better with prompt caching. Set to 0 to disable. Recommended: set to 30% less than the model's max context length.", val => parseInt(val, 10), DefaultOptions.useFullContext)
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--use-moderator", "Use the OpenAI Moderation tool")
@@ -111,7 +110,6 @@ export function createInstance(args) {
         ...(opts.structuredMode && opts.structuredMode !== "none" && { structuredMode: opts.structuredMode }),
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
-        ...(opts.experimentalFallbackModel && { fallbackModel: opts.experimentalFallbackModel }),
         ...(opts.useFullContext !== undefined && { useFullContext: opts.useFullContext }),
         ...(opts.logLevel && { logLevel: opts.logLevel })
     };
