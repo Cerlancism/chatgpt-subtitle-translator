@@ -99,14 +99,14 @@ Options:
     Log level (default: `debug`, choices: `trace`, `debug`, `info`, `warn`, `error`, `silent`)
   - `--silent`  
     Same as `--log-level silent`  
-  - `--quiet`  
-    Same as `--log-level silent`  
+  - `--quiet`
+    Same as `--log-level silent`
+  - `--no-stream`
+    Disable stream progress output to terminal (streaming is on by default)
 
 Additional Options for GPT: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
   - `-m, --model <model>`
-    (default: `"gpt-4o-mini"`) https://developers.openai.com/api/docs/models  
-  - `--stream`
-    Stream progress output to terminal
+    (default: `"gpt-4o-mini"`) https://developers.openai.com/api/docs/models
   - `-t, --temperature <temperature>`
     Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`)
   - `--top_p <top_p>`
