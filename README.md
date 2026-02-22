@@ -7,11 +7,11 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
-- **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--experimental-structured-mode`
-- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--experimental-use-full-context` (CLI only)
+- **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--structured-mode`
+- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--use-full-context` (CLI only)
 - Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
-- Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent  
-- Checks with the free OpenAI Moderation tool: prevents token wastage if the model is highly likely to refuse to translate  
+- Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent
+- Optional OpenAI Moderation tool check: prevents token wastage if the model is highly likely to refuse to translate, enabled with `--use-moderator`
 - Streaming process output  
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview)  
 - Progress resumption (CLI only)
