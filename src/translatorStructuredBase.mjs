@@ -1,10 +1,13 @@
-import { APIUserAbortError } from "openai";
+import { APIUserAbortError } from "openai/error.mjs";
 import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import log from "loglevel"
 import { Translator } from "./translator.mjs";
+import { TranslationOutput } from "./translatorOutput.mjs";
 
 /**
  * @abstract
+ * @template {any[]} [TLines=string[]]
+ * @extends {Translator<TLines>}
  */
 export class TranslatorStructuredBase extends Translator {
     /**
@@ -26,16 +29,18 @@ export class TranslatorStructuredBase extends Translator {
     }
 
     /**
-     * @param {string[]} lines 
      * @param {Error} error
+     * @param {number} lineCount
+     * @returns {TranslationOutput | undefined}
      */
-    async translateBaseFallback(lines, error) {
-        if (error && error instanceof APIUserAbortError) {
-            return
+    handleTranslateError(error, lineCount) {
+        if (error instanceof APIUserAbortError) {
+            return undefined
         }
-        log.warn("[TranslatorStructuredBase]", "Fallback to base mode")
-        const output = await super.translatePrompt(lines)
-        return output
+        if (lineCount > 1) {
+            return new TranslationOutput([], 0, 0, 0, 0)
+        }
+        throw error
     }
 
     /**
@@ -45,10 +50,11 @@ export class TranslatorStructuredBase extends Translator {
      * @param {boolean} jsonStream
      */
     async streamParse(params, zFormat, jsonStream = false) {
+        const zodResponseFormatOutput = zodResponseFormat(zFormat.structure, zFormat.name)
         if (params.stream) {
             const runner = this.services.openai.chat.completions.stream({
                 ...params,
-                response_format: zodResponseFormat(zFormat.structure, zFormat.name),
+                response_format: zodResponseFormatOutput,
                 stream: true,
                 stream_options: {
                     include_usage: true,
@@ -76,7 +82,7 @@ export class TranslatorStructuredBase extends Translator {
         } else {
             const output = await this.services.openai.chat.completions.parse({
                 ...params,
-                response_format: zodResponseFormat(zFormat.structure, zFormat.name),
+                response_format: zodResponseFormatOutput,
                 stream: false,
             })
             return output

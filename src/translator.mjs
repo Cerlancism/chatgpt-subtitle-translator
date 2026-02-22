@@ -1,5 +1,5 @@
 import log from "loglevel"
-import { openaiRetryWrapper, completeChatStream, getPricingModel } from './openai.mjs';
+import { openaiRetryWrapper, completeChatStream } from './openai.mjs';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision, sleep } from './helpers.mjs';
@@ -7,13 +7,17 @@ import { CooldownContext } from './cooldown.mjs';
 import { TranslationOutput } from './translatorOutput.mjs';
 
 /**
+ * Runtime context passed to translation service functions.
+ * Holds the OpenAI client, optional rate-limit cooldown state,
+ * and UI callbacks for streaming output.
+ *
  * @typedef TranslationServiceContext
- * @property {import("openai").OpenAI} openai
- * @property {CooldownContext} [cooler]
- * @property {(data: string) => void} [onStreamChunk]
- * @property {() => void} [onStreamEnd]
- * @property {() => void} [onClearLine]
- * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService]
+ * @property {import("openai").OpenAI} openai - Configured OpenAI client instance
+ * @property {CooldownContext} [cooler] - Optional cooldown controller for rate-limit back-off
+ * @property {(data: string) => void} [onStreamChunk] - Called for each streamed token chunk
+ * @property {() => void} [onStreamEnd] - Called when a stream response finishes
+ * @property {() => void} [onClearLine] - Called to erase the current console line (progress UI)
+ * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService] - Optional moderation service context
  */
 
 /**
@@ -25,49 +29,46 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Moderation model
  * @property {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} initialPrompts
  * Initial prompt messages before the translation request messages
- * @property {boolean} useModerator `true` \
+ * @property {boolean} useModerator `false` \
  * Verify with the free OpenAI Moderation tool before submitting the prompt to the ChatGPT model
  * @property {boolean} prefixNumber `true` \
  * Label lines with numerical prefixes to improve the one-to-one correlation between input and output line quantities
  * @property {boolean} lineMatching `true`
  * Enforce one-to-one line quantity matching between input and output
- * @property {number} historyPromptLength `10` \
- * Length of the prompt history to be retained and passed on to the next translation request in order to maintain some context.
- * @property {boolean} useFullContext
- * Use the full history, chunked by historyPromptLength, to work better with prompt caching.
+ * @property {number} useFullContext `2000` \
+ * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to disable.
  * @property {number[]} batchSizes `[10, 100]` \
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
  *
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
- * @property {boolean | "array" | "object" } structuredMode
+ * @property {"array" | "object" | "none" | "timestamp" | false} structuredMode
  * @property {number} max_token
  * @property {number} inputMultiplier
- * @property {string} fallbackModel
  * @property {import('loglevel').LogLevelDesc} logLevel
  */
 export const DefaultOptions = {
     createChatCompletionRequest: {
-        model: "gpt-4o-mini"
+        model: "gpt-4o-mini",
+        temperature: 0
     },
     moderationModel: "omni-moderation-latest",
     initialPrompts: [],
-    useModerator: true,
+    useModerator: false,
     prefixNumber: true,
     lineMatching: true,
-    historyPromptLength: 10,
-    useFullContext: false,
+    useFullContext: 2000,
     batchSizes: [10, 100],
-    structuredMode: false,
+    structuredMode: "array",
     max_token: 0,
     inputMultiplier: 0,
-    fallbackModel: undefined,
     logLevel: undefined
 }
 
 /**
  * Translator using ChatGPT
+ * @template {any[]} [TLines=string[]]
  */
 export class Translator {
     /**
@@ -85,7 +86,10 @@ export class Translator {
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         this.promptContext = []
 
-        /** @type {{ source: string; transform: string; }[]} */
+        /**
+         * @type {{ source: string; transform: string; promptTokens?: number; completionTokens?: number; }[]}
+         * token counts are the total request cost averaged per entry for batch requests
+         */
         this.workingProgress = []
         this.promptTokensUsed = 0
         this.promptTokensWasted = 0
@@ -93,6 +97,7 @@ export class Translator {
         this.completionTokensUsed = 0
         this.completionTokensWasted = 0
         this.tokensProcessTimeMs = 0
+        this.contextTokens = 0
 
         this.offset = 0
         this.end = undefined
@@ -101,7 +106,6 @@ export class Translator {
         this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
         this.moderatorFlags = new Map()
 
-        this.pricingModel = getPricingModel(this.options.createChatCompletionRequest.model)
         this.aborted = false
 
         this.thinkTags = {
@@ -115,7 +119,7 @@ export class Translator {
     }
 
     /**
-     * @param {string[]} lines 
+     * @param {any[]} lines
      */
     getMaxToken(lines) {
         if (this.options.max_token && !this.options.inputMultiplier) {
@@ -129,7 +133,7 @@ export class Translator {
     }
 
     /**
-     * @param {string[]} inputLines
+     * @param {any[]} inputLines
      * @param {string} rawContent
      */
     getOutput(inputLines, rawContent) {
@@ -154,7 +158,7 @@ export class Translator {
     }
 
     /**
-     * @param {string[]} lines
+     * @param {TLines} lines
      * @returns {Promise<TranslationOutput>}
      */
     async translatePrompt(lines) {
@@ -252,6 +256,7 @@ export class Translator {
         this.promptTokensUsed += response.promptTokens
         this.completionTokensUsed += response.completionTokens
         this.cachedTokens += response.cachedTokens
+        this.contextTokens = response.totalTokens
         this.tokensProcessTimeMs += (endTime - startTime)
         return response
     }
@@ -265,9 +270,9 @@ export class Translator {
         for (let x = 0; x < batch.length; x++) {
             const input = batch[x]
             this.buildContext()
-            const output = await this.translatePrompt([input])
+            const output = await this.translatePrompt(/** @type {any} */ ([input]))
             const writeOut = output.content[0]
-            yield* this.yieldOutput([batch[x]], [writeOut])
+            yield* this.yieldOutput([batch[x]], [writeOut], output.completionTokens)
         }
     }
 
@@ -303,7 +308,7 @@ export class Translator {
                 }
             }
             this.buildContext()
-            const output = await this.translatePrompt(batch)
+            const output = await this.translatePrompt(/** @type {any} */ (batch))
 
             if (this.aborted) {
                 log.debug("[Translator]", "Aborted")
@@ -334,7 +339,11 @@ export class Translator {
                 }
             }
             else {
-                yield* this.yieldOutput(batch, outputs)
+                // Lines are translated in batches but the model returns a single token count
+                // for the whole batch request. Since workingProgress is stored per entry and
+                // buildContext() slices and sums costs per entry, we divide evenly so that
+                // summing any subset of entries approximates the proportional token cost.
+                yield* this.yieldOutput(batch, outputs, output.completionTokens / outputs.length)
             }
 
             this.printUsage()
@@ -351,8 +360,9 @@ export class Translator {
     /**
      * @param {string[]} promptSources
      * @param {string[]} promptTransforms
+     * @param {number} [completionTokensPerEntry] Completion token cost per entry from the model response, for context budget tracking
      */
-    * yieldOutput(promptSources, promptTransforms) {
+    * yieldOutput(promptSources, promptTransforms, completionTokensPerEntry) {
         for (let index = 0; index < promptSources.length; index++) {
             const promptSource = promptSources[index];
             const promptTransform = promptTransforms[index] ?? ""
@@ -378,7 +388,7 @@ export class Translator {
             else {
                 finalTransform = this.postprocessLine(finalTransform)
             }
-            this.workingProgress.push({ source: promptSource, transform: promptTransform })
+            this.workingProgress.push({ source: promptSource, transform: promptTransform, completionTokens: completionTokensPerEntry })
             const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform, finalTransform }
             yield output
         }
@@ -444,17 +454,36 @@ export class Translator {
     }
 
     buildContext() {
-        if (this.workingProgress.length === 0 || this.options.historyPromptLength === 0) {
+        if (this.workingProgress.length === 0) {
             return;
         }
 
         let sliced;
-        if (this.options.useFullContext) {
-            // Use the entire workingProgress if useFullContext is true
-            sliced = this.workingProgress;
+        if (this.options.useFullContext > 0) {
+            // Slice workingProgress to fit within the token budget using tracked token counts
+            // from actual model responses. Entries without token data are included without
+            // contributing to the budget. Allows the first entry that crosses the budget to
+            // still be included, since the specified budget is intentionally a buffer below
+            // the model's limit.
+            const maxTokens = this.options.useFullContext;
+            let tokenCount = 0;
+            let startIndex = this.workingProgress.length;
+            for (let i = this.workingProgress.length - 1; i >= 0; i--) {
+                const entry = this.workingProgress[i];
+                // Use only completionTokens (scaled ~2x for source+translation) to estimate
+                // the marginal context cost of this entry. The API's promptTokens include system
+                // prompt and cumulative history overhead, which causes severe overcounting here.
+                tokenCount += (entry.completionTokens ?? 0) * 2;
+                startIndex = i;
+                if (tokenCount > maxTokens) break; // include this entry, then stop
+            }
+            sliced = this.workingProgress.slice(startIndex);
+            const logSliceContext = sliced.length < this.workingProgress.length
+                ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ~${Math.round(tokenCount)} tokens)`
+                : `full (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
+            log.debug("[Translator]", "Context:", logSliceContext)
         } else {
-            // Otherwise, slice based on historyPromptLength
-            sliced = this.workingProgress.slice(-this.options.historyPromptLength);
+            sliced = this.workingProgress.slice(-this.options.batchSizes[this.options.batchSizes.length - 1]);
         }
         const offset = this.workingProgress.length - sliced.length;
 
@@ -482,7 +511,7 @@ export class Translator {
      */
     getContext(sourceLines, transformLines) {
         const chunks = [];
-        const chunkSize = this.options.historyPromptLength;
+        const chunkSize = this.options.batchSizes[this.options.batchSizes.length - 1];
         for (let i = 0; i < sourceLines.length; i += chunkSize) {
             const sourceChunk = sourceLines.slice(i, i + chunkSize);
             const transformChunk = transformLines.slice(i, i + chunkSize);
@@ -509,27 +538,18 @@ export class Translator {
     }
 
     get usage() {
-        if (!this.pricingModel) {
-            log.warn("[Translator]", `Cost computation not supported for ${this.options.createChatCompletionRequest.model}`)
-        }
-
-        const pricePrompt = this.pricingModel?.prompt
-        const priceCompletion = this.pricingModel?.completion
-
         const usedTokens = this.promptTokensUsed + this.completionTokensUsed
         const wastedTokens = this.promptTokensWasted + this.completionTokensWasted
-        const usedTokensPricing = pricePrompt ? roundWithPrecision(pricePrompt * (this.promptTokensUsed / 1000) + priceCompletion * (this.completionTokensUsed / 1000), 3) : NaN
-        const wastedTokensPricing = priceCompletion ? roundWithPrecision(pricePrompt * (this.promptTokensWasted / 1000) + priceCompletion * (this.completionTokensWasted / 1000), 3) : NaN
         const rate = roundWithPrecision(usedTokens / (this.tokensProcessTimeMs / 1000 / 60), 2)
         const wastedPercent = (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 })
         const cachedTokens = this.cachedTokens
+        const contextTokens = this.contextTokens
         return {
             usedTokens,
             wastedTokens,
-            usedTokensPricing,
-            wastedTokensPricing,
             wastedPercent,
             cachedTokens,
+            contextTokens,
             rate,
         }
     }
@@ -542,18 +562,18 @@ export class Translator {
         const {
             usedTokens,
             wastedTokens,
-            usedTokensPricing,
-            wastedTokensPricing,
             wastedPercent,
             cachedTokens,
+            contextTokens,
             rate,
         } = usage
 
         log.debug(
             `[Translator] Estimated Usage -`,
-            "Tokens:", usedTokens, "$", usedTokensPricing >= 0 ? usedTokensPricing : "-",
-            "Wasted:", wastedTokens, "$", wastedTokensPricing >= 0 ? wastedTokensPricing : "-", wastedPercent,
+            "Tokens:", usedTokens,
+            "Wasted:", wastedTokens, wastedPercent,
             "Cached:", cachedTokens >= 0 ? cachedTokens : "-",
+            "Context:", contextTokens >= 0 ? `~${Math.round(contextTokens)}/${this.options.useFullContext} (${Math.round(contextTokens / this.options.useFullContext * 100)}%)` : "-",
             "Rate:", rate, "TPM", this.services.cooler?.rate, "RPM",
         )
     }

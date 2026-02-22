@@ -1,6 +1,6 @@
 import { PassThrough } from "stream";
 import { z } from "zod";
-import JSONStream from "JSONStream";
+import { JSONParser } from "@streamparser/json-node";
 import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
@@ -31,7 +31,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
         const max_tokens = this.getMaxToken(lines)
 
         const structuredArray = z.object({
-            outputs: z.array(z.string())
+            outputs: z.array(z.string()).describe(`to expect ${lines.length} items`)
         })
 
         try {
@@ -57,22 +57,6 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             const translationCandidate = output.choices[0].message
 
             const getLinesOutput = async (/** @type {import("openai/resources/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) => {
-                if (lines.length === 1 && translation.refusal && this.options.fallbackModel) {
-                    log.debug("[TranslatorStructuredArray] Refusal Fallback", this.options.fallbackModel)
-                    const requestOptions = { ...this.options.createChatCompletionRequest }
-                    requestOptions.model = this.options.fallbackModel
-                    const fallBackOutput = await this.streamParse({
-                        messages,
-                        ...requestOptions,
-                        stream: requestOptions.stream,
-                        max_tokens
-                    }, {
-                        structure: structuredArray,
-                        name: "translation_array"
-                    })
-                    translation = fallBackOutput.choices[0].message
-                }
-
                 if (translation.refusal) {
                     return [translation.refusal]
                 }
@@ -94,12 +78,13 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             this.promptTokensUsed += translationOutput.promptTokens
             this.completionTokensUsed += translationOutput.completionTokens
             this.cachedTokens += translationOutput.cachedTokens
+            this.contextTokens = translationOutput.totalTokens
             this.tokensProcessTimeMs += (endTime - startTime)
 
             return translationOutput
         } catch (error) {
             log.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
-            return await this.translateBaseFallback(lines, error)
+            return this.handleTranslateError(error, lines.length)
         }
     }
 
@@ -140,9 +125,10 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             this.services.onClearLine?.()
         })
 
-        const parser = JSONStream.parse(["outputs", true])
+        const pipeline = passThroughStream
+            .pipe(new JSONParser({ paths: ['$.outputs.*'], keepStack: false }))
 
-        parser.on("data", (output) => {
+        pipeline.on("data", (/** @type {{ value: string }} */ { value: output }) => {
             try {
                 this.services.onClearLine?.()
                 writeBuffer = `${output}\n`
@@ -151,10 +137,8 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             }
         })
 
-        parser.on("error", (err) => {
-            log.error("[TranslatorStructuredArray]", "JSONStream parsing error:", err)
+        pipeline.on("error", (/** @type {Error} */ err) => {
+            log.error("[TranslatorStructuredArray]", "stream-json parsing error:", err)
         })
-
-        passThroughStream.pipe(parser)
     }
 }

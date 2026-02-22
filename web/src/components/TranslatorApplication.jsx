@@ -428,9 +428,9 @@ export function TranslatorApplication() {
             {usageInformation && (
               <Card shadow="sm" className='mt-4 p-4'>
                 <span><b>Estimated Usage</b></span>
-                <span>Tokens: {usageInformation?.usedTokens} ${usageInformation?.usedTokensPricing >= 0 ? usageInformation?.usedTokensPricing : "-"}</span>
+                <span>Tokens: {usageInformation?.usedTokens}</span>
                 {usageInformation?.wastedTokens > 0 && (
-                  <span className={'text-danger'}>Wasted: {usageInformation?.wastedTokens} ${usageInformation?.wastedTokensPricing >= 0 ? usageInformation?.wastedTokensPricing : "-"} {usageInformation?.wastedPercent}</span>
+                  <span className={'text-danger'}>Wasted: {usageInformation?.wastedTokens} {usageInformation?.wastedPercent}</span>
                 )}
                 {usageInformation?.cachedTokens > 0 && (
                   <span className={'text-success'}>Cached: {usageInformation?.cachedTokens}</span>

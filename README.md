@@ -7,11 +7,11 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
-- **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--experimental-structured-mode`
-- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--experimental-use-full-context` (CLI only)
+- **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--structured-mode`
+- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, controlled with `--use-full-context` (CLI only, default: `2000`)
 - Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
-- Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent  
-- Checks with the free OpenAI Moderation tool: prevents token wastage if the model is highly likely to refuse to translate  
+- Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent
+- Optional OpenAI Moderation tool check: prevents token wastage if the model is highly likely to refuse to translate, enabled with `--use-moderator`
 - Streaming process output  
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview)  
 - Progress resumption (CLI only)
@@ -19,7 +19,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
-- Node.js version `>= 16.13.0` required. This README assumes `bash` shell environment
+- Node.js version `>= 20` required. This README assumes `bash` shell environment
 - Clone this repository and 
   ```bash
   git clone https://github.com/Cerlancism/chatgpt-subtitle-translator
@@ -67,17 +67,15 @@ Options:
     Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text, ignoring `--from` and `--to` options
   - `--initial-prompts <prompts>`  
     Initial prompts for the translation in JSON (default: `"[]"`) 
-  - `--no-use-moderator`  
-    Don't use the OpenAI API Moderation endpoint
-  - `--moderation-model`  
-    (default: `"omni-moderation-latest"`) https://platform.openai.com/docs/models/moderation
+  - `--use-moderator`
+    Use the OpenAI API Moderation endpoint
+  - `--moderation-model <model>`
+    (default: `"omni-moderation-latest"`) https://developers.openai.com/api/docs/models  
   - `--no-prefix-number`  
     Don't prefix lines with numerical indices
   - `--no-line-matching`  
     Don't enforce one to one line quantity input output matching
-  - `-l, --history-prompt-length <length>`  
-    Length of prompt history to retain for next request batch (default: 10)
-  - `-b, --batch-sizes <sizes>` 
+  - `-b, --batch-sizes <sizes>`
     Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10,100]"`)  
 
     The number of lines to include in each translation prompt, provided that they are estimated to be within the token limit.  
@@ -85,38 +83,42 @@ Options:
 
     Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.  
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
-  - `--experimental-structured-mode [mode]`  
-    Enable [structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/). (default: `array`, choices `array`)
-      - `--experimental-structured-mode array` Structures the input and output into a plain array format. This option is more concise compared to base mode, though it uses slightly more tokens per batch.
+  - `--structured-mode <mode>`
+    [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode. (default: `array`, choices: `array`, `object`, `none`)
+      - `array` Structures the input and output into a plain array format. More concise than base mode, though uses slightly more tokens per batch.
+      - `object` Structures the input and output as a keyed object.
+      - `none` Disables structured output.
 
-  - `--experimental-use-full-context`  
-    Include the full context of translated data to work well with [prompt caching](https://openai.com/index/api-prompt-caching/).  
-    
-    The translated lines per user and assistant message pairs are sliced as defined by `--history-prompt-length` (by default `--history-prompt-length 10`), it is recommended to set this to the largest batch size (by default `--batch-sizes "[10,100]"`): `--history-prompt-length 100`.  
-    
-    Enabling this may risk running into the model's context window limit, typically `128K`, but should be sufficient for most cases.
+  - `--use-full-context <tokens>`
+    Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Default: `2000`. Set to `0` to disable.
+
+    The token budget is tracked from actual model response token counts. The history is chunked into user/assistant message pairs using the last value in `--batch-sizes`.
+
+    Recommended value: set `<tokens>` to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--use-full-context 90000`.
   - `--log-level <level>`  
     Log level (default: `debug`, choices: `trace`, `debug`, `info`, `warn`, `error`, `silent`)
   - `--silent`  
     Same as `--log-level silent`  
-  - `--quiet`  
-    Same as `--log-level silent`  
+  - `--quiet`
+    Same as `--log-level silent`
+  - `--no-stream`
+    Disable stream progress output to terminal (streaming is on by default)
 
-Additional Options for GPT:  
-  - `-m, --model <model>`  
-    (default: `"gpt-4o-mini"`) https://platform.openai.com/docs/api-reference/chat/create
-  - `--stream`  
-    Stream progress output to terminal https://platform.openai.com/docs/api-reference/chat/create#chat-create-stream
-  - `-t, --temperature <temperature>`  
-    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `1`) https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature
-  - `--top_p <top_p>`  
-    Nucleus sampling parameter, top_p probability mass https://platform.openai.com/docs/api-reference/chat/create#chat-create-top_p
-  - `--presence_penalty <presence_penalty>`  
-    Penalty for new tokens based on their presence in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat-create-presence_penalty
-  - `--frequency_penalty <frequency_penalty`  
-    Penalty for new tokens based on their frequency in the text so far https://platform.openai.com/docs/api-reference/chat/create#chat-create-frequency_penalty
-  - `--logit_bias <logit_bias>`  
-    Modify the likelihood of specified tokens appearing in the completion https://platform.openai.com/docs/api-reference/chat/create#chat-create-logit_bias
+Additional Options for GPT: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
+  - `-m, --model <model>`
+    (default: `"gpt-4o-mini"`) https://developers.openai.com/api/docs/models
+  - `-t, --temperature <temperature>`
+    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `0`)
+  - `--top_p <top_p>`
+    Nucleus sampling parameter, top_p probability mass
+  - `--presence_penalty <presence_penalty>`
+    Penalty for new tokens based on their presence in the text so far
+  - `--frequency_penalty <frequency_penalty>`
+    Penalty for new tokens based on their frequency in the text so far
+  - `--logit_bias <logit_bias>`
+    Modify the likelihood of specified tokens appearing in the completion
+  - `--reasoning_effort <reasoning_effort>`
+    Constrains effort on reasoning for reasoning models
 
 
 ## Examples
