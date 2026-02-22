@@ -6,6 +6,8 @@ import { TranslationOutput } from "./translatorOutput.mjs";
 
 /**
  * @abstract
+ * @template {any[]} [TLines=string[]]
+ * @extends {Translator<TLines>}
  */
 export class TranslatorStructuredBase extends Translator {
     /**
