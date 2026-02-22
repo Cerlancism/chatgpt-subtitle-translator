@@ -60,7 +60,7 @@ export function createInstance(args) {
         .option("--experimental-input-multiplier <value>", "", parseInt, 0)
         .option("--experimental-fallback-model <value>", "Model to be used for refusal fallback")
         .addOption(new Option("--structured-mode <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object", "none"]).default("array"))
-        .option("--use-full-context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by historyPromptLength, to work better with prompt caching. Recommended: set to 30% less than the model's max context length.", parseInt)
+        .option("--use-full-context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by historyPromptLength, to work better with prompt caching. Set to 0 to disable. Recommended: set to 30% less than the model's max context length.", parseInt, DefaultOptions.useFullContext)
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--use-moderator", "Use the OpenAI Moderation tool")
@@ -112,7 +112,7 @@ export function createInstance(args) {
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
         ...(opts.experimentalFallbackModel && { fallbackModel: opts.experimentalFallbackModel }),
-        ...(opts.useFullContext && { useFullContext: opts.useFullContext }),
+        ...(opts.useFullContext !== undefined && { useFullContext: opts.useFullContext }),
         ...(opts.logLevel && { logLevel: opts.logLevel })
     };
 
