@@ -50,7 +50,8 @@ import { TranslationOutput } from './translatorOutput.mjs';
  */
 export const DefaultOptions = {
     createChatCompletionRequest: {
-        model: "gpt-4o-mini"
+        model: "gpt-4o-mini",
+        temperature: 0
     },
     moderationModel: "omni-moderation-latest",
     initialPrompts: [],
