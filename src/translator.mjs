@@ -31,7 +31,7 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Label lines with numerical prefixes to improve the one-to-one correlation between input and output line quantities
  * @property {boolean} lineMatching `true`
  * Enforce one-to-one line quantity matching between input and output
- * @property {number} useFullContext `0` \
+ * @property {number} useFullContext `2000` \
  * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to disable.
  * @property {number[]} batchSizes `[10, 100]` \
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
@@ -54,7 +54,7 @@ export const DefaultOptions = {
     useModerator: false,
     prefixNumber: true,
     lineMatching: true,
-    useFullContext: 0,
+    useFullContext: 2000,
     batchSizes: [10, 100],
     structuredMode: "array",
     max_token: 0,

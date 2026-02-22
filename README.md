@@ -8,7 +8,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
 - **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--structured-mode`
-- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, enabled with `--use-full-context` (CLI only)
+- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, controlled with `--use-full-context` (CLI only, default: `2000`)
 - Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
 - Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent
 - Optional OpenAI Moderation tool check: prevents token wastage if the model is highly likely to refuse to translate, enabled with `--use-moderator`
@@ -90,7 +90,7 @@ Options:
       - `none` Disables structured output.
 
   - `--use-full-context <tokens>`
-    Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Disabled by default.
+    Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Default: `2000`. Set to `0` to disable.
 
     The token budget is tracked from actual model response token counts. The history is chunked into user/assistant message pairs using the last value in `--batch-sizes`.
 
