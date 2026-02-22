@@ -256,6 +256,7 @@ export class Translator {
         this.promptTokensUsed += response.promptTokens
         this.completionTokensUsed += response.completionTokens
         this.cachedTokens += response.cachedTokens
+        this.contextTokens = response.totalTokens
         this.tokensProcessTimeMs += (endTime - startTime)
         return response
     }
@@ -470,12 +471,14 @@ export class Translator {
             let startIndex = this.workingProgress.length;
             for (let i = this.workingProgress.length - 1; i >= 0; i--) {
                 const entry = this.workingProgress[i];
-                tokenCount += (entry.promptTokens ?? 0) + (entry.completionTokens ?? 0);
+                // Use only completionTokens (scaled ~2x for source+translation) to estimate
+                // the marginal context cost of this entry. The API's promptTokens include system
+                // prompt and cumulative history overhead, which causes severe overcounting here.
+                tokenCount += (entry.completionTokens ?? 0) * 2;
                 startIndex = i;
                 if (tokenCount > maxTokens) break; // include this entry, then stop
             }
             sliced = this.workingProgress.slice(startIndex);
-            this.contextTokens = tokenCount;
             const logSliceContext = sliced.length < this.workingProgress.length
                 ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ~${Math.round(tokenCount)} tokens)`
                 : `full (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`

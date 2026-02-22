@@ -123,6 +123,8 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
 
             this.promptTokensUsed += translationOutput.promptTokens
             this.completionTokensUsed += translationOutput.completionTokens
+            this.cachedTokens += translationOutput.cachedTokens
+            this.contextTokens = translationOutput.totalTokens
             this.tokensProcessTimeMs += (endTime - startTime)
 
             return translationOutput
