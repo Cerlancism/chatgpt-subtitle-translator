@@ -67,7 +67,7 @@ export function createInstance(args) {
         .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
         .option("-b, --batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, DefaultOptions.batchSizes)
         .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic", parseFloat)
-        .option("--stream", "Enable stream mode for partial message deltas")
+        .option("--no-stream", "Disable stream progress output to terminal (streaming is on by default)")
         // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
         // .option("--stop <stop>", "Up to 4 sequences where the API will stop generating further tokens")
         // .option("--max-tokens <max_tokens>", "The maximum number of tokens to generate in the chat completion", parseInt)
@@ -92,7 +92,7 @@ export function createInstance(args) {
             ...(opts.temperature !== undefined && { temperature: opts.temperature }),
             ...(opts.top_p !== undefined && { top_p: opts.top_p }),
             // ...(opts.n && { n: opts.n }),
-            ...(opts.stream !== undefined && { stream: opts.stream }),
+            stream: opts.stream,
             // ...(opts.stop && { stop: opts.stop }),
             // ...(opts.max_tokens !== undefined && { max_tokens: opts.max_tokens }),
             ...(opts.presence_penalty !== undefined && { presence_penalty: opts.presence_penalty }),
