@@ -37,7 +37,7 @@ import { TranslationOutput } from './translatorOutput.mjs';
  * Enforce one-to-one line quantity matching between input and output
  * @property {number} useFullContext `2000` \
  * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to disable.
- * @property {number[]} batchSizes `[10, 100]` \
+ * @property {number[]} batchSizes `[10, 50]` \
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
  *
@@ -59,7 +59,7 @@ export const DefaultOptions = {
     prefixNumber: true,
     lineMatching: true,
     useFullContext: 2000,
-    batchSizes: [10, 100],
+    batchSizes: [10, 50],
     structuredMode: "array",
     max_token: 0,
     inputMultiplier: 0,
