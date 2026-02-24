@@ -1,4 +1,6 @@
+import { PassThrough } from "stream";
 import { z } from "zod";
+import { JSONParser } from "@streamparser/json-node";
 import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
@@ -61,7 +63,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             }, {
                 structure: timestampSchema,
                 name: "translation_timestamp"
-            }, false)
+            }, true)
 
             endTime = Date.now()
 
@@ -70,7 +72,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             const parsed = translationCandidate.refusal ? null : translationCandidate.parsed
 
             const translationOutput = new TranslationOutput(
-                /** @type {any} */ (parsed),
+                /** @type {any} */(parsed),
                 output.usage?.prompt_tokens,
                 output.usage?.completion_tokens,
                 output.usage?.prompt_tokens_details?.cached_tokens,
@@ -241,6 +243,73 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
             this.printUsage()
         }
+    }
+
+    /**
+     * @override
+     * @template T
+     * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<T>} runner
+     */
+    jsonStreamParse(runner) {
+        const passThroughStream = new PassThrough()
+
+        runner.on("content.delta", (e) => {
+            passThroughStream.write(e.delta)
+        })
+
+        runner.on("content.done", () => {
+            passThroughStream.end()
+        })
+
+        const prevLen = { start: 0, end: 0, text: 0 }
+        let textDone = true
+
+        const pipeline = passThroughStream
+            .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true }))
+
+        pipeline.on("data", (/** @type {{ value: string, key: string, partial: boolean }} */ { value, key, partial }) => {
+            try {
+                if (key === "start") {
+                    if (textDone) {
+                        prevLen.start = prevLen.end = prevLen.text = 0
+                        textDone = false
+                    }
+                    const delta = value.slice(prevLen.start)
+                    if (delta) {
+                        this.services.onStreamChunk?.(delta)
+                    }
+                    prevLen.start = value.length
+                    if (!partial) {
+                        this.services.onStreamChunk?.(' -> ')
+                    }
+                } else if (key === "end") {
+                    const delta = value.slice(prevLen.end)
+                    if (delta) {
+                        this.services.onStreamChunk?.(delta)
+                    }
+                    prevLen.end = value.length
+                    if (!partial) {
+                        this.services.onStreamChunk?.('  ')
+                    }
+                } else if (key === "text") {
+                    const delta = value.slice(prevLen.text)
+                    if (delta) {
+                        this.services.onStreamChunk?.(delta)
+                    }
+                    prevLen.text = value.length
+                    if (!partial) {
+                        this.services.onStreamChunk?.('\n')
+                        textDone = true
+                    }
+                }
+            } catch (err) {
+                log.error("[TranslatorStructuredTimestamp]", "Parsing error:", err)
+            }
+        })
+
+        pipeline.on("error", (/** @type {Error} */ err) => {
+            log.error("[TranslatorStructuredTimestamp]", "stream-json parsing error:", err)
+        })
     }
 
     /**
