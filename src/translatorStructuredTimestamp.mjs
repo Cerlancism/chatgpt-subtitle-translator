@@ -3,25 +3,22 @@ import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
-import { secondsToTimestamp } from "./subtitle.mjs";
 
 /**
- * @typedef {{ id: string, startTime: string, endTime: string, startSeconds: number, endSeconds: number, text: string }} SrtEntry
- * @typedef {{ start: number, end: number, text: string }} TimestampEntry
+ * @typedef {{ start: string, end: string, text: string }} TimestampEntry
  */
-
-const TOLERANCE_SECONDS = 0.011  // ~11ms tolerance for floating-point rounding
 
 const timestampSchema = z.object({
     outputs: z.array(z.object({
-        start: z.number(),
-        end: z.number(),
+        start: z.string(),
+        end: z.string(),
         text: z.string()
-    }))
+    })).describe("Subtitle timestamps and text"),
+    merged: z.boolean().describe("true if any input entries were merged; compliance requires the first output start time equals the first input start time and the last output end time equals the last input end time — if this cannot be preserved, do not merge")
 })
 
 /**
- * @extends {TranslatorStructuredBase<SrtEntry[]>}
+ * @extends {TranslatorStructuredBase<TimestampEntry[]>}
  */
 export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
@@ -33,19 +30,18 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         options.lineMatching = false
         super(language, services, options)
 
-        /** @type {{ inputs: TimestampEntry[], outputs: TimestampEntry[], completionTokens: number }[]} */
-        this.batchHistory = []
+        /** @type {{ input: TimestampEntry, output: TimestampEntry, completionTokens: number }[]} */
+        this.entryHistory = []
     }
 
     /**
      * @override
-     * @param {SrtEntry[]} entries
+     * @param {TimestampEntry[]} entries
      * @returns {Promise<TranslationOutput>}
      */
     async translatePrompt(entries) {
-        const inputEntries = entries.map(e => ({ start: e.startSeconds, end: e.endSeconds, text: e.text }))
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
-        const userMessage = { role: "user", content: JSON.stringify({ inputs: inputEntries }) }
+        const userMessage = { role: "user", content: JSON.stringify({ inputs: entries }) }
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
@@ -71,13 +67,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
             const translationCandidate = output.choices[0].message
 
-            /** @type {TimestampEntry[]} */
-            const outputEntries = translationCandidate.refusal
-                ? []
-                : (translationCandidate.parsed?.outputs ?? [])
+            const parsed = translationCandidate.refusal ? null : translationCandidate.parsed
 
             const translationOutput = new TranslationOutput(
-                /** @type {any} */ (outputEntries),
+                /** @type {any} */ (parsed),
                 output.usage?.prompt_tokens,
                 output.usage?.completion_tokens,
                 output.usage?.prompt_tokens_details?.cached_tokens,
@@ -99,37 +92,39 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     }
 
     buildTimestampContext() {
-        if (this.batchHistory.length === 0) return
+        if (this.entryHistory.length === 0) return
 
         const maxTokens = this.options.useFullContext
-        let tokenCount = 0
-        let startIndex = this.batchHistory.length
+        let sliced
 
         if (maxTokens > 0) {
-            for (let i = this.batchHistory.length - 1; i >= 0; i--) {
-                tokenCount += (this.batchHistory[i].completionTokens ?? 0) * 2
+            let tokenCount = 0
+            let startIndex = this.entryHistory.length
+            for (let i = this.entryHistory.length - 1; i >= 0; i--) {
+                tokenCount += (this.entryHistory[i].completionTokens ?? 0) * 2
                 startIndex = i
                 if (tokenCount > maxTokens) break
             }
-            const sliceCount = this.batchHistory.length - startIndex
-            const logMsg = sliceCount < this.batchHistory.length
-                ? `sliced ${this.batchHistory.length - sliceCount} batches (${sliceCount}/${this.batchHistory.length} kept, ~${Math.round(tokenCount)} tokens)`
-                : `full (${sliceCount} batches, ~${Math.round(tokenCount)} tokens)`
+            sliced = this.entryHistory.slice(startIndex)
+            const logMsg = sliced.length < this.entryHistory.length
+                ? `sliced ${this.entryHistory.length - sliced.length} entries (${sliced.length}/${this.entryHistory.length} kept, ~${Math.round(tokenCount)} tokens)`
+                : `full (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
             log.debug("[TranslatorStructuredTimestamp]", "Context:", logMsg)
         } else {
-            startIndex = Math.max(0, this.batchHistory.length - 1)
+            sliced = this.entryHistory.slice(-this.currentBatchSize)
         }
 
-        const sliced = this.batchHistory.slice(startIndex)
+        const chunkSize = this.currentBatchSize
         this.promptContext = []
-        for (const batch of sliced) {
-            this.promptContext.push({ role: "user", content: JSON.stringify({ inputs: batch.inputs }) })
-            this.promptContext.push({ role: "assistant", content: JSON.stringify({ outputs: batch.outputs }) })
+        for (let i = 0; i < sliced.length; i += chunkSize) {
+            const chunk = sliced.slice(i, i + chunkSize)
+            this.promptContext.push({ role: "user", content: JSON.stringify({ inputs: chunk.map(e => e.input) }) })
+            this.promptContext.push({ role: "assistant", content: JSON.stringify({ outputs: chunk.map(e => e.output) }) })
         }
     }
 
     /**
-     * @param {SrtEntry[]} entries
+     * @param {TimestampEntry[]} entries
      */
     async * translateSingleSrt(entries) {
         log.debug("[TranslatorStructuredTimestamp]", "Single entry mode")
@@ -137,32 +132,21 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             this.buildTimestampContext()
             const output = await this.translatePrompt([entry])
             /** @type {TimestampEntry[]} */
-            const outputEntries = /** @type {any} */ (output.content)
-            const resultEntry = outputEntries?.[0] ?? { start: entry.startSeconds, end: entry.endSeconds, text: entry.text }
+            const outputEntries = /** @type {any} */ (output.content)?.outputs ?? []
+            const resultEntry = outputEntries?.[0] ?? entry
 
             if (!outputEntries?.[0]) {
                 log.warn("[TranslatorStructuredTimestamp]", "Empty output for single entry, using original:", entry.text)
             }
 
-            const inputEntry = { start: entry.startSeconds, end: entry.endSeconds, text: entry.text }
-            this.batchHistory.push({
-                inputs: [inputEntry],
-                outputs: [resultEntry],
-                completionTokens: output.completionTokens
-            })
+            this.entryHistory.push({ input: entry, output: resultEntry, completionTokens: output.completionTokens })
 
-            yield {
-                startTime: secondsToTimestamp(resultEntry.start),
-                endTime: secondsToTimestamp(resultEntry.end),
-                startSeconds: resultEntry.start,
-                endSeconds: resultEntry.end,
-                text: resultEntry.text
-            }
+            yield resultEntry
         }
     }
 
     /**
-     * @param {SrtEntry[]} entries
+     * @param {TimestampEntry[]} entries
      */
     async * translateSrtLines(entries) {
         log.debug("[TranslatorStructuredTimestamp]", "System Instruction:", this.systemInstruction)
@@ -179,24 +163,43 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 return
             }
 
-            /** @type {TimestampEntry[]} */
-            const outputEntries = /** @type {any} */ (output.content)
+            const parsed = /** @type {{ outputs?: TimestampEntry[], merged?: boolean }} */ (output.content) ?? {}
+            const outputEntries = parsed.outputs ?? []
+            const mergedHint = parsed.merged ?? false
 
-            const lastInputEnd = batch.at(-1).endSeconds
+            const firstInputStart = batch[0].start
+            const firstOutputStart = outputEntries[0]?.start
+            const lastInputEnd = batch.at(-1).end
             const lastOutputEnd = outputEntries.at(-1)?.end
-            const isMismatch = outputEntries.length === 0
-                || Math.abs(lastOutputEnd - lastInputEnd) > TOLERANCE_SECONDS
+            const isMismatch = outputEntries.length === 0 || firstOutputStart !== firstInputStart || lastOutputEnd !== lastInputEnd
+            const actuallyMerged = outputEntries.length !== batch.length
 
-            if (!isMismatch && outputEntries.length !== batch.length) {
-                const mergeIdx = outputEntries.findIndex((o, i) => batch[i] && Math.abs(o.start - batch[i].startSeconds) > TOLERANCE_SECONDS)
+            if (!isMismatch && mergedHint !== actuallyMerged) {
+                log.warn("[TranslatorStructuredTimestamp]",
+                    `Merge hint mismatch: model declared merged=${mergedHint} but output count ${outputEntries.length} vs input ${batch.length}`)
+            }
+
+            if (!isMismatch && actuallyMerged) {
+                const mergeIdx = outputEntries.findIndex((o, i) => batch[i] && o.start !== batch[i].start)
                 const mergeStart = mergeIdx === -1 ? outputEntries.length : mergeIdx
-                const mergeEntry = batch[mergeStart]
-                const mergeOutput = outputEntries[mergeStart]
+                const rangeStart = (batch[mergeStart] ?? batch.at(-1)).start
+
+                const outputStartSet = new Set(outputEntries.map(e => e.start))
+                const inputStartSet = new Set(batch.map(e => e.start))
+                // First timestamp >= rangeStart that appears in both = reconciliation point
+                const reconcileAt = [...outputStartSet]
+                    .filter(s => inputStartSet.has(s) && s >= rangeStart)
+                    .sort()[0] ?? lastInputEnd
+
+                const fmtEntry = (/** @type {TimestampEntry} */ e) => `\n  ${e.start}: "${e.text}"`
+                const inputStartIdx = Math.max(0, mergeStart - 1)
+                const inputToLog = batch.slice(inputStartIdx).filter(e => e.start <= reconcileAt)
+                const outputToLog = outputEntries.filter(e => e.end >= rangeStart && e.start <= reconcileAt)
                 log.debug("[TranslatorStructuredTimestamp]",
                     "Merging detected",
                     `(input: ${batch.length}, output: ${outputEntries.length})`,
-                    mergeEntry ? `\n  input:  ${mergeEntry.startTime}: "${mergeEntry.text}"` : "",
-                    mergeOutput ? `\n  output: ${secondsToTimestamp(mergeOutput.start)}: "${mergeOutput.text}"` : ""
+                    `\n input:${inputToLog.map(fmtEntry).join("")}`,
+                    `\n output:${outputToLog.map(fmtEntry).join("")}`
                 )
             }
 
@@ -209,9 +212,9 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 } else {
                     log.debug("[TranslatorStructuredTimestamp]",
                         "Timestamp boundary mismatch",
-                        "expected end:", secondsToTimestamp(lastInputEnd),
-                        "got:", lastOutputEnd != null ? secondsToTimestamp(lastOutputEnd) : lastOutputEnd,
-                        `(input: ${batch.length}, output: ${outputEntries.length})`
+                        "expected start:", firstInputStart, "got:", firstOutputStart,
+                        "expected end:", lastInputEnd, "got:", lastOutputEnd,
+                        `(input: ${batch.length}, output: ${outputEntries.length}, merged: ${mergedHint})`
                     )
                 }
 
@@ -221,22 +224,12 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     yield* this.translateSingleSrt(batch)
                 }
             } else {
-                const inputsForHistory = batch.map(e => ({ start: e.startSeconds, end: e.endSeconds, text: e.text }))
-                this.batchHistory.push({
-                    inputs: inputsForHistory,
-                    outputs: outputEntries,
-                    completionTokens: output.completionTokens
-                })
-
-                for (const outEntry of outputEntries) {
-                    yield {
-                        startTime: secondsToTimestamp(outEntry.start),
-                        endTime: secondsToTimestamp(outEntry.end),
-                        startSeconds: outEntry.start,
-                        endSeconds: outEntry.end,
-                        text: outEntry.text
-                    }
+                const completionTokensPerEntry = output.completionTokens / outputEntries.length
+                for (let i = 0; i < outputEntries.length; i++) {
+                    this.entryHistory.push({ input: batch[i], output: outputEntries[i], completionTokens: completionTokensPerEntry })
                 }
+
+                yield* outputEntries
 
                 if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
                     reducedBatchSessions = 0

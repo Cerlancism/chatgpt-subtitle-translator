@@ -1,7 +1,7 @@
 export { createOpenAIClient } from './openai.mjs'
 export { wrapQuotes } from './helpers.mjs'
 export { CooldownContext } from './cooldown.mjs'
-export { parser as subtitleParser } from './subtitle.mjs'
+export { parser as subtitleParser, secondsToTimestamp } from './subtitle.mjs'
 export { Translator, DefaultOptions } from './translator.mjs'
 export { TranslatorStructuredBase } from './translatorStructuredBase.mjs'
 export { TranslatorStructuredArray } from './translatorStructuredArray.mjs'
