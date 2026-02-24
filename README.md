@@ -76,7 +76,7 @@ Options:
   - `--no-line-matching`  
     Don't enforce one to one line quantity input output matching
   - `-b, --batch-sizes <sizes>`
-    Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10,100]"`)  
+    Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10,50]"`)  
 
     The number of lines to include in each translation prompt, provided that they are estimated to be within the token limit.  
     In case of mismatched output line quantities, this number will be decreased step by step according to the values in the array, ultimately reaching one.

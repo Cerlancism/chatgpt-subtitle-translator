@@ -13,7 +13,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
      * @param {Partial<import("./translator.mjs").TranslatorOptions>} [options]
      */
     constructor(language, services, options) {
-        if (options.batchSizes[0] === 10 && options.batchSizes[1] === 100) {
+        if (options.batchSizes[0] === 10 && options.batchSizes[1] === 50) {
             const reducedBatchSizes = [10, 20]
             log.warn("[TranslatorStructuredObject]", "--batch-sizes is to be reduced to", JSON.stringify(reducedBatchSizes))
             options.batchSizes = reducedBatchSizes
