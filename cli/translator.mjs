@@ -202,13 +202,22 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
                 // Output count can differ from input, so progress file resume is not supported.
                 log.warn("[CLI]", "Timestamp mode: progress resumption is not supported, starting from beginning.")
                 fs.writeFileSync(outputFile, '')
+                const timestampSource = srtArraySource.map(e => ({ start: e.startTime, end: e.endTime, text: e.text }))
                 let outputId = 1
                 try {
-                    for await (const srtOut of /** @type {import('../src/translatorStructuredTimestamp.mjs').TranslatorStructuredTimestamp} */ (translator).translateSrtLines(srtArraySource)) {
-                        const entry = { ...srtOut, id: String(outputId++) }
+                    for await (const srtOut of /** @type {import('../src/translatorStructuredTimestamp.mjs').TranslatorStructuredTimestamp} */ (translator).translateSrtLines(timestampSource)) {
+                        const entry = {
+                            id: String(outputId),
+                            startTime: srtOut.start,
+                            startSeconds: subtitleParser.timestampToSeconds(srtOut.start),
+                            endTime: srtOut.end,
+                            endSeconds: subtitleParser.timestampToSeconds(srtOut.end),
+                            text: srtOut.text
+                        }
                         const outSrt = subtitleParser.toSrt([entry])
-                        log.info(entry.id, wrapQuotes(entry.startTime), "->", wrapQuotes(entry.endTime), wrapQuotes(entry.text))
+                        log.info(outputId, entry.startTime, "->", entry.endTime, wrapQuotes(entry.text))
                         await fs.promises.appendFile(outputFile, outSrt)
+                        outputId++
                     }
                 } catch (error) {
                     log.error("[CLI]", "Error", error)
