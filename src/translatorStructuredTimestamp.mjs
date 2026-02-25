@@ -10,12 +10,18 @@ import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
  * @typedef {{ start: string, end: string, text: string }} TimestampEntry
  */
 
-const timestampSchema = z.object({
-    outputs: z.array(z.object({
-        start: z.string(),
-        end: z.string(),
-        text: z.string()
-    })).describe("Subtitle timestamps and text"),
+const timestampEntriesSchema = z.array(z.object({
+    start: z.string(),
+    end: z.string(),
+    text: z.string()
+})).describe("Subtitle timestamps and text")
+
+const singleTimestampSchema = z.object({
+    outputs: timestampEntriesSchema
+})
+
+const batchTimestampSchema = z.object({
+    outputs: timestampEntriesSchema,
     merged: z.object({
         result: z.boolean().describe("true if any input entries were merged into fewer output entries"),
         justification: z.string().describe("which inputs (by start time) merged into which output, and why; empty string if not merged")
@@ -42,9 +48,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @override
      * @param {TimestampEntry[]} entries
+     * @param {import('zod').ZodTypeAny} [schema]
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(entries) {
+    async translatePrompt(entries, schema = batchTimestampSchema) {
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: JSON.stringify({ inputs: entries }) }
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
@@ -64,7 +71,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 stream: this.options.createChatCompletionRequest.stream,
                 max_tokens
             }, {
-                structure: timestampSchema,
+                structure: schema,
                 name: "translation_timestamp"
             }, true)
 
@@ -135,7 +142,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         log.debug("[TranslatorStructuredTimestamp]", "Single entry mode")
         for (const entry of entries) {
             this.buildTimestampContext()
-            const output = await this.translatePrompt([entry])
+            const output = await this.translatePrompt([entry], singleTimestampSchema)
             /** @type {TimestampEntry[]} */
             const outputEntries = /** @type {any} */ (output.content)?.outputs ?? []
             const resultEntry = outputEntries?.[0] ?? entry
