@@ -148,6 +148,73 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     }
 
     /**
+     * @param {TimestampEntry[]} batch
+     * @param {TimestampEntry[]} outputEntries
+     * @param {boolean} mergedHint
+     * @returns {boolean}
+     */
+    evaluateBatchOutput(batch, outputEntries, mergedHint) {
+        const firstInputStart = batch[0].start
+        const firstOutputStart = outputEntries[0]?.start
+        const lastInputEnd = batch.at(-1).end
+        const lastOutputEnd = outputEntries.at(-1)?.end
+        const isMismatch = outputEntries.length === 0 || firstOutputStart !== firstInputStart || lastOutputEnd !== lastInputEnd
+        const actuallyMerged = outputEntries.length !== batch.length
+
+        this.logMergeStatus(batch, outputEntries, mergedHint, isMismatch, actuallyMerged, lastInputEnd)
+
+        if (isMismatch) {
+            log.debug("[TranslatorStructuredTimestamp]",
+                "Timestamp boundary mismatch",
+                "expected start:", firstInputStart, "got:", firstOutputStart,
+                "expected end:", lastInputEnd, "got:", lastOutputEnd,
+                `(input: ${batch.length}, output: ${outputEntries.length}, merged: ${mergedHint})`
+            )
+        }
+
+        return isMismatch
+    }
+
+    /**
+     * @param {TimestampEntry[]} batch
+     * @param {TimestampEntry[]} outputEntries
+     * @param {boolean} mergedHint
+     * @param {boolean} isMismatch
+     * @param {boolean} actuallyMerged
+     * @param {string} lastInputEnd
+     */
+    logMergeStatus(batch, outputEntries, mergedHint, isMismatch, actuallyMerged, lastInputEnd) {
+        if (!isMismatch && mergedHint !== actuallyMerged) {
+            log.warn("[TranslatorStructuredTimestamp]",
+                `Merge hint mismatch: model declared merged=${mergedHint} but output count ${outputEntries.length} vs input ${batch.length}`)
+        }
+
+        if (!isMismatch && actuallyMerged) {
+            const mergeIdx = outputEntries.findIndex((o, i) => batch[i] && o.start !== batch[i].start)
+            const mergeStart = mergeIdx === -1 ? outputEntries.length : mergeIdx
+            const rangeStart = (batch[mergeStart] ?? batch.at(-1)).start
+
+            const outputStartSet = new Set(outputEntries.map(e => e.start))
+            const inputStartSet = new Set(batch.map(e => e.start))
+            // First timestamp >= rangeStart that appears in both = reconciliation point
+            const reconcileAt = [...outputStartSet]
+                .filter(s => inputStartSet.has(s) && s >= rangeStart)
+                .sort()[0] ?? lastInputEnd
+
+            const fmtEntry = (/** @type {TimestampEntry} */ e) => `\n  ${e.start}: "${e.text}"`
+            const inputStartIdx = Math.max(0, mergeStart - 1)
+            const inputToLog = batch.slice(inputStartIdx).filter(e => e.start <= reconcileAt)
+            const outputToLog = outputEntries.filter(e => e.end >= rangeStart && e.start <= reconcileAt)
+            log.debug("[TranslatorStructuredTimestamp]",
+                "Merging detected",
+                `(input: ${batch.length}, output: ${outputEntries.length})`,
+                `\n input:${inputToLog.map(fmtEntry).join("")}`,
+                `\n output:${outputToLog.map(fmtEntry).join("")}`
+            )
+        }
+    }
+
+    /**
      * @param {TimestampEntry[]} entries
      */
     async * translateSrtLines(entries) {
@@ -169,41 +236,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             const outputEntries = parsed.outputs ?? []
             const mergedHint = parsed.merged ?? false
 
-            const firstInputStart = batch[0].start
-            const firstOutputStart = outputEntries[0]?.start
-            const lastInputEnd = batch.at(-1).end
-            const lastOutputEnd = outputEntries.at(-1)?.end
-            const isMismatch = outputEntries.length === 0 || firstOutputStart !== firstInputStart || lastOutputEnd !== lastInputEnd
-            const actuallyMerged = outputEntries.length !== batch.length
-
-            if (!isMismatch && mergedHint !== actuallyMerged) {
-                log.warn("[TranslatorStructuredTimestamp]",
-                    `Merge hint mismatch: model declared merged=${mergedHint} but output count ${outputEntries.length} vs input ${batch.length}`)
-            }
-
-            if (!isMismatch && actuallyMerged) {
-                const mergeIdx = outputEntries.findIndex((o, i) => batch[i] && o.start !== batch[i].start)
-                const mergeStart = mergeIdx === -1 ? outputEntries.length : mergeIdx
-                const rangeStart = (batch[mergeStart] ?? batch.at(-1)).start
-
-                const outputStartSet = new Set(outputEntries.map(e => e.start))
-                const inputStartSet = new Set(batch.map(e => e.start))
-                // First timestamp >= rangeStart that appears in both = reconciliation point
-                const reconcileAt = [...outputStartSet]
-                    .filter(s => inputStartSet.has(s) && s >= rangeStart)
-                    .sort()[0] ?? lastInputEnd
-
-                const fmtEntry = (/** @type {TimestampEntry} */ e) => `\n  ${e.start}: "${e.text}"`
-                const inputStartIdx = Math.max(0, mergeStart - 1)
-                const inputToLog = batch.slice(inputStartIdx).filter(e => e.start <= reconcileAt)
-                const outputToLog = outputEntries.filter(e => e.end >= rangeStart && e.start <= reconcileAt)
-                log.debug("[TranslatorStructuredTimestamp]",
-                    "Merging detected",
-                    `(input: ${batch.length}, output: ${outputEntries.length})`,
-                    `\n input:${inputToLog.map(fmtEntry).join("")}`,
-                    `\n output:${outputToLog.map(fmtEntry).join("")}`
-                )
-            }
+            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, mergedHint)
 
             if (isMismatch || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
@@ -211,13 +244,6 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
                 if (output.refusal) {
                     log.debug("[TranslatorStructuredTimestamp]", "Refusal:", output.refusal)
-                } else {
-                    log.debug("[TranslatorStructuredTimestamp]",
-                        "Timestamp boundary mismatch",
-                        "expected start:", firstInputStart, "got:", firstOutputStart,
-                        "expected end:", lastInputEnd, "got:", lastOutputEnd,
-                        `(input: ${batch.length}, output: ${outputEntries.length}, merged: ${mergedHint})`
-                    )
                 }
 
                 if (this.changeBatchSize("decrease")) {
@@ -264,8 +290,30 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         const prevLen = { start: 0, end: 0, text: 0 }
         let textDone = true
 
+        /**
+         * @param {"start"|"end"|"text"} fieldKey
+         * @param {string} separator
+         * @param {string} value
+         * @param {boolean} partial
+         * @param {() => void} [onComplete]
+         */
+        const emitField = (fieldKey, separator, value, partial, onComplete) => {
+            if (!value) {
+                return
+            }
+            const delta = value.slice(prevLen[fieldKey])
+            if (delta) {
+                this.services.onStreamChunk?.(delta)
+            }
+            prevLen[fieldKey] = value.length
+            if (!partial) {
+                this.services.onStreamChunk?.(separator)
+                onComplete?.()
+            }
+        }
+
         const pipeline = passThroughStream
-            .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true }))
+            .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
 
         pipeline.on("data", (/** @type {{ value: string, key: string, partial: boolean }} */ { value, key, partial }) => {
             try {
@@ -274,33 +322,11 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                         prevLen.start = prevLen.end = prevLen.text = 0
                         textDone = false
                     }
-                    const delta = value.slice(prevLen.start)
-                    if (delta) {
-                        this.services.onStreamChunk?.(delta)
-                    }
-                    prevLen.start = value.length
-                    if (!partial) {
-                        this.services.onStreamChunk?.(' -> ')
-                    }
+                    emitField("start", " -> ", value, partial)
                 } else if (key === "end") {
-                    const delta = value.slice(prevLen.end)
-                    if (delta) {
-                        this.services.onStreamChunk?.(delta)
-                    }
-                    prevLen.end = value.length
-                    if (!partial) {
-                        this.services.onStreamChunk?.('  ')
-                    }
+                    emitField("end", "  ", value, partial)
                 } else if (key === "text") {
-                    const delta = value.slice(prevLen.text)
-                    if (delta) {
-                        this.services.onStreamChunk?.(delta)
-                    }
-                    prevLen.text = value.length
-                    if (!partial) {
-                        this.services.onStreamChunk?.('\n')
-                        textDone = true
-                    }
+                    emitField("text", "\n", value, partial, () => { textDone = true })
                 }
             } catch (err) {
                 log.error("[TranslatorStructuredTimestamp]", "Parsing error:", err)
