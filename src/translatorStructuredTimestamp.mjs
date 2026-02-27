@@ -64,6 +64,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             let startTime = 0, endTime = 0
             startTime = Date.now()
 
+            this.currentBatchEntries = entries
+
             await this.services.cooler?.cool()
 
             const output = await this.streamParse({
@@ -311,6 +313,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
         const prevLen = { start: 0, end: 0, text: 0 }
         let textDone = true
+        let expectedIdx = -1
+        const currentBatchEntries = /** @type {TimestampEntry[]} */ (this.currentBatchEntries ?? [])
 
         /**
          * @param {"start"|"end"|"text"} fieldKey
@@ -343,10 +347,17 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     if (textDone) {
                         prevLen.start = prevLen.end = prevLen.text = 0
                         textDone = false
+                        expectedIdx++
                     }
-                    emitField("start", " -> ", value, partial)
+                    if (!partial) {
+                        const expectedStart = currentBatchEntries[expectedIdx]?.start
+                        if (expectedStart && value !== expectedStart) {
+                            this.services.onStreamChunk?.(">>> ")
+                        }
+                        emitField("start", " -> ", value, partial)
+                    }
                 } else if (key === "end") {
-                    emitField("end", "  ", value, partial)
+                    if (!partial) emitField("end", "  ", value, partial)
                 } else if (key === "text") {
                     emitField("text", "\n", value, partial, () => { textDone = true })
                 }
