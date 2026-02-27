@@ -22,7 +22,7 @@ const singleTimestampSchema = z.object({
 
 const batchTimestampSchema = z.object({
     outputs: timestampEntriesSchema,
-    mergedRemarks: z.string().describe("MUST be empty if no merge! Otherwise: which inputs (by start time) were combined into which output and why")
+    mergedRemarks: z.string().describe("MUST be empty if no merges! Otherwise: briefly explain why entries were merged.")
 })
 
 /**
