@@ -22,11 +22,12 @@ const singleTimestampSchema = z.object({
 
 const batchTimestampSchema = z.object({
     outputs: timestampEntriesSchema,
-    merged: z.object({
-        result: z.boolean().describe("true if any input entries were merged into fewer output entries"),
-        justification: z.string().describe("which inputs (by start time) merged into which output, and why; empty string if not merged")
-    }).describe("Merge status - compliance requires the first output start time equals the first input start time and the last output end time equals the last input end time - if this cannot be preserved, do not merge")
+    mergedRemarks: z.string().describe("MUST be empty if no merge! Otherwise: which inputs (by start time) were combined into which output and why")
 })
+
+/**
+ * @typedef {z.infer<typeof batchTimestampSchema>} BatchTimestampOutput
+ */
 
 /**
  * @extends {TranslatorStructuredBase<TimestampEntry[]>}
@@ -130,8 +131,16 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         this.promptContext = []
         for (let i = 0; i < sliced.length; i += chunkSize) {
             const chunk = sliced.slice(i, i + chunkSize)
+            const seenStarts = new Set()
+            const outputs = chunk.reduce((acc, e) => {
+                if (!seenStarts.has(e.output.start)) {
+                    seenStarts.add(e.output.start)
+                    acc.push(e.output)
+                }
+                return acc
+            }, [])
             this.promptContext.push({ role: "user", content: JSON.stringify({ inputs: chunk.map(e => e.input) }) })
-            this.promptContext.push({ role: "assistant", content: JSON.stringify({ outputs: chunk.map(e => e.output) }) })
+            this.promptContext.push({ role: "assistant", content: JSON.stringify({ outputs }) })
         }
     }
 
@@ -160,11 +169,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @param {TimestampEntry[]} batch
      * @param {TimestampEntry[]} outputEntries
-     * @param {boolean} mergedHint
-     * @param {string | undefined} mergedExplanation
+     * @param {string} mergedRemarks
      * @returns {boolean}
      */
-    evaluateBatchOutput(batch, outputEntries, mergedHint, mergedExplanation) {
+    evaluateBatchOutput(batch, outputEntries, mergedRemarks) {
         const firstInputStart = batch[0].start
         const firstOutputStart = outputEntries[0]?.start
         const lastInputEnd = batch.at(-1).end
@@ -172,14 +180,14 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         const isMismatch = outputEntries.length === 0 || firstOutputStart !== firstInputStart || lastOutputEnd !== lastInputEnd
         const actuallyMerged = outputEntries.length !== batch.length
 
-        this.logMergeStatus(batch, outputEntries, mergedHint, mergedExplanation, isMismatch, actuallyMerged, lastInputEnd)
+        this.logMergeStatus(batch, outputEntries, mergedRemarks, isMismatch, actuallyMerged, lastInputEnd)
 
         if (isMismatch) {
             log.debug("[TranslatorStructuredTimestamp]",
                 "Timestamp boundary mismatch",
                 "expected start:", firstInputStart, "got:", firstOutputStart,
                 "expected end:", lastInputEnd, "got:", lastOutputEnd,
-                `(input: ${batch.length}, output: ${outputEntries.length}, merged: ${mergedHint})`
+                `(input: ${batch.length}, output: ${outputEntries.length})`
             )
         }
 
@@ -189,22 +197,16 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @param {TimestampEntry[]} batch
      * @param {TimestampEntry[]} outputEntries
-     * @param {boolean} mergedHint
-     * @param {string | undefined} mergedExplanation
+     * @param {string} mergedRemarks
      * @param {boolean} isMismatch
      * @param {boolean} actuallyMerged
      * @param {string} lastInputEnd
      */
-    logMergeStatus(batch, outputEntries, mergedHint, mergedExplanation, isMismatch, actuallyMerged, lastInputEnd) {
-        if (!isMismatch && mergedHint !== actuallyMerged) {
+    logMergeStatus(batch, outputEntries, mergedRemarks, isMismatch, actuallyMerged, lastInputEnd) {
+        const declaredMerged = mergedRemarks !== ""
+        if (!isMismatch && declaredMerged !== actuallyMerged) {
             log.warn("[TranslatorStructuredTimestamp]",
-                `Merge hint mismatch: model declared merged=${mergedHint} but output count ${outputEntries.length} vs input ${batch.length}`)
-        }
-
-        if (mergedHint && !mergedExplanation) {
-            log.warn("[TranslatorStructuredTimestamp]", "Model declared merged=true but provided no explanation")
-        } else if (!mergedHint && mergedExplanation) {
-            log.warn("[TranslatorStructuredTimestamp]", "Model declared merged=false but provided an explanation:", mergedExplanation)
+                `Merge mergedRemarks mismatch: model ${declaredMerged ? `declared merging ("${mergedRemarks}")` : "provided no remarks"} but output count ${outputEntries.length} vs input ${batch.length}`)
         }
 
         if (!isMismatch && actuallyMerged) {
@@ -228,7 +230,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 `(input: ${batch.length}, output: ${outputEntries.length})`,
                 `\n input:${inputToLog.map(fmtEntry).join("")}`,
                 `\n output:${outputToLog.map(fmtEntry).join("")}`,
-                mergedExplanation ? `\n reason: ${mergedExplanation}` : ""
+                mergedRemarks ? `\n remarks: ${mergedRemarks}` : ""
             )
         }
     }
@@ -251,12 +253,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 return
             }
 
-            const parsed = /** @type {{ outputs?: TimestampEntry[], merged?: { result: boolean, justification: string } }} */ (output.content) ?? {}
-            const outputEntries = parsed.outputs ?? []
-            const mergedHint = parsed.merged?.result ?? false
-            const mergedExplanation = parsed.merged?.justification
+            const parsed = /** @type {BatchTimestampOutput} */ (/** @type {unknown} */ (output.content ?? {}))
+            const outputEntries = parsed.outputs
 
-            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, mergedHint, mergedExplanation)
+            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.mergedRemarks)
 
             if (isMismatch || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
@@ -272,9 +272,11 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     yield* this.translateSingleSrt(batch)
                 }
             } else {
-                const completionTokensPerEntry = output.completionTokens / outputEntries.length
-                for (let i = 0; i < outputEntries.length; i++) {
-                    this.entryHistory.push({ input: batch[i], output: outputEntries[i], completionTokens: completionTokensPerEntry })
+                const completionTokensPerEntry = output.completionTokens / batch.length
+                for (const input of batch) {
+                    const matchedOutput = outputEntries.find(o => o.start <= input.start && o.end >= input.end)
+                        ?? outputEntries.at(-1)
+                    this.entryHistory.push({ input, output: matchedOutput, completionTokens: completionTokensPerEntry })
                 }
 
                 yield* outputEntries
