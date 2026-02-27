@@ -256,9 +256,9 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             }
 
             const parsed = /** @type {BatchTimestampOutput} */ (/** @type {unknown} */ (output.content ?? {}))
-            const outputEntries = parsed.outputs
+            const outputEntries = parsed.outputs ?? []
 
-            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.mergedRemarks)
+            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.mergedRemarks ?? "")
 
             if (isMismatch || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
