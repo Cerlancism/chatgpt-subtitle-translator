@@ -96,7 +96,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             this.promptTokensUsed += translationOutput.promptTokens
             this.completionTokensUsed += translationOutput.completionTokens
             this.cachedTokens += translationOutput.cachedTokens
-            this.contextTokens = translationOutput.totalTokens
+            this.contextPromptTokens = translationOutput.promptTokens
+            this.contextCompletionTokens = translationOutput.completionTokens
             this.tokensProcessTimeMs += (endTime - startTime)
 
             return translationOutput
@@ -123,7 +124,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             sliced = this.entryHistory.slice(startIndex)
             const logMsg = sliced.length < this.entryHistory.length
                 ? `sliced ${this.entryHistory.length - sliced.length} entries (${sliced.length}/${this.entryHistory.length} kept, ~${Math.round(tokenCount)} tokens)`
-                : `full (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
+                : `all (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
             log.debug("[TranslatorStructuredTimestamp]", "Context:", logMsg)
         } else {
             sliced = this.entryHistory.slice(-this.currentBatchSize)

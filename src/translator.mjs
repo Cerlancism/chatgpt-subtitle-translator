@@ -97,7 +97,8 @@ export class Translator {
         this.completionTokensUsed = 0
         this.completionTokensWasted = 0
         this.tokensProcessTimeMs = 0
-        this.contextTokens = 0
+        this.contextPromptTokens = 0
+        this.contextCompletionTokens = 0
 
         this.offset = 0
         this.end = undefined
@@ -256,7 +257,8 @@ export class Translator {
         this.promptTokensUsed += response.promptTokens
         this.completionTokensUsed += response.completionTokens
         this.cachedTokens += response.cachedTokens
-        this.contextTokens = response.totalTokens
+        this.contextPromptTokens = response.promptTokens
+        this.contextCompletionTokens = response.completionTokens
         this.tokensProcessTimeMs += (endTime - startTime)
         return response
     }
@@ -480,7 +482,7 @@ export class Translator {
             sliced = this.workingProgress.slice(startIndex);
             const logSliceContext = sliced.length < this.workingProgress.length
                 ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ~${Math.round(tokenCount)} tokens)`
-                : `full (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
+                : `all (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
             log.debug("[Translator]", "Context:", logSliceContext)
         } else {
             sliced = this.workingProgress.slice(-this.options.batchSizes[this.options.batchSizes.length - 1]);
@@ -538,18 +540,35 @@ export class Translator {
     }
 
     get usage() {
-        const usedTokens = this.promptTokensUsed + this.completionTokensUsed
-        const wastedTokens = this.promptTokensWasted + this.completionTokensWasted
-        const rate = roundWithPrecision(usedTokens / (this.tokensProcessTimeMs / 1000 / 60), 2)
+        const promptTokensUsed = this.promptTokensUsed
+        const completionTokensUsed = this.completionTokensUsed
+        const promptTokensWasted = this.promptTokensWasted
+        const completionTokensWasted = this.completionTokensWasted
+        const usedTokens = promptTokensUsed + completionTokensUsed
+        const wastedTokens = promptTokensWasted + completionTokensWasted
+        const minutesElapsed = this.tokensProcessTimeMs / 1000 / 60
+        const promptRate = roundWithPrecision(promptTokensUsed / minutesElapsed, 0)
+        const completionRate = roundWithPrecision(completionTokensUsed / minutesElapsed, 0)
+        const rate = roundWithPrecision(usedTokens / minutesElapsed, 0)
         const wastedPercent = (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 })
         const cachedTokens = this.cachedTokens
-        const contextTokens = this.contextTokens
+        const contextPromptTokens = this.contextPromptTokens
+        const contextCompletionTokens = this.contextCompletionTokens
+        const contextTokens = contextPromptTokens + contextCompletionTokens
         return {
+            promptTokensUsed,
+            completionTokensUsed,
+            promptTokensWasted,
+            completionTokensWasted,
             usedTokens,
             wastedTokens,
             wastedPercent,
             cachedTokens,
+            contextPromptTokens,
+            contextCompletionTokens,
             contextTokens,
+            promptRate,
+            completionRate,
             rate,
         }
     }
@@ -560,21 +579,29 @@ export class Translator {
         await sleep(10)
 
         const {
+            promptTokensUsed,
+            completionTokensUsed,
+            promptTokensWasted,
+            completionTokensWasted,
             usedTokens,
             wastedTokens,
             wastedPercent,
             cachedTokens,
+            contextPromptTokens,
+            contextCompletionTokens,
             contextTokens,
+            promptRate,
+            completionRate,
             rate,
         } = usage
 
         log.debug(
-            `[Translator] Estimated Usage -`,
-            "Tokens:", usedTokens,
-            "Wasted:", wastedTokens, wastedPercent,
-            "Cached:", cachedTokens >= 0 ? cachedTokens : "-",
-            "Context:", contextTokens >= 0 ? `~${Math.round(contextTokens)}/${this.options.useFullContext} (${Math.round(contextTokens / this.options.useFullContext * 100)}%)` : "-",
-            "Rate:", rate, "TPM", this.services.cooler?.rate, "RPM",
+            `[Translator] Estimated Usage`,
+            "\n\tTokens:", promptTokensUsed, "+", completionTokensUsed, "=", usedTokens,
+            "\n\tWasted:", promptTokensWasted, "+", completionTokensWasted, "=", wastedTokens, wastedPercent,
+            "\n\tCached:", cachedTokens >= 0 ? cachedTokens : "-",
+            "\n\tContext:", ...(contextTokens > 0 ? [contextPromptTokens, "+", contextCompletionTokens, "=", contextTokens, "/", this.options.useFullContext, `(${Math.round(contextTokens / this.options.useFullContext * 100)}%)`] : ["-"]),
+            "\n\tRate:", promptRate, "+", completionRate, "=", rate, "TPM", this.services.cooler?.rate, "RPM",
         )
     }
 
