@@ -200,7 +200,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 "Timestamp boundary mismatch",
                 "expected start:", firstInputStart, "got:", firstOutputStart,
                 "expected end:", lastInputEnd, "got:", lastOutputEnd,
-                `(input: ${batch.length}, output: ${outputEntries.length})`
+                `(input: ${batch.length}, output: ${outputEntries.length})`,
+                ...(mergedRemarks ? [`remarks: "${mergedRemarks}"`] : [])
             )
         }
 
