@@ -6,6 +6,7 @@ import log from "loglevel"
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
 import { timestampToMilliseconds, millisecondsToTimestamp } from "./subtitle.mjs";
+import { encode as encodeToon } from "@toon-format/toon";
 
 const timestampEntriesSchema = z.array(z.object({
     start: z.int(),
@@ -62,7 +63,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
      */
     async translatePrompt(entries, schema = batchTimestampSchema) {
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
-        const userMessage = { role: "user", content: JSON.stringify({ inputs: entries.map(toMsEntry) }) }
+        const userMessage = { role: "user", content: encodeToon({ inputs: entries.map(toMsEntry) }) }
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
@@ -151,7 +152,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 }
                 return acc
             }, [])
-            this.promptContext.push({ role: "user", content: JSON.stringify({ inputs: chunk.map(e => toMsEntry(e.input)) }) })
+            this.promptContext.push({ role: "user", content: encodeToon({ inputs: chunk.map(e => toMsEntry(e.input)) }) })
             this.promptContext.push({ role: "assistant", content: JSON.stringify({ outputs: outputs.map(toMsEntry) }) })
         }
     }
