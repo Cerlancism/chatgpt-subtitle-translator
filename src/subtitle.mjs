@@ -23,15 +23,31 @@ export function splitStringByNumberLabel(str) {
 }
 
 /**
- * @param {number} seconds
+ * @param {number} totalMs integer milliseconds
  */
+function formatTimestamp(totalMs) {
+    const h = Math.floor(totalMs / 3600000);
+    const m = Math.floor((totalMs % 3600000) / 60000);
+    const s = Math.floor((totalMs % 60000) / 1000);
+    const ms = totalMs % 1000;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+}
+
+/** @param {number} milliseconds */
+export function millisecondsToTimestamp(milliseconds) {
+    return formatTimestamp(milliseconds);
+}
+
+/** @param {string} timestamp HH:MM:SS,mmm */
+export function timestampToMilliseconds(timestamp) {
+    const [h, m, rest] = timestamp.split(':');
+    const [s, ms] = rest.split(',');
+    return parseInt(h) * 3600000 + parseInt(m) * 60000 + parseInt(s) * 1000 + parseInt(ms);
+}
+
+/** @param {number} seconds */
 export function secondsToTimestamp(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    const millisecs = Math.floor((seconds % 1) * 1000);
-    const result = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${millisecs.toString().padStart(3, '0')}`
-    return result;
+    return formatTimestamp(Math.floor(seconds * 1000));
 }
 
 /**
