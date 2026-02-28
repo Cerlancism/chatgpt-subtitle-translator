@@ -5,16 +5,24 @@ import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
+import { timestampToMilliseconds, millisecondsToTimestamp } from "./subtitle.mjs";
+
+const timestampEntriesSchema = z.array(z.object({
+    start: z.int(),
+    end: z.int(),
+    text: z.string()
+})).describe("Subtitle entries with start and end as milliseconds")
 
 /**
  * @typedef {{ start: string, end: string, text: string }} TimestampEntry
+ * @typedef {z.infer<typeof timestampEntriesSchema>[number]} MsEntry
  */
 
-const timestampEntriesSchema = z.array(z.object({
-    start: z.string(),
-    end: z.string(),
-    text: z.string()
-})).describe("Subtitle timestamps and text")
+/** @param {TimestampEntry} e @returns {MsEntry} */
+const toMsEntry = (e) => ({ start: timestampToMilliseconds(e.start), end: timestampToMilliseconds(e.end), text: e.text })
+
+/** @param {MsEntry} e @returns {TimestampEntry} */
+const fromMsEntry = (e) => ({ start: millisecondsToTimestamp(e.start), end: millisecondsToTimestamp(e.end), text: e.text })
 
 const singleTimestampSchema = z.object({
     outputs: timestampEntriesSchema
@@ -26,7 +34,7 @@ const batchTimestampSchema = z.object({
 })
 
 /**
- * @typedef {z.infer<typeof batchTimestampSchema>} BatchTimestampOutput
+ * @typedef {{ outputs: TimestampEntry[], mergedRemarks: string }} BatchTimestampOutput
  */
 
 /**
@@ -54,7 +62,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
      */
     async translatePrompt(entries, schema = batchTimestampSchema) {
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
-        const userMessage = { role: "user", content: JSON.stringify({ inputs: entries }) }
+        const userMessage = { role: "user", content: JSON.stringify({ inputs: entries.map(toMsEntry) }) }
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
@@ -82,7 +90,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
             const translationCandidate = output.choices[0].message
 
-            const parsed = translationCandidate.refusal ? null : translationCandidate.parsed
+            const parsedRaw = translationCandidate.refusal ? null : translationCandidate.parsed
+            const parsed = parsedRaw ? { ...parsedRaw, outputs: parsedRaw.outputs?.map(fromMsEntry) ?? [] } : null
 
             const translationOutput = new TranslationOutput(
                 /** @type {any} */(parsed),
@@ -142,8 +151,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 }
                 return acc
             }, [])
-            this.promptContext.push({ role: "user", content: JSON.stringify({ inputs: chunk.map(e => e.input) }) })
-            this.promptContext.push({ role: "assistant", content: JSON.stringify({ outputs }) })
+            this.promptContext.push({ role: "user", content: JSON.stringify({ inputs: chunk.map(e => toMsEntry(e.input)) }) })
+            this.promptContext.push({ role: "assistant", content: JSON.stringify({ outputs: outputs.map(toMsEntry) }) })
         }
     }
 
@@ -352,13 +361,13 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     }
                     if (!partial) {
                         const expectedStart = currentBatchEntries[expectedIdx]?.start
-                        if (expectedStart && value !== expectedStart) {
+                        if (expectedStart && /** @type {any} */(value) !== timestampToMilliseconds(expectedStart)) {
                             this.services.onStreamChunk?.(">>> ")
                         }
-                        emitField("start", " -> ", value, partial)
+                        emitField("start", " -> ", millisecondsToTimestamp(/** @type {any} */(value)), partial)
                     }
                 } else if (key === "end") {
-                    if (!partial) emitField("end", "  ", value, partial)
+                    if (!partial) emitField("end", "  ", millisecondsToTimestamp(/** @type {any} */(value)), partial)
                 } else if (key === "text") {
                     emitField("text", "\n", value, partial, () => { textDone = true })
                 }
