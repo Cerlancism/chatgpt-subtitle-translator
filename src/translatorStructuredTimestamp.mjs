@@ -351,7 +351,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         const pipeline = passThroughStream
             .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
 
-        pipeline.on("data", (/** @type {{ value: string, key: string, partial: boolean }} */ { value, key, partial }) => {
+        pipeline.on("data", (/** @type {{ value: string | number, key: string, partial: boolean }} */ { value, key, partial }) => {
             try {
                 if (key === "start") {
                     if (textDone) {
@@ -361,15 +361,15 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     }
                     if (!partial) {
                         const expectedStart = currentBatchEntries[expectedIdx]?.start
-                        if (expectedStart && /** @type {any} */(value) !== timestampToMilliseconds(expectedStart)) {
+                        if (expectedStart && /** @type {number} */(value) !== timestampToMilliseconds(expectedStart)) {
                             this.services.onStreamChunk?.(">>> ")
                         }
-                        emitField("start", " -> ", millisecondsToTimestamp(/** @type {any} */(value)), partial)
+                        emitField("start", " -> ", millisecondsToTimestamp(/** @type {number} */(value)), partial)
                     }
                 } else if (key === "end") {
-                    if (!partial) emitField("end", "  ", millisecondsToTimestamp(/** @type {any} */(value)), partial)
+                    if (!partial) emitField("end", "  ", millisecondsToTimestamp(/** @type {number} */(value)), partial)
                 } else if (key === "text") {
-                    emitField("text", "\n", value, partial, () => { textDone = true })
+                    emitField("text", "\n", /** @type {string} */(value), partial, () => { textDone = true })
                 }
             } catch (err) {
                 log.error("[TranslatorStructuredTimestamp]", "Parsing error:", err)
