@@ -48,6 +48,9 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
      * @param {Partial<import("./translator.mjs").TranslatorOptions>} [options]
      */
     constructor(language, services, options) {
+        if (options.lineMatching) {
+            log.warn("[TranslatorStructuredTimestamp]", "--no-line-matching must be used in timestamp mode, overriding.")
+        }
         options.lineMatching = false
         super(language, services, options)
 
