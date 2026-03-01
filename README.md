@@ -135,7 +135,7 @@ Hello.
 ```
 ### Emojis
 ```bash
-cli/translator.mjs --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
+cli/translator.mjs --to "Emojis" --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
 ```  
 Input Argument
 ```
@@ -147,7 +147,7 @@ Standard Output
 ```
 ### Scrambling
 ```bash
-cli/translator.mjs --system-instruction "Scramble characters of words while only keeping the start and end letter" --no-prefix-number --no-line-matching --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"
+cli/translator.mjs --system-instruction "Scramble characters of words while only keeping the start and end letter" --no-prefix-number --no-line-matching --plain-text "Chuck Norris can walk with the animals, talk with the animals;"
 ```
 Standard Output
 ```
@@ -155,7 +155,7 @@ Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;
 ```  
 ### Unscrabling
 ```bash
-cli/translator.mjs --system-instruction "Unscramble characters back to English" --no-prefix-number --no-line-matching --temperature 0 --plain-text "Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;"
+cli/translator.mjs --system-instruction "Unscramble characters back to English" --no-prefix-number --no-line-matching --plain-text "Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;"
 ```
 Standard Output
 ```
@@ -164,7 +164,7 @@ Chuck Norris can walk with the animals, talk with the animals;
 
 ### Plain text file  
 ```bash
-cli/translator.mjs --temperature 0 --input test/data/test_cn.txt
+cli/translator.mjs --input test/data/test_cn.txt
 ```  
 Input file: [test/data/test_cn.txt](test/data/test_cn.txt)
 ```
@@ -178,7 +178,7 @@ Goodbye!
 ```
 ### SRT file
 ```bash
-cli/translator.mjs --temperature 0 --input test/data/test_ja_small.srt
+cli/translator.mjs --input test/data/test_ja_small.srt
 ```  
 Input file: [test/data/test_ja_small.srt](test/data/test_ja_small.srt)
 ```srt
