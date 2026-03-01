@@ -53,7 +53,6 @@ export function createInstance(args) {
 
         .option("-i, --input <file>", "Text file name to use as input, .srt or plain text")
         .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
-        .option("-f, --file <file>", "Deprecated: alias for -i, --input")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
         .option("-p, --plain-text <text>", "Only translate this input plain text")
 
@@ -67,7 +66,7 @@ export function createInstance(args) {
         .option("--no-prefix-number", "Don't prefix lines with numerical indices")
         .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
         .option("-b, --batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, DefaultOptions.batchSizes)
-        .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value below 0.3 to be more deterministic", parseFloat, DefaultOptions.createChatCompletionRequest.temperature)
+        .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value such as 0 to be more deterministic", parseFloat, DefaultOptions.createChatCompletionRequest.temperature)
         .option("--no-stream", "Disable stream progress output to terminal (streaming is on by default)")
         // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
         // .option("--stop <stop>", "Up to 4 sequences where the API will stop generating further tokens")
@@ -126,11 +125,6 @@ export function createInstance(args) {
     }
 
     log.debug("[CLI]", "Log level", Object.entries(log.levels).find(x => x[1] === log.getLevel())?.[0])
-
-    if (opts.file && !opts.input) {
-        log.warn("[CLI]", "[WARNING]", "-f, --file is deprecated, use -i, --input")
-        opts.input = opts.file
-    }
 
     if (options.inputMultiplier && !options.max_token) {
         log.error("[CLI]", "[ERROR]", "--experimental-input-multiplier must be set with --experimental-max_token")

@@ -41,7 +41,7 @@ Reference: <https://github.com/openai/openai-quickstart-node#setup>
   cp .env.example .env
   ```
 - Add your [API key](https://platform.openai.com/account/api-keys) to the newly created `.env` file
-  - (Optional) Set rate limits: <https://platform.openai.com/docs/guides/rate-limits/overview>
+
 ## CLI
 ```
 cli/translator.mjs --help
@@ -109,7 +109,7 @@ Additional Options for GPT: https://developers.openai.com/api/reference/resource
   - `-m, --model <model>`
     (default: `"gpt-4o-mini"`) https://developers.openai.com/api/docs/models
   - `--reasoning_effort <reasoning_effort>`
-    Constrains effort on reasoning for reasoning models. Accepted values: `"low"`, `"medium"` (default), `"high"`. Additionally, `"none"` disables reasoning/thinking entirely (supported by OpenAI o-series/GPT-5+ and open models via Ollama such as Qwen3).
+    Constrains effort on reasoning for reasoning models. Accepted values depend on the model (e.g. `"low"`, `"medium"`, `"high"`); follows the model's default when not set. `"none"` disables reasoning/thinking entirely (supported by OpenAI o-series/GPT-5+ and open models via Ollama such as Qwen3).
   - `-t, --temperature <temperature>`
     Sampling temperature to use, should set a low value such as `0` to be more deterministic for translation (default: `0`)
   - `--top_p <top_p>`
