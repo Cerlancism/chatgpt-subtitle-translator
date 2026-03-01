@@ -8,10 +8,10 @@
 
 | Removed Option | Replacement |
 |---|---|
-| `-f, --file <file>` | `-i, -i <file>` |
+| `-f, --file <file>` | `-i, --input <file>` |
 | `-l, --history-prompt-length <length>` | Use the last value in `-b, --batch-sizes` |
 | `--experimental-structured-mode [mode]` | `-r, --structured <mode>` |
-| `--experimental-use-full-context` | `-c, --context <tokens>` |W
+| `--experimental-use-full-context` | `-c, --context <tokens>` |
 | `--experimental-fallback-model <value>` | _(removed, no replacement)_ |
 | `--no-use-moderator` | `--use-moderator` _(inverted - moderation is now **off** by default)_ |
 
@@ -35,7 +35,7 @@
 
 #### Runtime Requirements
 
-- **Node.js**: Minimum version raised from 18 to **20**.
+- **Node.js**: Minimum version raised from 16 to **20**.
 
 ---
 
@@ -62,7 +62,7 @@ Replaces `--experimental-use-full-context`. Accepts a maximum token budget for t
 translator -i subtitles.srt -c 90000
 ```
 
-Set to `0` to disable token-budget slicing. History is still included, falling back to the last `currentBatchSize` entries rather than a token-bounded slice:
+Set to `0` to include history without a token limit check:
 
 ```bash
 translator -i subtitles.srt -c 0
