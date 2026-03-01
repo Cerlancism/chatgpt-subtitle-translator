@@ -85,7 +85,7 @@ Options:
       - `none` Disables structured output.
 
   - `-c, --context <tokens>`
-    Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Default: `2000`. Set to `0` to disable.
+    Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Default: `2000`. Set to `0` to include history without a token limit check.
 
     The token budget is tracked from actual model response token counts. The history is chunked into user/assistant message pairs using the last value in `--batch-sizes`.
 

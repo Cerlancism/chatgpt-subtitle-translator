@@ -28,7 +28,7 @@ import { roundWithPrecision, sleep } from './helpers.mjs'
  * @property {boolean} lineMatching `true`
  * Enforce one-to-one line quantity matching between input and output
  * @property {number} useFullContext `2000` \
- * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to disable.
+ * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to include history without a token limit check.
  * @property {number[]} batchSizes `[10, 50]` \
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
