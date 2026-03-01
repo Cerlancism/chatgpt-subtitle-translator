@@ -21,7 +21,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
      * @param {[string]} lines
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(lines) {
+    async doTranslatePrompt(lines) {
         // const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: JSON.stringify({ inputs: lines }) }
@@ -35,9 +35,6 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
         })
 
         try {
-            let startTime = 0, endTime = 0
-            startTime = Date.now()
-
             await this.services.cooler?.cool()
 
             const output = await this.streamParse({
@@ -52,8 +49,6 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
 
             // log.debug("[TranslatorStructuredArray]", output.choices[0].message.content)
 
-            endTime = Date.now()
-
             const translationCandidate = output.choices[0].message
 
             const getLinesOutput = async (/** @type {import("openai/resources/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) => {
@@ -66,23 +61,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
 
             const linesOut = await getLinesOutput(translationCandidate)
 
-            const translationOutput = new TranslationOutput(
-                linesOut,
-                output.usage?.prompt_tokens,
-                output.usage?.completion_tokens,
-                output.usage?.prompt_tokens_details?.cached_tokens,
-                output.usage?.total_tokens,
-                output.choices[0].message.refusal
-            )
-
-            this.promptTokensUsed += translationOutput.promptTokens
-            this.completionTokensUsed += translationOutput.completionTokens
-            this.cachedTokens += translationOutput.cachedTokens
-            this.contextPromptTokens = translationOutput.promptTokens
-            this.contextCompletionTokens = translationOutput.completionTokens
-            this.tokensProcessTimeMs += (endTime - startTime)
-
-            return translationOutput
+            return TranslationOutput.fromCompletion(linesOut, output)
         } catch (error) {
             log.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
             return this.handleTranslateError(error, lines.length)

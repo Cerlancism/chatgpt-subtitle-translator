@@ -39,7 +39,7 @@ const batchTimestampSchema = z.object({
  */
 
 /**
- * @extends {TranslatorStructuredBase<TimestampEntry[]>}
+ * @extends {TranslatorStructuredBase<TimestampEntry>}
  */
 export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
@@ -58,21 +58,18 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @override
      * @param {TimestampEntry[]} entries
-     * @param {import('zod').ZodTypeAny} [schema]
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(entries, schema = batchTimestampSchema) {
+    async doTranslatePrompt(entries) {
+        const schema = entries.length === 1 ? singleTimestampSchema : batchTimestampSchema
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: encodeToon({ inputs: entries.map(toMsEntry) }) }
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
-        const max_tokens = this.getMaxToken(entries.map(e => e.text))
+        const max_tokens = this.getMaxToken(entries)
 
         try {
-            let startTime = 0, endTime = 0
-            startTime = Date.now()
-
             this.currentBatchEntries = entries
 
             await this.services.cooler?.cool()
@@ -87,30 +84,12 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 name: "translation_timestamp"
             }, true)
 
-            endTime = Date.now()
-
             const translationCandidate = output.choices[0].message
 
             const parsedRaw = translationCandidate.refusal ? null : translationCandidate.parsed
             const parsed = parsedRaw ? { ...parsedRaw, outputs: parsedRaw.outputs?.map(fromMsEntry) ?? [] } : null
 
-            const translationOutput = new TranslationOutput(
-                /** @type {any} */(parsed),
-                output.usage?.prompt_tokens,
-                output.usage?.completion_tokens,
-                output.usage?.prompt_tokens_details?.cached_tokens,
-                output.usage?.total_tokens,
-                translationCandidate.refusal
-            )
-
-            this.promptTokensUsed += translationOutput.promptTokens
-            this.completionTokensUsed += translationOutput.completionTokens
-            this.cachedTokens += translationOutput.cachedTokens
-            this.contextPromptTokens = translationOutput.promptTokens
-            this.contextCompletionTokens = translationOutput.completionTokens
-            this.tokensProcessTimeMs += (endTime - startTime)
-
-            return translationOutput
+            return TranslationOutput.fromCompletion(/** @type {any} */(parsed), output)
         } catch (error) {
             log.error("[TranslatorStructuredTimestamp]", `Error ${error?.constructor?.name}`, error?.message)
             return this.handleTranslateError(error, entries.length)
@@ -120,24 +99,13 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     buildTimestampContext() {
         if (this.entryHistory.length === 0) return
 
-        const maxTokens = this.options.useFullContext
-        let sliced
+        const { sliced, tokenCount } = this.sliceByTokenBudget(this.entryHistory, e => e.completionTokens)
 
-        if (maxTokens > 0) {
-            let tokenCount = 0
-            let startIndex = this.entryHistory.length
-            for (let i = this.entryHistory.length - 1; i >= 0; i--) {
-                tokenCount += (this.entryHistory[i].completionTokens ?? 0) * 2
-                startIndex = i
-                if (tokenCount > maxTokens) break
-            }
-            sliced = this.entryHistory.slice(startIndex)
+        if (this.options.useFullContext > 0) {
             const logMsg = sliced.length < this.entryHistory.length
                 ? `sliced ${this.entryHistory.length - sliced.length} entries (${sliced.length}/${this.entryHistory.length} kept, ~${Math.round(tokenCount)} tokens)`
                 : `all (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
             log.debug("[TranslatorStructuredTimestamp]", "Context:", logMsg)
-        } else {
-            sliced = this.entryHistory.slice(-this.currentBatchSize)
         }
 
         const chunkSize = this.currentBatchSize
@@ -164,7 +132,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         log.debug("[TranslatorStructuredTimestamp]", "Single entry mode")
         for (const entry of entries) {
             this.buildTimestampContext()
-            const output = await this.translatePrompt([entry], singleTimestampSchema)
+            const output = await this.translatePrompt([entry])
             /** @type {TimestampEntry[]} */
             const outputEntries = /** @type {any} */ (output.content)?.outputs ?? []
             const resultEntry = outputEntries?.[0] ?? entry
@@ -383,13 +351,4 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         })
     }
 
-    /**
-     * @override
-     * @param {string[]} lines
-     * @param {"user" | "assistant"} role
-     */
-    getContextLines(lines, role) {
-        // Not used in timestamp mode; context is built by buildTimestampContext()
-        return JSON.stringify(role === "user" ? { inputs: lines } : { outputs: lines })
-    }
 }
