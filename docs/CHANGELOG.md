@@ -86,7 +86,7 @@ cli/translator.mjs -i subtitles.srt -m o3-mini --reasoning_effort low
 
 - Replaced `JSONStream` with `@streamparser/json-node` for improved JSON streaming.
 - Replaced `readline` (legacy) with the built-in `node:readline`.
-- Token usage logging changed (improve breakdown formating, removed pricing data).
+- Token usage logging: improved breakdown formatting, removed pricing data.
 - Context budget logged at debug level on each batch.
 
 ---
