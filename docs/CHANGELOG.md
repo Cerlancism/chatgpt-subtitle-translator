@@ -50,7 +50,7 @@ A new structured output mode that provides the model with start/end timestamps a
 - Not compatible with `--plain-text`.
 
 ```bash
-translator -i subtitles.srt -r timestamp
+cli/translator.mjs -i subtitles.srt -r timestamp
 ```
 
 #### Context Token Budget (`-c, --context <tokens>`)
@@ -59,13 +59,13 @@ Replaces `--experimental-use-full-context`. Accepts a maximum token budget for t
 
 ```bash
 # Use up to 90,000 tokens of history (e.g., for a model with 128k context)
-translator -i subtitles.srt -c 90000
+cli/translator.mjs -i subtitles.srt -c 90000
 ```
 
 Set to `0` to include history without a token limit check:
 
 ```bash
-translator -i subtitles.srt -c 0
+cli/translator.mjs -i subtitles.srt -c 0
 ```
 
 #### Streaming On by Default
@@ -77,7 +77,7 @@ Streaming output to the terminal is now on by default. This gives real-time feed
 Pass reasoning effort hints (`low`, `medium`, `high`, or `none`) to reasoning models (OpenAI o-series, GPT-5+, or compatible open models via Ollama). Use `"none"` to disable reasoning/thinking entirely.
 
 ```bash
-translator -i subtitles.srt -m o3-mini --reasoning_effort low
+cli/translator.mjs -i subtitles.srt -m o3-mini --reasoning_effort low
 ```
 
 ---
@@ -86,8 +86,7 @@ translator -i subtitles.srt -m o3-mini --reasoning_effort low
 
 - Replaced `JSONStream` with `@streamparser/json-node` for improved JSON streaming.
 - Replaced `readline` (legacy) with the built-in `node:readline`.
-- Structured output schema unified for single and batch requests.
-- Token usage logging improved (formatted, without pricing data).
+- Token usage logging changed (improve breakdown formating, removed pricing data).
 - Context budget logged at debug level on each batch.
 
 ---
@@ -108,10 +107,10 @@ node --version  # must be >= 20
 
 ```bash
 # v2
-translator -f subtitles.srt
+cli/translator.mjs -f subtitles.srt
 
 # v3
-translator -i subtitles.srt
+cli/translator.mjs -i subtitles.srt
 ```
 
 #### `-l` / `--history-prompt-length` (removed)
@@ -120,39 +119,39 @@ History chunk size is now controlled by the last value in `--batch-sizes`.
 
 ```bash
 # v2
-translator -l 50 -i subtitles.srt
+cli/translator.mjs -l 50 -i subtitles.srt
 
 # v3 - set the last batch size to the desired history chunk length
-translator -b "[10, 50]" -i subtitles.srt
+cli/translator.mjs -b "[10, 50]" -i subtitles.srt
 ```
 
 #### `--experimental-structured-mode` -> `-r` / `--structured`
 
 ```bash
 # v2
-translator --experimental-structured-mode array -i subtitles.srt
+cli/translator.mjs --experimental-structured-mode array -i subtitles.srt
 
 # v3
-translator -r array -i subtitles.srt
+cli/translator.mjs -r array -i subtitles.srt
 ```
 
 To disable structured output (equivalent to v2 default):
 
 ```bash
-translator -r none -i subtitles.srt
+cli/translator.mjs -r none -i subtitles.srt
 ```
 
 #### `--experimental-use-full-context` -> `-c` / `--context`
 
 ```bash
 # v2
-translator --experimental-use-full-context -i subtitles.srt
+cli/translator.mjs --experimental-use-full-context -i subtitles.srt
 
 # v3 - provide a token budget (or omit to use the default of 2000)
-translator -c 2000 -i subtitles.srt
+cli/translator.mjs -c 2000 -i subtitles.srt
 
 # v3 - set to 0 to include history without a token limit check
-translator -c 0 -i subtitles.srt
+cli/translator.mjs -c 0 -i subtitles.srt
 ```
 
 #### `--no-use-moderator` (inverted)
@@ -161,10 +160,10 @@ Moderation is now **off by default**. If you were previously not passing `--no-u
 
 ```bash
 # v2 - moderation was on unless you passed --no-use-moderator
-translator -i subtitles.srt
+cli/translator.mjs -i subtitles.srt
 
 # v3 - moderation is off by default; opt in explicitly
-translator --use-moderator -i subtitles.srt
+cli/translator.mjs --use-moderator -i subtitles.srt
 ```
 
 #### `--experimental-fallback-model` (removed)
@@ -189,8 +188,8 @@ If you were explicitly passing `--stream` to enable streaming, that flag no long
 
 ```bash
 # v2
-translator --stream -i subtitles.srt
+cli/translator.mjs --stream -i subtitles.srt
 
 # v3
-translator -i subtitles.srt
+cli/translator.mjs -i subtitles.srt
 ```
