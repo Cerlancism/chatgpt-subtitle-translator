@@ -428,14 +428,17 @@ export function TranslatorApplication() {
             {usageInformation && (
               <Card shadow="sm" className='mt-4 p-4'>
                 <span><b>Estimated Usage</b></span>
-                <span>Tokens: {usageInformation?.usedTokens}</span>
+                <span>Tokens: {usageInformation?.promptTokensUsed} + {usageInformation?.completionTokensUsed} = {usageInformation?.usedTokens}</span>
                 {usageInformation?.wastedTokens > 0 && (
-                  <span className={'text-danger'}>Wasted: {usageInformation?.wastedTokens} {usageInformation?.wastedPercent}</span>
+                  <span className={'text-danger'}>Wasted: {usageInformation?.promptTokensWasted} + {usageInformation?.completionTokensWasted} = {usageInformation?.wastedTokens} {usageInformation?.wastedPercent}</span>
                 )}
                 {usageInformation?.cachedTokens > 0 && (
                   <span className={'text-success'}>Cached: {usageInformation?.cachedTokens}</span>
                 )}
-                <span>{usageInformation?.rate} TPM {RPMInfomation} RPM</span>
+                {usageInformation?.contextTokens > 0 && (
+                  <span>Context: {usageInformation?.contextPromptTokens} + {usageInformation?.contextCompletionTokens} = {usageInformation?.contextTokens}</span>
+                )}
+                <span>{usageInformation?.promptRate} + {usageInformation?.completionRate} = {usageInformation?.rate} TPM {RPMInfomation} RPM</span>
               </Card>
             )}
 
