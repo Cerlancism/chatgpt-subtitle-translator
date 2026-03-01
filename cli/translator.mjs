@@ -59,8 +59,8 @@ export function createInstance(args) {
 
         .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
         .option("--experimental-input-multiplier <value>", "", val => parseInt(val, 10), 0)
-        .addOption(new Option("--structured-mode <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object", "none", "timestamp"]).default("array"))
-        .option("--use-full-context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by historyPromptLength, to work better with prompt caching. Set to 0 to disable. Recommended: set to 30% less than the model's max context length.", val => parseInt(val, 10), DefaultOptions.useFullContext)
+        .addOption(new Option("-r, --structured <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "object", "none", "timestamp"]).default("array"))
+        .option("-c, --context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by historyPromptLength, to work better with prompt caching. Set to 0 to disable. Recommended: set to 30% less than the model's max context length.", val => parseInt(val, 10), DefaultOptions.useFullContext)
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--use-moderator", "Use the OpenAI Moderation tool")
@@ -108,10 +108,10 @@ export function createInstance(args) {
         ...(opts.prefixNumber !== undefined && { prefixNumber: opts.prefixNumber }),
         ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
         ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
-        ...(opts.structuredMode && opts.structuredMode !== "none" && { structuredMode: opts.structuredMode }),
+        ...(opts.structured && opts.structured !== "none" && { structuredMode: opts.structured }),
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
-        ...(opts.useFullContext !== undefined && { useFullContext: opts.useFullContext }),
+        ...(opts.context !== undefined && { useFullContext: opts.context }),
         ...(opts.logLevel && { logLevel: opts.logLevel })
     };
 
@@ -187,6 +187,10 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     }
 
     if (opts.plainText) {
+        if (opts.structured === "timestamp") {
+            log.error("[CLI]", "--plain-text is not supported in timestamp mode.")
+            process.exit(1)
+        }
         await translatePlainText(/** @type {import('../src/translator.mjs').Translator} */ (translator), opts.plainText)
     }
     else if (opts.input) {

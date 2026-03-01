@@ -7,8 +7,8 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
-- **New**: Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `--structured-mode`
-- **New**: Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, controlled with `--use-full-context` (CLI only, default: `2000`)
+- Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `-r, --structured`
+- Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, controlled with `-c, --context` (CLI only)
 - Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
 - Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent
 - Optional OpenAI Moderation tool check: prevents token wastage if the model is highly likely to refuse to translate, enabled with `--use-moderator`
@@ -61,8 +61,6 @@ Options:
     Input source text with the content of this file, in `.srt` format or plain text
   - `-o, --output <file>`  
     Output file name, defaults to be based on input file name
-  - `-p, --plain-text <text>`  
-    Input source text with this plain text argument
   - `-s, --system-instruction <instruction>`  
     Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text, ignoring `--from` and `--to` options
   - `--initial-prompts <prompts>`  
@@ -71,10 +69,6 @@ Options:
     Use the OpenAI API Moderation endpoint
   - `--moderation-model <model>`
     (default: `"omni-moderation-latest"`) https://developers.openai.com/api/docs/models  
-  - `--no-prefix-number`  
-    Don't prefix lines with numerical indices
-  - `--no-line-matching`  
-    Don't enforce one to one line quantity input output matching
   - `-b, --batch-sizes <sizes>`
     Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10,50]"`)  
 
@@ -83,18 +77,25 @@ Options:
 
     Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.  
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
-  - `--structured-mode <mode>`
-    [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode. (default: `array`, choices: `array`, `object`, `none`)
-      - `array` Structures the input and output into a plain array format. More concise than base mode, though uses slightly more tokens per batch.
+  - `-r, --structured <mode>`
+    [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode with timestamp support. (default: `array`, choices: `array`, `timestamp`, `object`, `none`)
+      - `array` Structures the input and output into a plain array format. More concise than `none` mode, though uses slightly more tokens per batch.
+      - `timestamp` Provides the model with start/end timestamps alongside each entry's text, allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and a merge remarks field in output. Output entry count may differ from input, so progress file resumption is not supported.
       - `object` Structures the input and output as a keyed object.
       - `none` Disables structured output.
 
-  - `--use-full-context <tokens>`
+  - `-c, --context <tokens>`
     Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Default: `2000`. Set to `0` to disable.
 
     The token budget is tracked from actual model response token counts. The history is chunked into user/assistant message pairs using the last value in `--batch-sizes`.
 
-    Recommended value: set `<tokens>` to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--use-full-context 90000`.
+    Recommended value: set `<tokens>` to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--context 90000`.
+  - `--no-prefix-number`
+    Don't prefix lines with numerical indices. Ignored in `-r, --structured` `array|object|timestamp` - prefix numbers are always disabled there.
+  - `--no-line-matching`
+    Don't enforce one to one line quantity input output matching. Ignored in `-r, --structured` `timestamp` - line matching is always disabled there since entries may be merged.
+  - `-p, --plain-text <text>`
+    Input source text with this plain text argument. Not supported in `-r, --structured` `timestamp`.
   - `--log-level <level>`  
     Log level (default: `debug`, choices: `trace`, `debug`, `info`, `warn`, `error`, `silent`)
   - `--silent`  
@@ -107,8 +108,10 @@ Options:
 Additional Options for GPT: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
   - `-m, --model <model>`
     (default: `"gpt-4o-mini"`) https://developers.openai.com/api/docs/models
+  - `--reasoning_effort <reasoning_effort>`
+    Constrains effort on reasoning for reasoning models. Accepted values: `"low"`, `"medium"` (default), `"high"`. Additionally, `"none"` disables reasoning/thinking entirely (supported by OpenAI o-series/GPT-5+ and open models via Ollama such as Qwen3).
   - `-t, --temperature <temperature>`
-    Sampling temperature to use, should set a low value below `0.3` to be more deterministic for translation (default: `0`)
+    Sampling temperature to use, should set a low value such as `0` to be more deterministic for translation (default: `0`)
   - `--top_p <top_p>`
     Nucleus sampling parameter, top_p probability mass
   - `--presence_penalty <presence_penalty>`
@@ -117,8 +120,6 @@ Additional Options for GPT: https://developers.openai.com/api/reference/resource
     Penalty for new tokens based on their frequency in the text so far
   - `--logit_bias <logit_bias>`
     Modify the likelihood of specified tokens appearing in the completion
-  - `--reasoning_effort <reasoning_effort>`
-    Constrains effort on reasoning for reasoning models
 
 
 ## Examples
@@ -132,7 +133,7 @@ Hello.
 ```
 ### Emojis
 ```bash
-cli/translator.mjs --stream --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
+cli/translator.mjs --to "Emojis" --temperature 0 --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
 ```  
 Input Argument
 ```
@@ -144,7 +145,7 @@ Standard Output
 ```
 ### Scrambling
 ```bash
-cli/translator.mjs --stream --system-instruction "Scramble characters of words while only keeping the start and end letter" --no-prefix-number --no-line-matching --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"
+cli/translator.mjs --system-instruction "Scramble characters of words while only keeping the start and end letter" --no-prefix-number --no-line-matching --temperature 0 --plain-text "Chuck Norris can walk with the animals, talk with the animals;"
 ```
 Standard Output
 ```
@@ -152,7 +153,7 @@ Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;
 ```  
 ### Unscrabling
 ```bash
-cli/translator.mjs --stream --system-instruction "Unscramble characters back to English" --no-prefix-number --no-line-matching --temperature 0 --plain-text "Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;"
+cli/translator.mjs --system-instruction "Unscramble characters back to English" --no-prefix-number --no-line-matching --temperature 0 --plain-text "Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;"
 ```
 Standard Output
 ```
@@ -161,7 +162,7 @@ Chuck Norris can walk with the animals, talk with the animals;
 
 ### Plain text file  
 ```bash
-cli/translator.mjs --stream --temperature 0 --input test/data/test_cn.txt
+cli/translator.mjs --temperature 0 --input test/data/test_cn.txt
 ```  
 Input file: [test/data/test_cn.txt](test/data/test_cn.txt)
 ```
@@ -175,7 +176,7 @@ Goodbye!
 ```
 ### SRT file
 ```bash
-cli/translator.mjs --stream --temperature 0 --input test/data/test_ja_small.srt
+cli/translator.mjs --temperature 0 --input test/data/test_ja_small.srt
 ```  
 Input file: [test/data/test_ja_small.srt](test/data/test_ja_small.srt)
 ```srt
@@ -224,37 +225,39 @@ Yes, it's very nice weather.
 
 ## How it works
 ### Token Reductions
-**System Instruction**  
-Tokens: `4`
+SRT timestamps and indices are stripped. Text lines are batched into a structured JSON user message; the model returns a matching structured JSON response. The translated lines are then reassembled back into SRT format.
+
+**System Instruction**
+Tokens: `3`
 ```
 Translate to English
-```  
+```
 <table>
 <tr>
-<th>Input</th>
-<th>Prompt</th>
-<th>Transform</th>
-<th>Output</th>
+<th>Input (SRT)</th>
+<th>Prompt (User Message)</th>
+<th>Transform (Model Response)</th>
+<th>Output (SRT)</th>
 </tr>
 <tr>
 <td>
 
+Tokens: `139`
+
+</td>
+<td>
+
+Tokens: `52`
+
+</td>
+<td>
+
+Tokens: `38`
+
+</td>
+<td>
+
 Tokens: `127`
-
-</td>
-<td>
-
-Tokens: `45`
-
-</td>
-<td>
-
-Tokens: `39`
-
-</td>
-<td>
-
-Tokens: `124`
 
 </td>
 </tr>
@@ -286,23 +289,35 @@ Tokens: `124`
 </td>
 <td valign="top">
 
-```log
-1. おはようございます。
-2. お元気ですか？
-3. はい、元気です。
-4. 今日は天気がいいですね。
-5. はい、とてもいい天気です。
+*(compact JSON, formatted here for readability)*
+
+```json
+{
+  "inputs": [
+    "おはようございます。",
+    "お元気ですか？",
+    "はい、元気です。",
+    "今日は天気がいいですね。",
+    "はい、とてもいい天気です。"
+  ]
+}
 ```
 
 </td>
 <td valign="top">
 
-```log
-1. Good morning.
-2. How are you?
-3. Yes, I'm doing well.
-4. The weather is nice today, isn't it?
-5. Yes, it's very nice weather.
+*(compact JSON, formatted here for readability)*
+
+```json
+{
+  "outputs": [
+    "Good morning.",
+    "How are you?",
+    "Yes, I'm doing well.",
+    "The weather is nice today, isn't it?",
+    "Yes, it's very nice weather."
+  ]
+}
 ```
 
 </td>
@@ -333,22 +348,3 @@ Yes, it's very nice weather.
 </td>
 </tr>
 </table>
-
-### Token Estimated Usage Analysis and Comparison
-| Lines | SRT Text Format | No Batching | ChatGPT Subtitle Translator |
-|-------|-----------------|-------------|-----------------------------|
-| 5     | 280             | 469         | 133                         |
-| 10    | 511             | 834         | 171                         |
-| 50    | 2,518           | 7,944       | 818                         |
-| 100   | 5,011           | 15,263      | 1,611                       |
-| 500   | 25,400          | 79,297      | 9,025                       |
-| 1000  | 52,988          | 184,596     | 20,593                      |
-
-*Test data can be found in the [test/data](./test/data) directory. Token count also roughly includes message payload structure and prompt token overheads.*
-
-![comparison analysis chart](./docs/comparison_analysis_chart.png)
-**SRT Text Format**: Full SRT text format, including timestamps for input/output.  
-**No Batching**: SRT formatting and timestamp stripping, but one line per prompt with system instruction overhead, including up to `10` historical entries for context per prompt.  
-**ChatGPT Subtitle Translator**: SRT formatting and timestamp stripping, with line batching of `100`, including up to `10` historical entries for context per batch.  
-
-*This analysis assumes perfect input/output quantity matching. In reality, this depends on model and subtitle quality. Typically, buffer an additional 20%~30% token usage for retries, refer to the `--batch-sizes` CLI option.*
