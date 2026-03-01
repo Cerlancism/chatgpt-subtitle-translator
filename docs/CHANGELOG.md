@@ -17,7 +17,7 @@
 
 #### CLI Options Changed
 
-- **`--stream` → `--no-stream`**: Streaming is now **enabled by default**. Pass `--no-stream` to disable it.
+- **`--stream` -> `--no-stream`**: Streaming is now **enabled by default**. Pass `--no-stream` to disable it.
 - **`--temperature`**: Now defaults to `0` (was previously unset, leaving the model default). Deterministic preferred output is now the default.
 - **`-r, --structured`**: Promoted from `--experimental-structured-mode`. Now accepts `array` | `timestamp` | `object` | `none`, and defaults to `"array"`. In v2, structured output was an opt-in experimental flag - omitting `--experimental-structured-mode` was implicitly equivalent to `none`. In v3, `none` is an explicit value you must pass to replicate that behaviour, since `array` is now the default. Passing `-r none` disables structured output entirely and falls back to free-form text responses, the same as the v2 default.
 - **`-c, --context <tokens>`**: Promoted from `--experimental-use-full-context`. Accepts a token budget integer (default `2000`). Set to `0` to include history without a token limit check.
@@ -92,7 +92,7 @@ translator -i subtitles.srt -m o3-mini --reasoning_effort low
 
 ---
 
-## Migration Guide: v2 → v3
+## Migration Guide: v2 -> v3
 
 ### Node.js Requirement
 
@@ -126,7 +126,7 @@ translator -l 50 -i subtitles.srt
 translator -b "[10, 50]" -i subtitles.srt
 ```
 
-#### `--experimental-structured-mode` → `-r` / `--structured`
+#### `--experimental-structured-mode` -> `-r` / `--structured`
 
 ```bash
 # v2
@@ -142,7 +142,7 @@ To disable structured output (equivalent to v2 default):
 translator -r none -i subtitles.srt
 ```
 
-#### `--experimental-use-full-context` → `-c` / `--context`
+#### `--experimental-use-full-context` -> `-c` / `--context`
 
 ```bash
 # v2
