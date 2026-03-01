@@ -30,7 +30,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
      * @param {[string]} lines
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(lines) {
+    async doTranslatePrompt(lines) {
         // const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         // const userMessage = { role: "user", content: `Translate from given schema` }
@@ -55,9 +55,6 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
         const translationBatch = z.object({ ...structuredObject })
 
         try {
-            let startTime = 0, endTime = 0
-            startTime = Date.now()
-
             await this.services.cooler?.cool()
 
             const output = await this.streamParse({
@@ -71,8 +68,6 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
             })
 
             // log.debug("[TranslatorStructuredObject]", output.choices[0].message.content)
-
-            endTime = Date.now()
 
             const translation = output.choices[0].message
 
@@ -109,23 +104,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
 
             const linesOut = getLinesOutput()
 
-            const translationOutput = new TranslationOutput(
-                linesOut,
-                output.usage?.prompt_tokens,
-                output.usage?.completion_tokens,
-                output.usage?.prompt_tokens_details?.cached_tokens,
-                output.usage?.total_tokens,
-                output.choices[0].message.refusal
-            )
-
-            this.promptTokensUsed += translationOutput.promptTokens
-            this.completionTokensUsed += translationOutput.completionTokens
-            this.cachedTokens += translationOutput.cachedTokens
-            this.contextPromptTokens = translationOutput.promptTokens
-            this.contextCompletionTokens = translationOutput.completionTokens
-            this.tokensProcessTimeMs += (endTime - startTime)
-
-            return translationOutput
+            return TranslationOutput.fromCompletion(linesOut, output)
         } catch (error) {
             log.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
             return this.handleTranslateError(error, lines.length)

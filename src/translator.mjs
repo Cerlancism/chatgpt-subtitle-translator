@@ -2,135 +2,44 @@ import log from "loglevel"
 import { openaiRetryWrapper, completeChatStream } from './openai.mjs';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
-import { roundWithPrecision, sleep } from './helpers.mjs';
-import { CooldownContext } from './cooldown.mjs';
+import { TranslatorBase, DefaultOptions } from './translatorBase.mjs';
 import { TranslationOutput } from './translatorOutput.mjs';
 
+export { DefaultOptions }
+
 /**
- * Runtime context passed to translation service functions.
- * Holds the OpenAI client, optional rate-limit cooldown state,
- * and UI callbacks for streaming output.
- *
- * @typedef TranslationServiceContext
- * @property {import("openai").OpenAI} openai - Configured OpenAI client instance
- * @property {CooldownContext} [cooler] - Optional cooldown controller for rate-limit back-off
- * @property {(data: string) => void} [onStreamChunk] - Called for each streamed token chunk
- * @property {() => void} [onStreamEnd] - Called when a stream response finishes
- * @property {() => void} [onClearLine] - Called to erase the current console line (progress UI)
- * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService] - Optional moderation service context
+ * @typedef {import('./translatorBase.mjs').TranslationServiceContext} TranslationServiceContext
+ * @typedef {import('./translatorBase.mjs').TranslatorOptions} TranslatorOptions
  */
 
 /**
- * @type {TranslatorOptions}
- * @typedef TranslatorOptions
- * @property {Pick<Partial<import('openai').OpenAI.Chat.ChatCompletionCreateParams>, "messages" | "model"> & Omit<import('openai').OpenAI.Chat.ChatCompletionCreateParams, "messages" | "model">} createChatCompletionRequest
- * Options for ChatGPT besides the messages; it is recommended to set `temperature: 0` for an almost deterministic translation
- * @property {import('openai').OpenAI.ModerationModel} moderationModel
- * Moderation model
- * @property {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} initialPrompts
- * Initial prompt messages before the translation request messages
- * @property {boolean} useModerator `false` \
- * Verify with the free OpenAI Moderation tool before submitting the prompt to the ChatGPT model
- * @property {boolean} prefixNumber `true` \
- * Label lines with numerical prefixes to improve the one-to-one correlation between input and output line quantities
- * @property {boolean} lineMatching `true`
- * Enforce one-to-one line quantity matching between input and output
- * @property {number} useFullContext `2000` \
- * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to disable.
- * @property {number[]} batchSizes `[10, 50]` \
- * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
- * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
- *
- * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
- * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
- * @property {"array" | "object" | "none" | "timestamp" | false} structuredMode
- * @property {number} max_token
- * @property {number} inputMultiplier
- * @property {import('loglevel').LogLevelDesc} logLevel
+ * @template [T=string]
+ * @template {T[]} [TLines=T[]]
+ * @extends {TranslatorBase<T, TLines>}
+ * Translator using ChatGPT — string-array implementation.
  */
-export const DefaultOptions = {
-    createChatCompletionRequest: {
-        model: "gpt-4o-mini",
-        temperature: 0
-    },
-    moderationModel: "omni-moderation-latest",
-    initialPrompts: [],
-    useModerator: false,
-    prefixNumber: true,
-    lineMatching: true,
-    useFullContext: 2000,
-    batchSizes: [10, 50],
-    structuredMode: "array",
-    max_token: 0,
-    inputMultiplier: 0,
-    logLevel: undefined
-}
-
-/**
- * Translator using ChatGPT
- * @template {any[]} [TLines=string[]]
- */
-export class Translator {
+export class Translator extends TranslatorBase {
     /**
      * @param {{from?: string, to: string}} language
      * @param {TranslationServiceContext} services
      * @param {Partial<TranslatorOptions>} [options]
      */
     constructor(language, services, options) {
-        options.createChatCompletionRequest = { ...DefaultOptions.createChatCompletionRequest, ...options.createChatCompletionRequest }
-
-        this.language = language
-        this.services = services
-        this.options = /** @type {TranslatorOptions & {createChatCompletionRequest: {model: string}}} */ ({ ...DefaultOptions, ...options })
-        this.systemInstruction = `Translate ${this.language.from ? this.language.from + " " : ""}to ${this.language.to}`
-        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
-        this.promptContext = []
+        super(language, services, options)
 
         /**
-         * @type {{ source: string; transform: string; promptTokens?: number; completionTokens?: number; }[]}
+         * @type {{ source: string; transform: string; completionTokens?: number; }[]}
          * token counts are the total request cost averaged per entry for batch requests
          */
         this.workingProgress = []
-        this.promptTokensUsed = 0
-        this.promptTokensWasted = 0
-        this.cachedTokens = 0
-        this.completionTokensUsed = 0
-        this.completionTokensWasted = 0
-        this.tokensProcessTimeMs = 0
-        this.contextPromptTokens = 0
-        this.contextCompletionTokens = 0
-
         this.offset = 0
         this.end = undefined
-
-        this.workingBatchSizes = [...this.options.batchSizes]
-        this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
         this.moderatorFlags = new Map()
-
-        this.aborted = false
 
         this.thinkTags = {
             start: "<think>",
             end: "</think>"
         }
-
-        if (options.logLevel) {
-            log.setLevel(options.logLevel)
-        }
-    }
-
-    /**
-     * @param {any[]} lines
-     */
-    getMaxToken(lines) {
-        if (this.options.max_token && !this.options.inputMultiplier) {
-            return this.options.max_token
-        }
-        else if (this.options.max_token && this.options.inputMultiplier) {
-            const max = JSON.stringify(lines).length * this.options.inputMultiplier
-            return Math.min(this.options.max_token, max)
-        }
-        return undefined
     }
 
     /**
@@ -159,10 +68,11 @@ export class Translator {
     }
 
     /**
+     * @override
      * @param {TLines} lines
      * @returns {Promise<TranslationOutput>}
      */
-    async translatePrompt(lines) {
+    async doTranslatePrompt(lines) {
         const text = lines.join("\n\n")
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: `${text}` }
@@ -171,13 +81,9 @@ export class Translator {
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
         const max_tokens = this.getMaxToken(lines)
 
-
-
-        let startTime = 0, endTime = 0
         const streamMode = this.options.createChatCompletionRequest.stream
-        const response = await openaiRetryWrapper(async () => {
+        return openaiRetryWrapper(async () => {
             await this.services.cooler?.cool()
-            startTime = Date.now()
             if (!streamMode) {
                 const promptResponse = await this.services.openai.chat.completions.create({
                     messages,
@@ -185,21 +91,8 @@ export class Translator {
                     stream: false,
                     max_tokens
                 })
-                endTime = Date.now()
-                const usage = promptResponse.usage
                 const rawContent = promptResponse.choices[0].message.content
-                const prompt_tokens = usage?.prompt_tokens
-                const completion_tokens = usage?.completion_tokens
-                const cached_tokens = usage?.prompt_tokens_details?.cached_tokens
-                const total_tokens = usage?.total_tokens
-                const output = new TranslationOutput(
-                    this.getOutput(lines, rawContent),
-                    prompt_tokens,
-                    completion_tokens,
-                    cached_tokens,
-                    total_tokens
-                )
-                return output
+                return TranslationOutput.fromUsage(this.getOutput(lines, rawContent), promptResponse.usage)
             }
             else {
                 const promptResponse = await this.services.openai.chat.completions.create({
@@ -234,33 +127,13 @@ export class Translator {
                         writeQueue = ''
                     }
                 }, (u) => {
-                    endTime = Date.now()
                     usage = u
                     // process.stdout.write("\n")
                     this.services.onStreamEnd?.()
                 })
-                const prompt_tokens = usage?.prompt_tokens
-                const completion_tokens = usage?.completion_tokens
-                const cached_tokens = usage?.prompt_tokens_details?.cached_tokens
-                const total_tokens = usage?.total_tokens
-                const output = new TranslationOutput(
-                    this.getOutput(lines, streamOutput),
-                    prompt_tokens,
-                    completion_tokens,
-                    cached_tokens,
-                    total_tokens
-                )
-                return output
+                return TranslationOutput.fromUsage(this.getOutput(lines, streamOutput), usage)
             }
         }, 3, "TranslationPrompt")
-
-        this.promptTokensUsed += response.promptTokens
-        this.completionTokensUsed += response.completionTokens
-        this.cachedTokens += response.cachedTokens
-        this.contextPromptTokens = response.promptTokens
-        this.contextCompletionTokens = response.completionTokens
-        this.tokensProcessTimeMs += (endTime - startTime)
-        return response
     }
 
     /**
@@ -279,8 +152,7 @@ export class Translator {
     }
 
     /**
-     * 
-     * @param {string[]} lines 
+     * @param {string[]} lines
      */
     async * translateLines(lines) {
         log.debug("[Translator]", "System Instruction:", this.systemInstruction)
@@ -427,66 +299,24 @@ export class Translator {
         return line
     }
 
-    /**
-     * @param {"increase" | "decrease"} mode
-     */
-    changeBatchSize(mode) {
-        const old = this.currentBatchSize
-        if (mode === "decrease") {
-            if (this.currentBatchSize === this.options.batchSizes[0]) {
-                return false
-            }
-            this.workingBatchSizes.unshift(this.workingBatchSizes.pop())
-        }
-        else if (mode === "increase") {
-            if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1]) {
-                return false
-            }
-            this.workingBatchSizes.push(this.workingBatchSizes.shift())
-        }
-        this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
-        if (this.currentBatchSize === this.options.batchSizes[this.options.batchSizes.length - 1]) {
-            this.batchSizeThreshold = undefined
-        }
-        else {
-            this.batchSizeThreshold = Math.floor(Math.max(old, this.currentBatchSize) / Math.min(old, this.currentBatchSize))
-        }
-        log.debug("[Translator]", "BatchSize", mode, old, "->", this.currentBatchSize, "SizeThreshold", this.batchSizeThreshold)
-        return true
-    }
-
     buildContext() {
         if (this.workingProgress.length === 0) {
             return;
         }
 
-        let sliced;
+        const { sliced, tokenCount } = this.sliceByTokenBudget(
+            this.workingProgress,
+            e => e.completionTokens,
+            this.options.batchSizes[this.options.batchSizes.length - 1]
+        )
+
         if (this.options.useFullContext > 0) {
-            // Slice workingProgress to fit within the token budget using tracked token counts
-            // from actual model responses. Entries without token data are included without
-            // contributing to the budget. Allows the first entry that crosses the budget to
-            // still be included, since the specified budget is intentionally a buffer below
-            // the model's limit.
-            const maxTokens = this.options.useFullContext;
-            let tokenCount = 0;
-            let startIndex = this.workingProgress.length;
-            for (let i = this.workingProgress.length - 1; i >= 0; i--) {
-                const entry = this.workingProgress[i];
-                // Use only completionTokens (scaled ~2x for source+translation) to estimate
-                // the marginal context cost of this entry. The API's promptTokens include system
-                // prompt and cumulative history overhead, which causes severe overcounting here.
-                tokenCount += (entry.completionTokens ?? 0) * 2;
-                startIndex = i;
-                if (tokenCount > maxTokens) break; // include this entry, then stop
-            }
-            sliced = this.workingProgress.slice(startIndex);
             const logSliceContext = sliced.length < this.workingProgress.length
                 ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ~${Math.round(tokenCount)} tokens)`
                 : `all (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
             log.debug("[Translator]", "Context:", logSliceContext)
-        } else {
-            sliced = this.workingProgress.slice(-this.options.batchSizes[this.options.batchSizes.length - 1]);
         }
+
         const offset = this.workingProgress.length - sliced.length;
 
         /**
@@ -531,83 +361,11 @@ export class Translator {
 
 
     /**
-     * @param {string[]} lines 
+     * @param {string[]} lines
      * @param {"user" | "assistant" } role
      * @returns {string}
      */
     getContextLines(lines, role) {
         return lines.join("\n\n")
-    }
-
-    get usage() {
-        const promptTokensUsed = this.promptTokensUsed
-        const completionTokensUsed = this.completionTokensUsed
-        const promptTokensWasted = this.promptTokensWasted
-        const completionTokensWasted = this.completionTokensWasted
-        const usedTokens = promptTokensUsed + completionTokensUsed
-        const wastedTokens = promptTokensWasted + completionTokensWasted
-        const minutesElapsed = this.tokensProcessTimeMs / 1000 / 60
-        const promptRate = roundWithPrecision(promptTokensUsed / minutesElapsed, 0)
-        const completionRate = roundWithPrecision(completionTokensUsed / minutesElapsed, 0)
-        const rate = roundWithPrecision(usedTokens / minutesElapsed, 0)
-        const wastedPercent = (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 })
-        const cachedTokens = this.cachedTokens
-        const contextPromptTokens = this.contextPromptTokens
-        const contextCompletionTokens = this.contextCompletionTokens
-        const contextTokens = contextPromptTokens + contextCompletionTokens
-        return {
-            promptTokensUsed,
-            completionTokensUsed,
-            promptTokensWasted,
-            completionTokensWasted,
-            usedTokens,
-            wastedTokens,
-            wastedPercent,
-            cachedTokens,
-            contextPromptTokens,
-            contextCompletionTokens,
-            contextTokens,
-            promptRate,
-            completionRate,
-            rate,
-        }
-    }
-
-    async printUsage() {
-        const usage = this.usage
-
-        await sleep(10)
-
-        const {
-            promptTokensUsed,
-            completionTokensUsed,
-            promptTokensWasted,
-            completionTokensWasted,
-            usedTokens,
-            wastedTokens,
-            wastedPercent,
-            cachedTokens,
-            contextPromptTokens,
-            contextCompletionTokens,
-            contextTokens,
-            promptRate,
-            completionRate,
-            rate,
-        } = usage
-
-        log.debug(
-            `[Translator] Estimated Usage`,
-            "\n\tTokens:", promptTokensUsed, "+", completionTokensUsed, "=", usedTokens,
-            "\n\tWasted:", promptTokensWasted, "+", completionTokensWasted, "=", wastedTokens, wastedPercent,
-            "\n\tCached:", cachedTokens >= 0 ? cachedTokens : "-",
-            "\n\tContext:", ...(contextTokens > 0 ? [contextPromptTokens, "+", contextCompletionTokens, "=", contextTokens, "/", this.options.useFullContext, `(${Math.round(contextTokens / this.options.useFullContext * 100)}%)`] : ["-"]),
-            "\n\tRate:", promptRate, "+", completionRate, "=", rate, "TPM", this.services.cooler?.rate, "RPM",
-        )
-    }
-
-    abort() {
-        log.warn("[Translator]", "Aborting")
-        this.streamController?.abort()
-        this.aborted = true
     }
 }
