@@ -218,16 +218,16 @@ export class Translator extends TranslatorBase {
                 // buildContext() slices and sums costs per entry, we divide evenly so that
                 // summing any subset of entries approximates the proportional token cost.
                 yield* this.yieldOutput(batch, outputs, output.completionTokens / outputs.length)
+
+                if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
+                    reducedBatchSessions = 0
+                    const old = this.currentBatchSize
+                    this.changeBatchSize("increase")
+                    index -= (this.currentBatchSize - old)
+                }
             }
 
             this.printUsage()
-
-            if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
-                reducedBatchSessions = 0
-                const old = this.currentBatchSize
-                this.changeBatchSize("increase")
-                index -= (this.currentBatchSize - old)
-            }
         }
     }
 
