@@ -9,7 +9,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
-- Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, available in the Web UI and in CLI with `-r, --structured`
+- Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, enabled by default in the Web UI and CLI
 - Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, controlled with `-c, --context` (CLI only)
 - Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
 - Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent
@@ -22,10 +22,10 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 ## Setup
 Reference: <https://github.com/openai/openai-quickstart-node#setup>
 - Node.js version `>= 20` required. This README assumes `bash` shell environment
-- Clone this repository and 
+- Clone this repository
   ```bash
   git clone https://github.com/Cerlancism/chatgpt-subtitle-translator
-  ``` 
+  ```
 - Navigate into the directory
   ```bash
   cd chatgpt-subtitle-translator
@@ -59,18 +59,12 @@ Options:
     Source language (default: "") 
   - `--to <language>`  
     Target language (default: "English")
+  - `-s, --system-instruction <instruction>`  
+    Override the prompt system instruction template `Translate ${from} to ${to}` with this text, **ignoring `--from` and `--to` options**
   - `-i, --input <file>`  
     Input source text with the content of this file, in `.srt` format or plain text
   - `-o, --output <file>`  
     Output file name, defaults to be based on input file name
-  - `-s, --system-instruction <instruction>`  
-    Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text, ignoring `--from` and `--to` options
-  - `--initial-prompts <prompts>`  
-    Initial prompts for the translation in JSON (default: `"[]"`) 
-  - `--use-moderator`
-    Use the OpenAI API Moderation endpoint
-  - `--moderation-model <model>`
-    (default: `"omni-moderation-latest"`) https://developers.openai.com/api/docs/models  
   - `-b, --batch-sizes <sizes>`
     Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10,50]"`)  
 
@@ -92,20 +86,26 @@ Options:
     The token budget is tracked from actual model response token counts. The history is chunked into user/assistant message pairs using the last value in `--batch-sizes`.
 
     Recommended value: set `<tokens>` to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--context 90000`.
+  - `--initial-prompts <prompts>`  
+    Initial prompts for the translation in JSON (default: `"[]"`) 
+  - `--use-moderator`
+    Use the OpenAI API Moderation endpoint
+  - `--moderation-model <model>`
+    (default: `"omni-moderation-latest"`) https://developers.openai.com/api/docs/models  
   - `--no-prefix-number`
     Don't prefix lines with numerical indices. Ignored in `-r, --structured` `array|object|timestamp` - prefix numbers are always disabled there.
   - `--no-line-matching`
     Don't enforce one to one line quantity input output matching. Ignored in `-r, --structured` `timestamp` - line matching is always disabled there since entries may be merged.
   - `-p, --plain-text <text>`
     Input source text with this plain text argument. Not supported in `-r, --structured` `timestamp`.
+  - `--no-stream`
+    Disable stream progress output to terminal (streaming is on by default)
   - `--log-level <level>`  
     Log level (default: `debug`, choices: `trace`, `debug`, `info`, `warn`, `error`, `silent`)
   - `--silent`  
     Same as `--log-level silent`  
   - `--quiet`
     Same as `--log-level silent`
-  - `--no-stream`
-    Disable stream progress output to terminal (streaming is on by default)
 
 Additional Options for GPT: https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
   - `-m, --model <model>`
@@ -153,7 +153,7 @@ Standard Output
 ```
 Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;
 ```  
-### Unscrabling
+### Unscrambling
 ```bash
 cli/translator.mjs --system-instruction "Unscramble characters back to English" --no-prefix-number --no-line-matching --plain-text "Cuhck Nroris can wakl wtih the aiamnls, talk wtih the aiamnls;"
 ```
