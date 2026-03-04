@@ -31,7 +31,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
         const max_tokens = this.getMaxToken(lines)
 
         const structuredArray = z.object({
-            outputs: z.array(z.string()).describe(`to expect ${lines.length} items`)
+            outputs: z.array(z.string())
         })
 
         try {
