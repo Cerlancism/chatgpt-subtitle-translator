@@ -531,7 +531,7 @@ Tokens: `127`
 
 *(Toon format - compact, not JSON)*
 
-```
+```yaml
 inputs[5]{start,end,text}:
   0,2000,おはようございます。
   2000,5000,お元気ですか？
