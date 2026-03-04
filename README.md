@@ -226,14 +226,14 @@ Yes, it's very nice weather.
 ```
 
 ## How it works
-### Token Reductions
-SRT timestamps and indices are stripped. Text lines are batched into a structured JSON user message; the model returns a matching structured JSON response. The translated lines are then reassembled back into SRT format.
+SRT indices and timestamps are stripped or simplified before sending to the model, reducing tokens. Lines are batched together into a single prompt - removing repeated per-entry overhead. The default system instruction is a minimal `Translate to <language>` (3 tokens). Structured output modes enforce a schema so the model returns only the translated text, with no extra commentary.
 
-**System Instruction**
-Tokens: `3`
-```
-Translate to English
-```
+Four modes are available via `--structured`:
+
+#### `array` (default)
+
+Lines are sent as a JSON array. The model returns a matching array.
+
 <table>
 <tr>
 <th>Input (SRT)</th>
@@ -320,6 +320,351 @@ Tokens: `127`
     "Yes, it's very nice weather."
   ]
 }
+```
+
+</td>
+<td valign="top">
+
+```srt
+1
+00:00:00,000 --> 00:00:02,000
+Good morning.
+
+2
+00:00:02,000 --> 00:00:05,000
+How are you?
+
+3
+00:00:05,000 --> 00:00:07,000
+Yes, I'm doing well.
+
+4
+00:00:08,000 --> 00:00:12,000
+The weather is nice today, isn't it?
+
+5
+00:00:12,000 --> 00:00:16,000
+Yes, it's very nice weather.
+```
+
+</td>
+</tr>
+</table>
+
+#### `object`
+
+Source lines are used as keys in the response schema. The model maps each source key to its translation. No explicit user message is sent - the schema itself conveys the input.
+
+<table>
+<tr>
+<th>Input (SRT)</th>
+<th>Prompt (Schema Keys)</th>
+<th>Transform (Model Response)</th>
+<th>Output (SRT)</th>
+</tr>
+<tr>
+<td>
+
+Tokens: `139`
+
+</td>
+<td>
+
+Tokens: `~60`
+
+</td>
+<td>
+
+Tokens: `85`
+
+</td>
+<td>
+
+Tokens: `127`
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+```srt
+1
+00:00:00,000 --> 00:00:02,000
+おはようございます。
+
+2
+00:00:02,000 --> 00:00:05,000
+お元気ですか？
+
+3
+00:00:05,000 --> 00:00:07,000
+はい、元気です。
+
+4
+00:00:08,000 --> 00:00:12,000
+今日は天気がいいですね。
+
+5
+00:00:12,000 --> 00:00:16,000
+はい、とてもいい天気です。
+```
+
+</td>
+<td valign="top">
+
+*Source lines are encoded as response schema keys (no user message)*
+
+```json
+{
+  "おはようございます。": "string",
+  "お元気ですか？": "string",
+  "はい、元気です。": "string",
+  "今日は天気がいいですね。": "string",
+  "はい、とてもいい天気です。": "string"
+}
+```
+
+</td>
+<td valign="top">
+
+*(compact JSON, formatted here for readability)*
+
+```json
+{
+  "おはようございます。": "Good morning.",
+  "お元気ですか？": "How are you?",
+  "はい、元気です。": "Yes, I'm doing well.",
+  "今日は天気がいいですね。": "The weather is nice today, isn't it?",
+  "はい、とてもいい天気です。": "Yes, it's very nice weather."
+}
+```
+
+</td>
+<td valign="top">
+
+```srt
+1
+00:00:00,000 --> 00:00:02,000
+Good morning.
+
+2
+00:00:02,000 --> 00:00:05,000
+How are you?
+
+3
+00:00:05,000 --> 00:00:07,000
+Yes, I'm doing well.
+
+4
+00:00:08,000 --> 00:00:12,000
+The weather is nice today, isn't it?
+
+5
+00:00:12,000 --> 00:00:16,000
+Yes, it's very nice weather.
+```
+
+</td>
+</tr>
+</table>
+
+#### `timestamp`
+
+Timestamps are preserved alongside the text. Lines are sent using the compact [Toon format](https://www.npmjs.com/package/@toon-format/toon) (milliseconds). The model may merge subtitle entries when contextually appropriate, which it reports via `mergedRemarks`.
+
+<table>
+<tr>
+<th>Input (SRT)</th>
+<th>Prompt (User Message)</th>
+<th>Transform (Model Response)</th>
+<th>Output (SRT)</th>
+</tr>
+<tr>
+<td>
+
+Tokens: `139`
+
+</td>
+<td>
+
+Tokens: `92`
+
+</td>
+<td>
+
+Tokens: `104`
+
+</td>
+<td>
+
+Tokens: `127`
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+```srt
+1
+00:00:00,000 --> 00:00:02,000
+おはようございます。
+
+2
+00:00:02,000 --> 00:00:05,000
+お元気ですか？
+
+3
+00:00:05,000 --> 00:00:07,000
+はい、元気です。
+
+4
+00:00:08,000 --> 00:00:12,000
+今日は天気がいいですね。
+
+5
+00:00:12,000 --> 00:00:16,000
+はい、とてもいい天気です。
+```
+
+</td>
+<td valign="top">
+
+*(Toon format - compact, not JSON)*
+
+```
+inputs[5]{start,end,text}:
+  0,2000,おはようございます。
+  2000,5000,お元気ですか？
+  5000,7000,はい、元気です。
+  8000,12000,今日は天気がいいですね。
+  12000,16000,はい、とてもいい天気です。
+```
+
+</td>
+<td valign="top">
+
+*(compact JSON, formatted here for readability)*
+
+```json
+{
+  "outputs": [
+    { "start": 0, "end": 2000, "text": "Good morning." },
+    { "start": 2000, "end": 5000, "text": "How are you?" },
+    { "start": 5000, "end": 7000, "text": "Yes, I'm doing well." },
+    { "start": 8000, "end": 12000, "text": "The weather is nice today, isn't it?" },
+    { "start": 12000, "end": 16000, "text": "Yes, it's very nice weather." }
+  ],
+  "mergedRemarks": ""
+}
+```
+
+</td>
+<td valign="top">
+
+```srt
+1
+00:00:00,000 --> 00:00:02,000
+Good morning.
+
+2
+00:00:02,000 --> 00:00:05,000
+How are you?
+
+3
+00:00:05,000 --> 00:00:07,000
+Yes, I'm doing well.
+
+4
+00:00:08,000 --> 00:00:12,000
+The weather is nice today, isn't it?
+
+5
+00:00:12,000 --> 00:00:16,000
+Yes, it's very nice weather.
+```
+
+</td>
+</tr>
+</table>
+
+#### `none`
+
+No structured output. Lines are sent as plain text and the model returns plain text.
+
+<table>
+<tr>
+<th>Input (SRT)</th>
+<th>Prompt (User Message)</th>
+<th>Transform (Model Response)</th>
+<th>Output (SRT)</th>
+</tr>
+<tr>
+<td>
+
+Tokens: `139`
+
+</td>
+<td>
+
+Tokens: `59`
+
+</td>
+<td>
+
+Tokens: `42`
+
+</td>
+<td>
+
+Tokens: `127`
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+```srt
+1
+00:00:00,000 --> 00:00:02,000
+おはようございます。
+
+2
+00:00:02,000 --> 00:00:05,000
+お元気ですか？
+
+3
+00:00:05,000 --> 00:00:07,000
+はい、元気です。
+
+4
+00:00:08,000 --> 00:00:12,000
+今日は天気がいいですね。
+
+5
+00:00:12,000 --> 00:00:16,000
+はい、とてもいい天気です。
+```
+
+</td>
+<td valign="top">
+
+```
+1. おはようございます。
+2. お元気ですか？
+3. はい、元気です。
+4. 今日は天気がいいですね。
+5. はい、とてもいい天気です。
+```
+
+</td>
+<td valign="top">
+
+```
+1. Good morning.
+2. How are you?
+3. Yes, I'm doing well.
+4. The weather is nice today, isn't it?
+5. Yes, it's very nice weather.
 ```
 
 </td>
