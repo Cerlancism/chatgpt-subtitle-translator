@@ -13,7 +13,7 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 - Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, controlled with `-c, --context` (CLI only)
 - Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
 - Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent
-- Optional OpenAI Moderation tool check: prevents token wastage if the model is highly likely to refuse to translate, enabled with `--use-moderator`
+- Optional OpenAI Moderation tool check: prevents token wastage if the model is highly likely to refuse to translate, enabled with `--use-moderator` (CLI only)
 - Streaming process output  
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview)  
 - Progress resumption (CLI only)
@@ -75,7 +75,7 @@ Options:
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
   - `-r, --structured <mode>`
     [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode with timestamp support. (default: `array`, choices: `array`, `timestamp`, `object`, `none`)
-      - `array` Structures the input and output into a plain array format. More concise than `none` mode, though uses slightly more tokens per batch.
+      - `array` Structures the input and output into an array format.
       - `timestamp` Provides the model with start/end timestamps alongside each entry's text, allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and a merge remarks field in output. Output entry count may differ from input, so progress file resumption is not supported.
       - `object` Structures the input and output as a keyed object.
       - `none` Disables structured output.
@@ -226,7 +226,7 @@ Yes, it's very nice weather.
 ```
 
 ## How it works
-SRT indices and timestamps are stripped or simplified before sending to the model, reducing tokens. Lines are batched together into a single prompt - removing repeated per-entry overhead. The default system instruction is a minimal `Translate to <language>` (3 tokens). Structured output modes enforce a schema so the model returns only the translated text, with no extra commentary.
+SRT indices and timestamps are stripped or simplified before sending to the model, reducing tokens. Lines are batched together into a single prompt - removing repeated per-entry overhead. The default system instruction is a minimal `Translate to <language>` (3 tokens). Structured output modes enforce a schema so the model returns only the translated text.
 
 Four modes are available via `--structured`:
 
