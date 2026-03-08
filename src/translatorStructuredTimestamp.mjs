@@ -20,7 +20,7 @@ const timestampEntriesSchema = z.array(z.object({
  */
 
 /** @param {TimestampEntry} e @returns {MsEntry} */
-const toMsEntry = (e) => ({ start: timestampToMilliseconds(e.start), end: timestampToMilliseconds(e.end), text: e.text })
+export const toMsEntry = (e) => ({ start: timestampToMilliseconds(e.start), end: timestampToMilliseconds(e.end), text: e.text })
 
 /** @param {MsEntry} e @returns {TimestampEntry} */
 const fromMsEntry = (e) => ({ start: millisecondsToTimestamp(e.start), end: millisecondsToTimestamp(e.end), text: e.text })

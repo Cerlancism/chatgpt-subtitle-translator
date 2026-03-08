@@ -14,6 +14,7 @@ import {
     TranslatorStructuredObject,
     TranslatorStructuredArray,
     TranslatorStructuredTimestamp,
+    TranslatorAgent,
     createOpenAIClient,
     CooldownContext,
     subtitleParser,
@@ -58,7 +59,7 @@ export function createInstance(args) {
 
         .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
         .option("--experimental-input-multiplier <value>", "", val => parseInt(val, 10), 0)
-        .addOption(new Option("-r, --structured <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "timestamp", "object", "none"]).default("array"))
+        .addOption(new Option("-r, --structured <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "timestamp", "object", "none", "agent"]).default("array"))
         .option("-c, --context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by the last value in --batch-sizes, to work better with prompt caching. Set to 0 to include history without a token limit check. Recommended: set to 30% less than the model's max context length.", val => parseInt(val, 10), DefaultOptions.useFullContext)
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
@@ -169,6 +170,9 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
         else if (options.structuredMode == "timestamp") {
             return new TranslatorStructuredTimestamp({ from: opts.from, to: opts.to }, services, options);
         }
+        else if (options.structuredMode == "agent") {
+            return new TranslatorAgent({ from: opts.from, to: opts.to }, services, options);
+        }
         else {
             return new Translator({ from: opts.from, to: opts.to }, services, options);
         }
@@ -181,8 +185,8 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     }
 
     if (opts.plainText) {
-        if (opts.structured === "timestamp") {
-            log.error("[CLI]", "--plain-text is not supported in timestamp mode.")
+        if (opts.structured === "timestamp" || opts.structured === "agent") {
+            log.error("[CLI]", "--plain-text is not supported in timestamp/agent mode.")
             process.exit(1)
         }
         await translatePlainText(/** @type {import('../src/translator.mjs').Translator} */ (translator), opts.plainText)
@@ -195,10 +199,10 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
             const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}.srt`
 
-            if (options.structuredMode === "timestamp") {
-                // Timestamp mode: model receives start/end seconds and may merge entries.
+            if (options.structuredMode === "timestamp" || options.structuredMode === "agent") {
+                // Timestamp/agent mode: model receives start/end seconds and may merge entries.
                 // Output count can differ from input, so progress file resume is not supported.
-                log.warn("[CLI]", "Timestamp mode: progress resumption is not supported, starting from beginning.")
+                log.warn("[CLI]", `${options.structuredMode === "agent" ? "Agent" : "Timestamp"} mode: progress resumption is not supported, starting from beginning.`)
                 fs.writeFileSync(outputFile, '')
                 const timestampSource = srtArraySource.map(e => ({ start: e.startTime, end: e.endTime, text: e.text }))
                 let outputId = 1
