@@ -32,7 +32,7 @@ const singleTimestampSchema = z.object({
 
 const batchTimestampSchema = z.object({
     outputs: timestampEntriesSchema,
-    mergedRemarks: z.string()
+    remarksIfContainedMergers: z.string()
 })
 
 const schemaDescriptions = {
@@ -41,12 +41,12 @@ const schemaDescriptions = {
     ].join("\n"),
     batch: [
         "outputs: Subtitle entries with start and end as milliseconds",
-        "mergedRemarks: MUST be empty if no merges! Otherwise: briefly explain why entries were merged in 1 short sentence.",
+        "remarksIfContainedMergers: MUST be empty if no merges! Otherwise: briefly explain why entries were merged in 1 short sentence.",
     ].join("\n"),
 }
 
 /**
- * @typedef {{ outputs: TimestampEntry[], mergedRemarks: string }} BatchTimestampOutput
+ * @typedef {{ outputs: TimestampEntry[], remarksIfContainedMergers: string }} BatchTimestampOutput
  */
 
 /**
@@ -181,10 +181,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @param {TimestampEntry[]} batch
      * @param {TimestampEntry[]} outputEntries
-     * @param {string} mergedRemarks
+     * @param {string} remarksIfContainedMergers
      * @returns {boolean}
      */
-    evaluateBatchOutput(batch, outputEntries, mergedRemarks) {
+    evaluateBatchOutput(batch, outputEntries, remarksIfContainedMergers) {
         const firstInputStart = batch[0].start
         const firstOutputStart = outputEntries[0]?.start
         const lastInputEnd = batch.at(-1).end
@@ -192,7 +192,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         const isMismatch = outputEntries.length === 0 || firstOutputStart !== firstInputStart || lastOutputEnd !== lastInputEnd
         const actuallyMerged = outputEntries.length !== batch.length
 
-        this.logMergeStatus(batch, outputEntries, mergedRemarks, isMismatch, actuallyMerged, lastInputEnd)
+        this.logMergeStatus(batch, outputEntries, remarksIfContainedMergers, isMismatch, actuallyMerged, lastInputEnd)
 
         if (isMismatch) {
             log.debug("[TranslatorStructuredTimestamp]",
@@ -200,7 +200,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 "expected start:", firstInputStart, "got:", firstOutputStart,
                 "expected end:", lastInputEnd, "got:", lastOutputEnd,
                 `(input: ${batch.length}, output: ${outputEntries.length})`,
-                ...(mergedRemarks ? [`remarks: "${mergedRemarks}"`] : [])
+                ...(remarksIfContainedMergers ? [`remarks: "${remarksIfContainedMergers}"`] : [])
             )
         }
 
@@ -210,16 +210,16 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @param {TimestampEntry[]} batch
      * @param {TimestampEntry[]} outputEntries
-     * @param {string} mergedRemarks
+     * @param {string} remarksIfContainedMergers
      * @param {boolean} isMismatch
      * @param {boolean} actuallyMerged
      * @param {string} lastInputEnd
      */
-    logMergeStatus(batch, outputEntries, mergedRemarks, isMismatch, actuallyMerged, lastInputEnd) {
-        const declaredMerged = mergedRemarks !== ""
+    logMergeStatus(batch, outputEntries, remarksIfContainedMergers, isMismatch, actuallyMerged, lastInputEnd) {
+        const declaredMerged = remarksIfContainedMergers !== ""
         if (!isMismatch && declaredMerged !== actuallyMerged) {
             log.warn("[TranslatorStructuredTimestamp]",
-                `Merge mergedRemarks mismatch: model ${declaredMerged ? `declared merging ("${mergedRemarks}")` : "provided no remarks"} but output count ${outputEntries.length} vs input ${batch.length}`)
+                `Merge remarksIfContainedMergers mismatch: model ${declaredMerged ? `declared merging ("${remarksIfContainedMergers}")` : "provided no remarks"} but output count ${outputEntries.length} vs input ${batch.length}`)
         }
 
         if (!isMismatch && actuallyMerged) {
@@ -243,7 +243,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 `(input: ${batch.length}, output: ${outputEntries.length})`,
                 `\n input:${inputToLog.map(fmtEntry).join("")}`,
                 `\n output:${outputToLog.map(fmtEntry).join("")}`,
-                mergedRemarks ? `\n remarks: ${mergedRemarks}` : ""
+                remarksIfContainedMergers ? `\n remarks: ${remarksIfContainedMergers}` : ""
             )
         }
     }
@@ -269,7 +269,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             const parsed = /** @type {BatchTimestampOutput} */ (/** @type {unknown} */ (output.content ?? {}))
             const outputEntries = parsed.outputs ?? []
 
-            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.mergedRemarks ?? "")
+            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.remarksIfContainedMergers ?? "")
 
             if (isMismatch || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
