@@ -425,10 +425,10 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             log.debug("[TranslatorAgent]", "Context summary:\n", consolidatedContextSummary)
 
             await this.services.cooler?.cool()
-            const refinedDirective = await this._refineFinalInstruction(consolidatedContextSummary, budget, subtitleMeta)
+            const refinedDirective = await this._refineFinalInstruction(consolidatedContextSummary, budget)
             log.debug("[TranslatorAgent]", "Refined instruction:\n", refinedDirective)
 
-            finalInstruction = [refinedDirective ?? this.systemInstruction, consolidatedContextSummary]
+            finalInstruction = [refinedDirective ?? this.systemInstruction, consolidatedContextSummary, subtitleMeta]
                 .filter(Boolean).join("\n---\n")
         }
 
@@ -623,10 +623,9 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
      *
      * @param {string} contextSummary - consolidated context from all scan windows
      * @param {number} budget - max_tokens for the model call
-     * @param {string} subtitleMeta - raw subtitle metadata (file name, entry count, duration)
      * @returns {Promise<string | null>}
      */
-    async _refineFinalInstruction(contextSummary, budget, subtitleMeta) {
+    async _refineFinalInstruction(contextSummary, budget) {
         const messages = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ ([
             {
                 role: "system",
@@ -634,17 +633,15 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                     `Your goal is a lean, focused instruction.\n\n` +
                     `Rules:\n` +
                     `1. Preserve the target language and any stylistic directives that apply to the observed content.\n` +
-                    `2. Include the subtile file name, entry count and duration.\n` +
-                    `3. If the base instruction contains a glossary, dictionary, or list of terms/names, ` +
+                    `2. If the base instruction contains a glossary, dictionary, or list of terms/names, ` +
                     `filter it to only entries that appear in or are directly relevant to the observed content. ` +
                     `Remove any entries not encountered in this file.\n` +
-                    `4. Remove instructions that are redundant, contradicted, or clearly out of scope given what was observed.\n` +
-                    `5. Do not embed narrative facts from the context — keep it as clean translator guidance.\n`
+                    `3. Remove instructions that are redundant, contradicted, or clearly out of scope given what was observed.\n` +
+                    `4. Do not embed narrative facts from the context — keep it as clean translator guidance.\n`
             },
             {
                 role: "user",
                 content:
-                    `# Subtitle information:\n${subtitleMeta}\n\n` +
                     `# Base instruction:\n${this.systemInstruction}\n\n` +
                     `# Observed content context:\n${contextSummary}`
             }
@@ -748,7 +745,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                 (/** @type {unknown} */ (output.content ?? {}))
             const outputEntries = parsed.outputs ?? []
 
-            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.mergedRemarks ?? "")
+            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.remarksIfContainedMergers ?? "")
 
             if (isMismatch || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
