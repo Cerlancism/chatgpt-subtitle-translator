@@ -574,20 +574,28 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
      * @returns {Promise<string>}
      */
     async _consolidateBatchSummaries(existing, newNote = "", budget, budgetFactor = 0.5) {
+        const isFinal = !newNote
         const targetTokens = Math.floor(budget * budgetFactor)
         const messages = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ ([
             {
                 role: "system",
-                content: `You are consolidating mid-pass batch summaries for a subtitle file ` +
-                    `into a single condensed set of notes (target: ~${targetTokens} tokens).\n\n` +
-                    `Rules:\n` +
+                content: (isFinal
+                    ? `You are doing a final consolidation of all batch summaries for a subtitle file ` +
+                      `into a single complete set of notes (target: ~${targetTokens} tokens). ` +
+                      `This will be used as the full context for a translator - preserve all details.`
+                    : `You are doing a mid-pass consolidation of batch summaries for a subtitle file ` +
+                      `into a single condensed set of notes (target: ~${targetTokens} tokens). ` +
+                      `More batches will follow - stay concise but keep all unique facts.`) +
+                    `\n\nRules:\n` +
                     `1. Open with your overall impression of the content so far.\n` +
                     `2. Preserve all unique 5W1H facts (who, what, where, when, why/how - names, locations, terms, tone, dialect).\n` +
-                    `3. Remove duplicate or contradictory information. Keep it concise.`
+                    `3. Remove duplicate or contradictory information. ${isFinal ? "Be thorough - this is the last pass." : "Keep it concise - more content is coming."}`
             },
             {
                 role: "user",
-                content: `# Existing batch summaries:\n${existing}\n\n# New batch summary:\n${newNote}`
+                content: isFinal
+                    ? `# Batch summaries:\n${existing}`
+                    : `# Existing batch summaries:\n${existing}\n\n# New batch summary:\n${newNote}`
             }
         ])
         try {
@@ -595,7 +603,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                 messages,
                 ...this.options.createChatCompletionRequest,
                 stream: this.options.createChatCompletionRequest.stream,
-                max_tokens: targetTokens
+                max_tokens: Math.floor(targetTokens * 1.5)
             }, { structure: consolidateSchema, name: "agent_consolidate" })
 
             this._accumulatePlanningUsage(output)
