@@ -519,7 +519,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             `You are scanning a context window of entries ${batchStart} to ${batchStart + batch.length - 1} ` +
             `(timestamps ${batch[0].start}–${batch[batch.length - 1].end} ms).\n\n` +
             `Rules for batchSummary:\n` +
-            `1. Write in target language.\n` +
+            `1. Write in the translated language.\n` +
             `2. Open with your overall impression of this window's content.\n` +
             `3. Write only what is new or notable here - do not repeat or refine prior context.\n` +
             `4. Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
@@ -588,7 +588,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                       `into a single condensed set of notes (target: ~${targetTokens} tokens). ` +
                       `More batches will follow - stay concise but keep all unique facts.`) +
                     `\n\nRules:\n` +
-                    `1. Write in target language.\n` +
+                    `1. Write in the translated language.\n` +
                     `2. Open with your overall impression of the content so far.\n` +
                     `3. Preserve all unique 5W1H facts (who, what, where, when, why/how - names, locations, terms, tone, dialect).\n` +
                     `4. Remove duplicate or contradictory information. ${isFinal ? "Be thorough - this is the last pass." : "Keep it concise - more content is coming."}`
