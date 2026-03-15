@@ -619,7 +619,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
 
     /**
      * Refines the base system instruction against the scanned context.
-     * Only makes changes if the base instruction is redundant or misaligned — otherwise returns it verbatim.
+     * Only makes changes if the base instruction is redundant or misaligned - otherwise returns it verbatim.
      *
      * @param {string} contextSummary - consolidated context from all scan windows
      * @param {number} budget - max_tokens for the model call
@@ -637,7 +637,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                     `filter it to only entries that appear in or are directly relevant to the observed content. ` +
                     `Remove any entries not encountered in this file.\n` +
                     `3. Remove instructions that are redundant, contradicted, or clearly out of scope given what was observed.\n` +
-                    `4. Do not embed narrative facts from the context — keep it as clean translator guidance.\n`
+                    `4. Do not embed narrative facts from the context - keep it as clean translator guidance.\n`
             },
             {
                 role: "user",

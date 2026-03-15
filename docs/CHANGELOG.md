@@ -8,9 +8,9 @@
 
 A two-pass agentic translation mode built on `timestamp`.
 
-**Pass 1 — Planning:** Scans the full subtitle file in max-batch-size chunks. For each chunk the model produces a batch summary (character names, locations, events, tone, dialect) and decides a natural batch boundary. Summaries accumulate and are consolidated when they exceed the token budget. At the end of the scan, a refined system instruction is generated that filters the glossary and stylistic notes down to only what was observed in the file.
+**Pass 1 - Planning:** Scans the full subtitle file in max-batch-size chunks. For each chunk the model produces a batch summary (character names, locations, events, tone, dialect) and decides a natural batch boundary. Summaries accumulate and are consolidated when they exceed the token budget. At the end of the scan, a refined system instruction is generated that filters the glossary and stylistic notes down to only what was observed in the file.
 
-**Pass 2 — Translation:** Runs identically to `timestamp` mode using the enriched instruction and the agent-determined batch boundaries from Pass 1.
+**Pass 2 - Translation:** Runs identically to `timestamp` mode using the enriched instruction and the agent-determined batch boundaries from Pass 1.
 
 Best suited for content with recurring characters, specialized vocabulary, or stylistic consistency requirements. Costs additional API calls for the planning pass. Progress file resumption is not supported.
 

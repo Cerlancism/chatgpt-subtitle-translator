@@ -17,7 +17,7 @@ export { DefaultOptions }
  * @template [T=string]
  * @template {T[]} [TLines=T[]]
  * @extends {TranslatorBase<T, TLines>}
- * Translator using ChatGPT — string-array implementation.
+ * Translator using ChatGPT - string-array implementation.
  */
 export class Translator extends TranslatorBase {
     /**

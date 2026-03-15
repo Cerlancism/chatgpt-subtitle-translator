@@ -118,7 +118,7 @@ export class TranslatorBase {
     }
 
     /**
-     * Timing and accumulation wrapper — subclasses override doTranslatePrompt, not this.
+     * Timing and accumulation wrapper - subclasses override doTranslatePrompt, not this.
      * @param {TLines} lines
      * @returns {Promise<import('./translatorOutput.mjs').TranslationOutput>}
      */
