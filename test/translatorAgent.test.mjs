@@ -39,10 +39,8 @@ test('_refineFinalInstruction: filters glossary to only observed terms', async (
         `Episode 3 of a crime drama. Detective Tanaka interrogates suspect Sato at the koban. ` +
         `Police chief Yamamoto supervises. No scientists, doctors, or lawyers appear.`
 
-    const subtitleMeta = `File: episode3.srt | Total entries: 120 | Duration: 00:00:00,000 -> 00:22:00,000`
-
     const agent = makeAgent(baseInstruction)
-    const result = await agent._refineFinalInstruction(contextSummary, 500, subtitleMeta)
+    const result = await agent._refineFinalInstruction(contextSummary, 500)
 
     console.log("Refined instruction:\n", result)
 
@@ -63,10 +61,8 @@ test('_refineFinalInstruction: filters glossary to only observed terms', async (
 test('_refineFinalInstruction: preserves target language when base is minimal', async () => {
     const baseInstruction = `Translate Japanese to English.`
     const contextSummary = `A short cooking show. Host explains how to make ramen.`
-    const subtitleMeta = `File: cooking.srt | Total entries: 30 | Duration: 00:00:00,000 -> 00:05:00,000`
-
     const agent = makeAgent(baseInstruction)
-    const result = await agent._refineFinalInstruction(contextSummary, 500, subtitleMeta)
+    const result = await agent._refineFinalInstruction(contextSummary, 500)
 
     console.log("Refined instruction:\n", result)
 
