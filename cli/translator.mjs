@@ -59,7 +59,7 @@ export function createInstance(args) {
 
         .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
         .option("--experimental-input-multiplier <value>", "", val => parseInt(val, 10), 0)
-        .addOption(new Option("-r, --structured <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "timestamp", "object", "none", "agent"]).default("array"))
+        .addOption(new Option("-r, --structured <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "timestamp", "agent", "object", "none"]).default("array"))
         .option("-c, --context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by the last value in --batch-sizes, to work better with prompt caching. Set to 0 to include history without a token limit check. Recommended: set to 30% less than the model's max context length.", val => parseInt(val, 10), DefaultOptions.useFullContext)
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
@@ -165,14 +165,14 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
         if (options.structuredMode == "array") {
             return new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
         }
-        else if (options.structuredMode == "object") {
-            return new TranslatorStructuredObject({ from: opts.from, to: opts.to }, services, options);
-        }
         else if (options.structuredMode == "timestamp") {
             return new TranslatorStructuredTimestamp({ from: opts.from, to: opts.to }, services, options);
         }
         else if (options.structuredMode == "agent") {
             return new TranslatorAgent({ from: opts.from, to: opts.to }, services, options);
+        }
+        else if (options.structuredMode == "object") {
+            return new TranslatorStructuredObject({ from: opts.from, to: opts.to }, services, options);
         }
         else {
             return new Translator({ from: opts.from, to: opts.to }, services, options);
