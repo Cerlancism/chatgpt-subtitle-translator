@@ -280,7 +280,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                     `2. Specify what to watch for: scene boundaries, speaker changes, contextual dependencies, terminology consistency, tone/register shifts.`
             },
             ...this.options.initialPrompts,
-            { role: "user", content: `Content overview:\n${overview}` }
+            { role: "user", content: `# Content overview:\n${overview}` }
         ]
 
         try {
@@ -354,7 +354,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                         const candidate = accumulatedBatchSummary
                             ? `${accumulatedBatchSummary}\n${newNote}`
                             : newNote
-                        
+
                         const accumulatedBatchSummaryTokens = countTokens(candidate)
                         log.debug("[TranslatorAgent]",
                             "Accumulated batch summary length:", candidate.length, `(${accumulatedBatchSummaryTokens}/${budget} tokens)`)
@@ -516,7 +516,8 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             this.systemInstruction,
             contextSection,
             agentSection,
-            `You are scanning a context window of entries ${batchStart} to ${batchStart + batch.length - 1}.\n\n` +
+            `You are scanning a context window of entries ${batchStart} to ${batchStart + batch.length - 1} ` +
+            `(timestamps ${batch[0].start}–${batch[batch.length - 1].end} ms).\n\n` +
             `Rules for batchSummary:\n` +
             `1. Open with your overall impression of this window's content.\n` +
             `2. Write only what is new or notable here - do not repeat or refine prior context.\n` +
@@ -586,7 +587,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             },
             {
                 role: "user",
-                content: `Existing batch summaries:\n${existing}\n\nNew batch summary:\n${newNote}`
+                content: `# Existing batch summaries:\n${existing}\n\n# New batch summary:\n${newNote}`
             }
         ])
         try {
@@ -633,19 +634,19 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                     `Your goal is a lean, focused instruction.\n\n` +
                     `Rules:\n` +
                     `1. Preserve the target language and any stylistic directives that apply to the observed content.\n` +
-                    `2. Include the subtile file name, entry count and duration.` +
+                    `2. Include the subtile file name, entry count and duration.\n` +
                     `3. If the base instruction contains a glossary, dictionary, or list of terms/names, ` +
                     `filter it to only entries that appear in or are directly relevant to the observed content. ` +
                     `Remove any entries not encountered in this file.\n` +
                     `4. Remove instructions that are redundant, contradicted, or clearly out of scope given what was observed.\n` +
-                    `5. Do not embed narrative facts from the context — keep it as clean translator guidance.\n` 
+                    `5. Do not embed narrative facts from the context — keep it as clean translator guidance.\n`
             },
             {
                 role: "user",
-                content: 
-                    `Base instruction:\n${this.systemInstruction}\n\n` +
-                    `Subtitle metadata:\n${subtitleMeta}\n\n` +
-                    `Observed content context:\n${contextSummary}`
+                content:
+                    `# Subtitle information:\n${subtitleMeta}\n\n` +
+                    `# Base instruction:\n${this.systemInstruction}\n\n` +
+                    `# Observed content context:\n${contextSummary}`
             }
         ])
         try {
