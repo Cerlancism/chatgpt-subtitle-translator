@@ -519,9 +519,10 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             `You are scanning a context window of entries ${batchStart} to ${batchStart + batch.length - 1} ` +
             `(timestamps ${batch[0].start}–${batch[batch.length - 1].end} ms).\n\n` +
             `Rules for batchSummary:\n` +
-            `1. Open with your overall impression of this window's content.\n` +
-            `2. Write only what is new or notable here - do not repeat or refine prior context.\n` +
-            `3. Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
+            `1. Write in target language.\n` +
+            `2. Open with your overall impression of this window's content.\n` +
+            `3. Write only what is new or notable here - do not repeat or refine prior context.\n` +
+            `4. Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
             `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).\n\n` +
             `Rules for batchSize:\n` +
             `1. Decide how many entries from the start of this window (position ${batchStart}) ` +
@@ -583,13 +584,14 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                     ? `You are doing a final consolidation of all batch summaries for a subtitle file ` +
                       `into a single complete set of notes (target: ~${targetTokens} tokens). ` +
                       `This will be used as the full context for a translator - preserve all details.`
-                    : `You are doing a mid-pass consolidation of batch summaries for a subtitle file ` +
+                    : `You are doing a consolidation of batch summary windows for a subtitle file ` +
                       `into a single condensed set of notes (target: ~${targetTokens} tokens). ` +
                       `More batches will follow - stay concise but keep all unique facts.`) +
                     `\n\nRules:\n` +
-                    `1. Open with your overall impression of the content so far.\n` +
-                    `2. Preserve all unique 5W1H facts (who, what, where, when, why/how - names, locations, terms, tone, dialect).\n` +
-                    `3. Remove duplicate or contradictory information. ${isFinal ? "Be thorough - this is the last pass." : "Keep it concise - more content is coming."}`
+                    `1. Write in target language.\n` +
+                    `2. Open with your overall impression of the content so far.\n` +
+                    `3. Preserve all unique 5W1H facts (who, what, where, when, why/how - names, locations, terms, tone, dialect).\n` +
+                    `4. Remove duplicate or contradictory information. ${isFinal ? "Be thorough - this is the last pass." : "Keep it concise - more content is coming."}`
             },
             {
                 role: "user",
@@ -702,7 +704,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
         this.systemInstruction = accumulatedBatchSummary || baseInstruction
 
         if (accumulatedBatchSummary) {
-            log.debug("[TranslatorAgent]", "System instruction updated:\n", this.systemInstruction)
+            log.debug("[TranslatorAgent]", `System instruction updated:\n${this.systemInstruction}`)
         }
 
         // Fall back to standard behavior if planning produced no slices
