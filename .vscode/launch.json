@@ -20,7 +20,8 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "command": "cli/translator.mjs --model qwen3:14b --structured timestamp --reasoning_effort none --input test/data/test_ja.srt",
+            "command": "cli/translator.mjs --to English --input test/data/test_ja_100.srt --structured agent --batch-sizes '[3, 10, 33]' --model vera-8192 --context 4000",
+            // "command": "cli/translator.mjs --model qwen3:14b --structured timestamp --reasoning_effort none --input test/data/test_ja.srt",
             // "command": "cli/translator.mjs --to Chinese --input test/data/test_ja.srt --batch-sizes '[5]' --model gpt-5-nano --reasoning_effort low",
             // "command": "cli/translator.mjs --to Chinese --input test/data/test_ja.srt --batch-sizes '[5,10]' --model vera-8192 --context 2000",
             // "command": "cli/translator.mjs --to Chinese --input test/data/test_ja_500.srt --batch-sizes '[10,25]' --model vera-8192 --structured timestamp",

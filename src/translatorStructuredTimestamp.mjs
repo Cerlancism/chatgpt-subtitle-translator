@@ -2,6 +2,7 @@ import { PassThrough } from "stream";
 import { z } from "zod";
 import { JSONParser } from "@streamparser/json-node";
 import log from "loglevel"
+import { countTokens } from "gpt-tokenizer"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
@@ -12,7 +13,7 @@ const timestampEntriesSchema = z.array(z.object({
     start: z.int(),
     end: z.int(),
     text: z.string()
-})).describe("Subtitle entries with start and end as milliseconds")
+}))
 
 /**
  * @typedef {{ start: string, end: string, text: string }} TimestampEntry
@@ -31,8 +32,18 @@ const singleTimestampSchema = z.object({
 
 const batchTimestampSchema = z.object({
     outputs: timestampEntriesSchema,
-    mergedRemarks: z.string().describe("MUST be empty if no merges! Otherwise: briefly explain why entries were merged.")
+    mergedRemarks: z.string()
 })
+
+const schemaDescriptions = {
+    single: [
+        "outputs: Subtitle entries with start and end as milliseconds",
+    ].join("\n"),
+    batch: [
+        "outputs: Subtitle entries with start and end as milliseconds",
+        "mergedRemarks: MUST be empty if no merges! Otherwise: briefly explain why entries were merged in 1 short sentence.",
+    ].join("\n"),
+}
 
 /**
  * @typedef {{ outputs: TimestampEntry[], mergedRemarks: string }} BatchTimestampOutput
@@ -64,11 +75,14 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
      * @returns {Promise<TranslationOutput>}
      */
     async doTranslatePrompt(entries) {
-        const schema = entries.length === 1 ? singleTimestampSchema : batchTimestampSchema
+        const isSingle = entries.length === 1
+        const schema = isSingle ? singleTimestampSchema : batchTimestampSchema
+        const schemaAppendix = isSingle ? schemaDescriptions.single : schemaDescriptions.batch
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
         const userMessage = { role: "user", content: encodeToon({ inputs: entries.map(toMsEntry) }) }
+        const systemContent = this.systemInstruction ? `${this.systemInstruction}\n\n# Output Schema\n${schemaAppendix}` : undefined
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
-        const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
+        const systemMessage = systemContent ? [{ role: "system", content: systemContent }] : []
         const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
         const max_tokens = this.getMaxToken(entries)
 
@@ -102,19 +116,13 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     buildTimestampContext() {
         if (this.entryHistory.length === 0) return
 
-        const { sliced, tokenCount } = this.sliceByTokenBudget(this.entryHistory, e => e.completionTokens)
+        const chunkSize = this.options.batchSizes[this.options.batchSizes.length - 1]
 
-        if (this.options.useFullContext > 0) {
-            const logMsg = sliced.length < this.entryHistory.length
-                ? `sliced ${this.entryHistory.length - sliced.length} entries (${sliced.length}/${this.entryHistory.length} kept, ~${Math.round(tokenCount)} tokens)`
-                : `all (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
-            log.debug("[TranslatorStructuredTimestamp]", "Context:", logMsg)
-        }
-
-        const chunkSize = this.currentBatchSize
-        this.promptContext = []
-        for (let i = 0; i < sliced.length; i += chunkSize) {
-            const chunk = sliced.slice(i, i + chunkSize)
+        // Precompute all chunks with their serialized message content
+        const allChunks = []
+        for (let i = 0; i < this.entryHistory.length; i += chunkSize) {
+            const chunk = this.entryHistory.slice(i, i + chunkSize)
+            const userContent = encodeToon({ inputs: chunk.map(e => toMsEntry(e.input)) })
             const seenStarts = new Set()
             const outputs = chunk.reduce((acc, e) => {
                 if (!seenStarts.has(e.output.start)) {
@@ -123,9 +131,29 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 }
                 return acc
             }, [])
-            this.promptContext.push({ role: "user", content: encodeToon({ inputs: chunk.map(e => toMsEntry(e.input)) }) })
-            this.promptContext.push({ role: "assistant", content: JSON.stringify({ outputs: outputs.map(toMsEntry) }) })
+            const assistantContent = JSON.stringify({ outputs: outputs.map(toMsEntry) })
+            allChunks.push({ userContent, assistantContent, size: chunk.length })
         }
+
+        const { includedChunks, tokenCount } = this.selectContextChunks(allChunks,
+            ({ userContent, assistantContent }) => countTokens(userContent) + countTokens(assistantContent)
+        )
+
+        if (this.options.useFullContext > 0) {
+            const totalEntries = this.entryHistory.length
+            const includedEntries = includedChunks.reduce((sum, c) => sum + c.size, 0)
+            const logMsg = includedEntries < totalEntries
+                ? `sliced ${totalEntries - includedEntries} entries (${includedEntries}/${totalEntries} kept, ${tokenCount} tokens)`
+                : `all (${includedEntries} entries, ${tokenCount} tokens)`
+            log.debug("[TranslatorStructuredTimestamp]", "Context:", logMsg)
+        }
+
+        this.promptContext = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ (
+            includedChunks.flatMap(({ userContent, assistantContent }) => [
+                { role: "user", content: userContent },
+                { role: "assistant", content: assistantContent }
+            ])
+        )
     }
 
     /**
