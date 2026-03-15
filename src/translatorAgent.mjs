@@ -523,7 +523,8 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             `2. Open with your overall impression of this window's content.\n` +
             `3. Write only what is new or notable here - do not repeat or refine prior context.\n` +
             `4. Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
-            `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).\n\n` +
+            `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).\n` +
+            `5. Do not output batch index numbers or timestamps.\n\n` +
             `Rules for batchSize:\n` +
             `1. Decide how many entries from the start of this window (position ${batchStart}) ` +
             `to commit as one translation batch - this sets where the next scan window begins.\n` +
@@ -595,9 +596,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             },
             {
                 role: "user",
-                content: isFinal
-                    ? `# Batch summaries:\n${existing}`
-                    : `# Existing batch summaries:\n${existing}\n\n# New batch summary:\n${newNote}`
+                content: `Batch summaries:\n${existing}`
             }
         ])
         try {
