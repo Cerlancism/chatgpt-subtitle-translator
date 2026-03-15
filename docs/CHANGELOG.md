@@ -1,5 +1,45 @@
 # Changelog
 
+## 3.1.0 (2026-03-15)
+
+### New Features
+
+#### Agent Mode (`-r agent`)
+
+A two-pass agentic translation mode built on `timestamp`.
+
+**Pass 1 — Planning:** Scans the full subtitle file in max-batch-size chunks. For each chunk the model produces a batch summary (character names, locations, events, tone, dialect) and decides a natural batch boundary. Summaries accumulate and are consolidated when they exceed the token budget. At the end of the scan, a refined system instruction is generated that filters the glossary and stylistic notes down to only what was observed in the file.
+
+**Pass 2 — Translation:** Runs identically to `timestamp` mode using the enriched instruction and the agent-determined batch boundaries from Pass 1.
+
+Best suited for content with recurring characters, specialized vocabulary, or stylistic consistency requirements. Costs additional API calls for the planning pass. Progress file resumption is not supported.
+
+```bash
+cli/translator.mjs -i subtitles.srt -r agent --from Japanese --to English
+```
+
+### Other Changes
+
+#### `OPENAI_DEFAULT_MODEL` environment variable
+
+A new optional env var that sets the default model instead of hardcoding `gpt-4o-mini`. Useful when you always use a different model without passing `-m` on every invocation.
+
+```env
+OPENAI_DEFAULT_MODEL=gpt-4o
+```
+
+#### `OPENAI_API_RPM` default raised to 500
+
+The default requests-per-minute limit was raised from `60` to `500` to better match typical API tier limits. The `.env.example` value is now commented out (the built-in default applies unless you override it).
+
+The fallback order for the moderator RPM was also corrected: `OPENAI_API_MODERATOR_RPM` is now checked before `OPENAI_API_RPM` (previously the two were swapped).
+
+#### Context selection now uses real token counts
+
+Context history chunking (`-c, --context`) switched from using model-reported completion token counts as a proxy to counting tokens directly with [`gpt-tokenizer`](https://www.npmjs.com/package/gpt-tokenizer). This makes the budget more accurate and independent of whether a prior response recorded token usage.
+
+---
+
 ## 3.0.0 (2026-03-01)
 
 ### Breaking Changes
