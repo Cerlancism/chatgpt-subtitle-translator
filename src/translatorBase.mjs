@@ -1,4 +1,5 @@
 import log from "loglevel"
+import { countTokens } from "gpt-tokenizer"
 import { roundWithPrecision, sleep } from './helpers.mjs'
 
 /**
@@ -39,6 +40,7 @@ import { roundWithPrecision, sleep } from './helpers.mjs'
  * @property {number} max_token
  * @property {number} inputMultiplier
  * @property {import('loglevel').LogLevelDesc} logLevel
+ * @property {string} [inputFile] - Optional input file path, used by agent mode to provide file context during planning
  */
 
 export const DefaultOptions = {
@@ -80,10 +82,10 @@ export class TranslatorBase {
         this.services = services
         this.options = /** @type {TranslatorOptions & {createChatCompletionRequest: {model: string}}} */ ({ ...DefaultOptions, ...options })
         this.systemInstruction = `Translate ${this.language.from ? this.language.from + " " : ""}to ${this.language.to}`
-
+        
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         this.promptContext = []
-
+        
         this.promptTokensUsed = 0
         this.promptTokensWasted = 0
         this.cachedTokens = 0
@@ -92,17 +94,18 @@ export class TranslatorBase {
         this.tokensProcessTimeMs = 0
         this.contextPromptTokens = 0
         this.contextCompletionTokens = 0
-
+        
         this.workingBatchSizes = [...this.options.batchSizes]
         this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
-
+        
         this.aborted = false
         /** @type {AbortController | undefined} */
         this.streamController = undefined
-
+        
         if (options.logLevel) {
             log.setLevel(options.logLevel)
         }
+        log.debug("[Translator]", "Model:", this.options.createChatCompletionRequest.model)
     }
 
     /**
@@ -144,7 +147,7 @@ export class TranslatorBase {
             return this.options.max_token
         }
         else if (this.options.max_token && this.options.inputMultiplier) {
-            const max = JSON.stringify(lines).length * this.options.inputMultiplier
+            const max = countTokens(JSON.stringify(lines)) * this.options.inputMultiplier
             return Math.min(this.options.max_token, max)
         }
         return undefined
@@ -195,28 +198,28 @@ export class TranslatorBase {
     }
 
     /**
-     * Slices an array of entries to fit within the useFullContext token budget,
-     * scanning from most-recent backward. Falls back to the last `fallbackCount`
-     * entries when useFullContext is disabled (≤ 0).
+     * Scans pre-grouped chunks from most recent backward, returning those that fit within
+     * the useFullContext token budget. When budget is disabled (≤ 0), returns only the last chunk.
      * @template T
-     * @param {T[]} entries
-     * @param {(entry: T) => number | undefined} getCost - returns completionTokens for an entry
-     * @param {number} [fallbackCount] - entries to include when useFullContext is disabled. Defaults to currentBatchSize.
-     * @returns {{ sliced: T[], tokenCount: number }}
+     * @param {T[]} chunks
+     * @param {(chunk: T) => number} getChunkCost
+     * @returns {{ includedChunks: T[], tokenCount: number }}
      */
-    sliceByTokenBudget(entries, getCost, fallbackCount) {
+    selectContextChunks(chunks, getChunkCost) {
         const maxTokens = this.options.useFullContext
-        if (maxTokens <= 0) {
-            return { sliced: entries.slice(-(fallbackCount ?? this.currentBatchSize)), tokenCount: 0 }
-        }
         let tokenCount = 0
-        let startIndex = entries.length
-        for (let i = entries.length - 1; i >= 0; i--) {
-            tokenCount += (getCost(entries[i]) ?? 0) * 2
-            startIndex = i
-            if (tokenCount > maxTokens) break
+        let includedCount = maxTokens <= 0 ? Math.min(1, chunks.length) : 0
+        if (maxTokens > 0) {
+            for (let i = chunks.length - 1; i >= 0; i--) {
+                const cost = getChunkCost(chunks[i])
+                if (tokenCount + cost > maxTokens) break
+                tokenCount += cost
+                includedCount++
+            }
+            // Always include at least the most recent chunk to avoid losing all context
+            if (includedCount === 0 && chunks.length > 0) includedCount = 1
         }
-        return { sliced: entries.slice(startIndex), tokenCount }
+        return { includedChunks: chunks.slice(chunks.length - includedCount), tokenCount }
     }
 
     get usage() {

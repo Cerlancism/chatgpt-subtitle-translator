@@ -74,9 +74,10 @@ Options:
     Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.  
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
   - `-r, --structured <mode>`
-    [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode with timestamp support. (default: `array`, choices: `array`, `timestamp`, `object`, `none`)
+    [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode with timestamp support. (default: `array`, choices: `array`, `timestamp`, `object`, `none`, `agent`)
       - `array` Structures the input and output into an array format.
       - `timestamp` Provides the model with start/end timestamps alongside each entry's text, allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and a merge remarks field in output. Output entry count may differ from input, so progress file resumption is not supported.
+      - `agent` Two-pass agentic mode built on `timestamp`. **Pass 1 (Planning):** scans the full subtitle file in batches to observe character names, genre/tone, terminology, and dialect, accumulating a refined system instruction and suggested custom batch boundaries. **Pass 2 (Translation):** translates using the enriched instruction and agent-determined batching. Best for content with recurring characters, specialized vocabulary, or stylistic consistency requirements. Uses more API calls than `timestamp` due to the planning pass. Progress file resumption is not supported.
       - `object` Structures the input and output as a keyed object.
       - `none` Disables structured output.
 
@@ -228,7 +229,7 @@ Yes, it's very nice weather.
 ## How it works
 SRT indices and timestamps are stripped or simplified before sending to the model, reducing tokens. Lines are batched together into a single prompt - removing repeated per-entry overhead. The default system instruction is a minimal `Translate to <language>` (3 tokens). Structured output modes enforce a schema so the model returns only the translated text.
 
-Four modes are available via `--structured`:
+Five modes are available via `--structured`:
 
 #### `array` (default)
 
@@ -586,6 +587,10 @@ Yes, it's very nice weather.
 </td>
 </tr>
 </table>
+
+#### `agent`
+
+Two-pass mode built on `timestamp`. Pass 1 (Planning) scans the full file in max-batch-size chunks, collecting character names, tone, terminology, and suggested batch boundaries into a refined system instruction. Pass 2 (Translation) runs identically to `timestamp` using that instruction and the agent-determined batching. Costs additional API calls for the planning pass; progress file resumption is not supported.
 
 #### `none`
 

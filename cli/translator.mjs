@@ -25,8 +25,8 @@ import 'dotenv/config'
 
 const proxyAgent = getProxyAgent()
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY, undefined, process.env.OPENAI_BASE_URL, proxyAgent)
-const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 60), 60000, "ChatGPTAPI")
-const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? process.env.OPENAI_API_MODERATOR_RPM ?? 60), 60000, "OpenAIModerator")
+const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 500), 60000, "ChatGPTAPI")
+const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_MODERATOR_RPM ?? process.env.OPENAI_API_RPM ?? 500), 60000, "OpenAIModerator")
 
 function getProxyAgent() {
     const httpProxyConfig = process.env.http_proxy ?? process.env.HTTP_PROXY
@@ -49,7 +49,7 @@ export function createInstance(args) {
         .description("Translation tool based on ChatGPT API")
         .option("--from <language>", "Source language")
         .option("--to <language>", "Target language", "English")
-        .option("-m, --model <model>", "OpenAI model to use for translation", DefaultOptions.createChatCompletionRequest.model)
+        .option("-m, --model <model>", "OpenAI model to use for translation", process.env.OPENAI_DEFAULT_MODEL ?? DefaultOptions.createChatCompletionRequest.model)
         .option("--moderation-model <model>", "OpenAI moderation model", DefaultOptions.moderationModel)
 
         .option("-i, --input <file>", "Text file name to use as input, .srt or plain text")
@@ -112,7 +112,8 @@ export function createInstance(args) {
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
         ...(opts.context !== undefined && { useFullContext: opts.context }),
-        ...(opts.logLevel && { logLevel: opts.logLevel })
+        ...(opts.logLevel && { logLevel: opts.logLevel }),
+        ...(opts.input && { inputFile: opts.input })
     };
 
     log.setDefaultLevel("debug")

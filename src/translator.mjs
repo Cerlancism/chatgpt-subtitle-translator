@@ -1,4 +1,5 @@
 import log from "loglevel"
+import { countTokens } from "gpt-tokenizer"
 import { openaiRetryWrapper, completeChatStream } from './openai.mjs';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
@@ -304,16 +305,25 @@ export class Translator extends TranslatorBase {
             return;
         }
 
-        const { sliced, tokenCount } = this.sliceByTokenBudget(
-            this.workingProgress,
-            e => e.completionTokens,
-            this.options.batchSizes[this.options.batchSizes.length - 1]
-        )
+        const chunkSize = this.options.batchSizes[this.options.batchSizes.length - 1]
+
+        // Group all history into fixed-size chunks of batchSizes[last]
+        const allChunks = []
+        for (let i = 0; i < this.workingProgress.length; i += chunkSize) {
+            allChunks.push(this.workingProgress.slice(i, i + chunkSize))
+        }
+
+        const { includedChunks, tokenCount } = this.selectContextChunks(allChunks, chunk => {
+            const messages = this.getContext(chunk.map(e => e.source), chunk.map(e => e.transform))
+            return messages.reduce((sum, m) => sum + countTokens(String(m.content ?? "")), 0)
+        })
+
+        const sliced = includedChunks.flat()
 
         if (this.options.useFullContext > 0) {
             const logSliceContext = sliced.length < this.workingProgress.length
-                ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ~${Math.round(tokenCount)} tokens)`
-                : `all (${sliced.length} entries, ~${Math.round(tokenCount)} tokens)`
+                ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ${tokenCount} tokens)`
+                : `all (${sliced.length} entries, ${tokenCount} tokens)`
             log.debug("[Translator]", "Context:", logSliceContext)
         }
 
