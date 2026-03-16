@@ -109,8 +109,7 @@ function buildOptions(opts) {
         ...(opts.context !== undefined && { useFullContext: opts.context }),
         ...(opts.logLevel && { logLevel: opts.logLevel }),
         ...(opts.input && { inputFile: opts.input }),
-        ...(opts.skipRefine && { skipRefineInstruction: true }),
-        ...(opts.contextSummary && { agentContextSummary: opts.contextSummary })
+        ...(opts.skipRefine && { skipRefineInstruction: true })
     }
 
     log.setDefaultLevel("debug")
@@ -157,7 +156,6 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     addTranslatorOptions(program.command("agent")
         .description("Agentic 2-pass translation: planning pass observes content before translating"))
         .option("--skip-refine", "Skip final instruction refinement and use the base instruction directly")
-        .option("--context-summary <summary>", "Provide a context summary directly, skipping the batch summary scanning pass")
         .action(async (_, agentCmd) => {
             const opts = agentCmd.optsWithGlobals()
             await run(opts, buildOptions(opts), true)
@@ -249,51 +247,32 @@ async function run(opts, options, agentMode = false) {
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
             const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}.srt`
 
-            const isNoResumeMode = options.structuredMode === "timestamp" || agentMode
-            if (isNoResumeMode) {
-                // Timestamp and agent modes do not support progress resume.
-                // Timestamp: output count can differ from input due to merging.
-                // Agent: planning pass always runs from the beginning.
+            const isTimestampAgentMode = options.structuredMode === "timestamp"
+            if (isTimestampAgentMode) {
+                // Timestamp/agent mode: model receives start/end seconds and may merge entries.
+                // Output count can differ from input, so progress file resume is not supported.
                 log.warn("[CLI]", `${agentMode ? "Agent" : "Timestamp"} mode: progress resumption is not supported, starting from beginning.`)
                 fs.writeFileSync(outputFile, '')
-                if (options.structuredMode === "timestamp") {
-                    const timestampSource = srtArraySource.map(e => ({ start: e.startTime, end: e.endTime, text: e.text }))
-                    let outputId = 1
-                    try {
-                        for await (const srtOut of /** @type {import('../src/translatorStructuredTimestamp.mjs').TranslatorStructuredTimestamp} */ (translator).translateSrtLines(timestampSource)) {
-                            const entry = {
-                                id: String(outputId),
-                                startTime: srtOut.start,
-                                startSeconds: subtitleParser.timestampToSeconds(srtOut.start),
-                                endTime: srtOut.end,
-                                endSeconds: subtitleParser.timestampToSeconds(srtOut.end),
-                                text: srtOut.text
-                            }
-                            const outSrt = subtitleParser.toSrt([entry])
-                            log.info(outputId, entry.startTime, "->", entry.endTime, wrapQuotes(entry.text))
-                            await fs.promises.appendFile(outputFile, outSrt)
-                            outputId++
+                const timestampSource = srtArraySource.map(e => ({ start: e.startTime, end: e.endTime, text: e.text }))
+                let outputId = 1
+                try {
+                    for await (const srtOut of /** @type {import('../src/translatorStructuredTimestamp.mjs').TranslatorStructuredTimestamp} */ (translator).translateSrtLines(timestampSource)) {
+                        const entry = {
+                            id: String(outputId),
+                            startTime: srtOut.start,
+                            startSeconds: subtitleParser.timestampToSeconds(srtOut.start),
+                            endTime: srtOut.end,
+                            endSeconds: subtitleParser.timestampToSeconds(srtOut.end),
+                            text: srtOut.text
                         }
-                    } catch (error) {
-                        log.error("[CLI]", "Error", error)
-                        process.exit(1)
+                        const outSrt = subtitleParser.toSrt([entry])
+                        log.info(outputId, entry.startTime, "->", entry.endTime, wrapQuotes(entry.text))
+                        await fs.promises.appendFile(outputFile, outSrt)
+                        outputId++
                     }
-                } else {
-                    // Agent with array delegate: translate lines, write back into original SRT positions
-                    const srtArrayWorking = subtitleParser.fromSrt(text)
-                    const sourceLines = srtArraySource.map(x => x.text)
-                    try {
-                        for await (const output of translator.translateLines(sourceLines)) {
-                            const srtEntry = srtArrayWorking[output.index - 1]
-                            srtEntry.text = output.finalTransform
-                            const outSrt = subtitleParser.toSrt([srtEntry])
-                            log.info(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
-                            await fs.promises.appendFile(outputFile, outSrt)
-                        }
-                    } catch (error) {
-                        log.error("[CLI]", "Error", error)
-                        process.exit(1)
-                    }
+                } catch (error) {
+                    log.error("[CLI]", "Error", error)
+                    process.exit(1)
                 }
             }
             else {
