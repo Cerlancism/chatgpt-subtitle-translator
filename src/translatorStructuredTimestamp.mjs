@@ -181,10 +181,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @param {TimestampEntry[]} batch
      * @param {TimestampEntry[]} outputEntries
-     * @param {string} remarksIfContainedMergers
+     * @param {string} [remarksIfContainedMergers]
      * @returns {boolean}
      */
-    evaluateBatchOutput(batch, outputEntries, remarksIfContainedMergers) {
+    evaluateBatchOutput(batch, outputEntries, remarksIfContainedMergers = "") {
         const firstInputStart = batch[0].start
         const firstOutputStart = outputEntries[0]?.start
         const lastInputEnd = batch.at(-1).end
