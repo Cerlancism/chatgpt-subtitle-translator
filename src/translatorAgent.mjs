@@ -186,9 +186,8 @@ function createArrayAdapter(agent, delegate) {
  * Agentic 2-pass translator using composition.
  *
  * Pass 0 (Overview): Samples first/last entries for content overview and scan guidance.
- * Pass 1 (Planning): Scans all entries in fixed max-batch-size windows, accumulating
- * batch summaries. After scanning, summaries are consolidated and optionally refined
- * into a final instruction. Custom batch slice boundaries are committed per window.
+ * Pass 1 (Planning): Scans all entries in max-batch-size chunks. Each chunk produces
+ * refined translation instructions and custom batch slice boundaries.
  * Pass 2 (Translation): Uses the accumulated instruction and custom slices,
  * delegating translation to the inner translator via the mode adapter.
  *
@@ -434,58 +433,50 @@ export class TranslatorAgent extends TranslatorStructuredBase {
 
         let accumulatedBatchSummary = ""
 
-        if (this.options.agentContextSummary) {
-            log.debug("[TranslatorAgent]", "Pass 1 skipped: using provided context summary")
-            accumulatedBatchSummary = this.options.agentContextSummary
-            for (let batchStart = 0; batchStart < entries.length; batchStart += scanBatchSize) {
-                rawSlices.push({ start: batchStart, end: Math.min(batchStart + scanBatchSize - 1, entries.length - 1) })
-            }
-        } else {
-            for (let batchStart = 0; batchStart < entries.length; batchStart += scanBatchSize) {
-                const batch = entries.slice(batchStart, batchStart + scanBatchSize)
-                const batchEnd = batchStart + batch.length - 1
+        for (let batchStart = 0; batchStart < entries.length; batchStart += scanBatchSize) {
+            const batch = entries.slice(batchStart, batchStart + scanBatchSize)
+            const batchEnd = batchStart + batch.length - 1
 
-                log.debug("[TranslatorAgent]", "Scanning window", batchStart, "-", batchEnd)
+            log.debug("[TranslatorAgent]", "Scanning window", batchStart, "-", batchEnd)
 
-                await this.services.cooler?.cool()
+            await this.services.cooler?.cool()
 
-                try {
-                    const result = await this._runScanBatch(batch, batchStart, accumulatedBatchSummary, overviewResult?.agentInstruction)
-                    if (result) {
-                        const newNote = result.batchSummary?.trim()
-                        if (newNote) {
-                            log.debug("[TranslatorAgent]", "Batch summary from window", batchStart, `(${countTokens(newNote)} tokens):\n`, newNote)
-                            const candidate = accumulatedBatchSummary
-                                ? `${accumulatedBatchSummary}\n${newNote}`
-                                : newNote
+            try {
+                const result = await this._runScanBatch(batch, batchStart, accumulatedBatchSummary, overviewResult?.agentInstruction)
+                if (result) {
+                    const newNote = result.batchSummary?.trim()
+                    if (newNote) {
+                        log.debug("[TranslatorAgent]", "Batch summary from window", batchStart, `(${countTokens(newNote)} tokens):\n`, newNote)
+                        const candidate = accumulatedBatchSummary
+                            ? `${accumulatedBatchSummary}\n${newNote}`
+                            : newNote
 
-                            const accumulatedBatchSummaryTokens = countTokens(candidate)
+                        const accumulatedBatchSummaryTokens = countTokens(candidate)
+                        log.debug("[TranslatorAgent]",
+                            "Accumulated batch summary length:", candidate.length, `(${accumulatedBatchSummaryTokens}/${budget} tokens)`)
+                        if (accumulatedBatchSummaryTokens > budget) {
                             log.debug("[TranslatorAgent]",
-                                "Accumulated batch summary length:", candidate.length, `(${accumulatedBatchSummaryTokens}/${budget} tokens)`)
-                            if (accumulatedBatchSummaryTokens > budget) {
-                                log.debug("[TranslatorAgent]",
-                                    "Batch summary accumulator over budget (>", budget, "tokens) - consolidating")
-                                await this.services.cooler?.cool()
-                                accumulatedBatchSummary = await this._consolidateBatchSummaries(
-                                    accumulatedBatchSummary, newNote, budget
-                                )
-                                log.debug("[TranslatorAgent]", "Consolidated batch summary:", accumulatedBatchSummary)
-                                log.debug("[TranslatorAgent]",
-                                    "Consolidated batch summary length:", accumulatedBatchSummary.length, `(${countTokens(accumulatedBatchSummary)} tokens)`)
-                            } else {
-                                accumulatedBatchSummary = candidate
-                            }
+                                "Batch summary accumulator over budget (>", budget, "tokens) - consolidating")
+                            await this.services.cooler?.cool()
+                            accumulatedBatchSummary = await this._consolidateBatchSummaries(
+                                accumulatedBatchSummary, newNote, budget
+                            )
+                            log.debug("[TranslatorAgent]", "Consolidated batch summary:", accumulatedBatchSummary)
+                            log.debug("[TranslatorAgent]",
+                                "Consolidated batch summary length:", accumulatedBatchSummary.length, `(${countTokens(accumulatedBatchSummary)} tokens)`)
+                        } else {
+                            accumulatedBatchSummary = candidate
                         }
-                    } else {
-                        log.warn("[TranslatorAgent]", "Scan batch returned null for range", batchStart, "-", batchEnd)
                     }
-                } catch (error) {
-                    log.warn("[TranslatorAgent]", "Scan batch error:", error?.message,
-                        "for range", batchStart, "-", batchEnd)
+                } else {
+                    log.warn("[TranslatorAgent]", "Scan batch returned null for range", batchStart, "-", batchEnd)
                 }
-
-                rawSlices.push({ start: batchStart, end: batchEnd })
+            } catch (error) {
+                log.warn("[TranslatorAgent]", "Scan batch error:", error?.message,
+                    "for range", batchStart, "-", batchEnd)
             }
+
+            rawSlices.push({ start: batchStart, end: batchEnd })
         }
 
         const customSlices = this._normalizeSlices(rawSlices, entries.length)
@@ -493,14 +484,9 @@ export class TranslatorAgent extends TranslatorStructuredBase {
         // Final synthesis: consolidate all batch summaries, then produce refined directive
         let finalInstruction = accumulatedBatchSummary
         if (accumulatedBatchSummary) {
-            let consolidatedContextSummary
-            if (this.options.agentContextSummary) {
-                // Provided summary is already consolidated — skip the consolidation API call
-                consolidatedContextSummary = accumulatedBatchSummary
-            } else {
-                await this.services.cooler?.cool()
-                consolidatedContextSummary = await this._consolidateBatchSummaries(accumulatedBatchSummary, undefined, budget)
-            }
+            await this.services.cooler?.cool()
+            // Final consolidation: collapse all per-window batch summaries into one contextSummary
+            const consolidatedContextSummary = await this._consolidateBatchSummaries(accumulatedBatchSummary, undefined, budget)
             log.debug("[TranslatorAgent]", "Context summary:\n", consolidatedContextSummary)
 
             let refinedDirective
