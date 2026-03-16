@@ -42,11 +42,12 @@ function getProxyAgent() {
 }
 
 /**
- * @param {readonly string[]} args
+ * Adds all shared translator options to a command.
+ * @param {Command} cmd
+ * @returns {Command}
  */
-export function createInstance(args) {
-    const program = new Command()
-        .description("Translation tool based on ChatGPT API")
+function addTranslatorOptions(cmd) {
+    return cmd
         .option("--from <language>", "Source language")
         .option("--to <language>", "Target language", "English")
         .option("-m, --model <model>", "OpenAI model to use for translation", process.env.OPENAI_DEFAULT_MODEL ?? DefaultOptions.createChatCompletionRequest.model)
@@ -59,7 +60,6 @@ export function createInstance(args) {
 
         .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
         .option("--experimental-input-multiplier <value>", "", val => parseInt(val, 10), 0)
-        .addOption(new Option("-r, --structured <mode>", "Structured response format mode, see https://openai.com/index/introducing-structured-outputs-in-the-api/").choices(["array", "timestamp", "agent", "object", "none"]).default("array"))
         .option("-c, --context <tokens>", "Max context token budget for history. Includes as much translation history as fits within this token budget, chunked by the last value in --batch-sizes, to work better with prompt caching. Set to 0 to include history without a token limit check. Recommended: set to 30% less than the model's max context length.", val => parseInt(val, 10), DefaultOptions.useFullContext)
 
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
@@ -69,38 +69,33 @@ export function createInstance(args) {
         .option("-b, --batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse, DefaultOptions.batchSizes)
         .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value such as 0 to be more deterministic", parseFloat, DefaultOptions.createChatCompletionRequest.temperature)
         .option("--no-stream", "Disable stream progress output to terminal (streaming is on by default)")
-        // .option("--n <n>", "Number of chat completion choices to generate for each input message", parseInt)
-        // .option("--stop <stop>", "Up to 4 sequences where the API will stop generating further tokens")
-        // .option("--max-tokens <max_tokens>", "The maximum number of tokens to generate in the chat completion", parseInt)
         .option("--top_p <top_p>", "Nucleus sampling parameter, top_p probability mass", parseFloat)
         .option("--presence_penalty <presence_penalty>", "Penalty for new tokens based on their presence in the text so far", parseFloat)
         .option("--frequency_penalty <frequency_penalty>", "Penalty for new tokens based on their frequency in the text so far", parseFloat)
         .option("--logit_bias <logit_bias>", "Modify the likelihood of specified tokens appearing in the completion", JSON.parse)
         .option("--reasoning_effort <reasoning_effort>", "Constrains effort on reasoning for reasoning models")
-        // .option("--user <user>", "A unique identifier representing your end-user")
         .addOption(new Option("--log-level <level>", "Log level").choices(["trace", "debug", "info", "warn", "error", "silent"]))
         .option("--silent", "Same as --log-level silent")
         .option("--quiet", "Same as --log-level silent")
-        .parse(args)
+}
 
-    const opts = program.opts()
-    /**
-     * @type {Partial<import("../src/translator.mjs").TranslatorOptions>}
-     */
+/**
+ * Builds the TranslatorOptions object from parsed Commander opts.
+ * @param {Record<string, any>} opts
+ * @returns {Partial<import("../src/translator.mjs").TranslatorOptions>}
+ */
+function buildOptions(opts) {
+    /** @type {Partial<import("../src/translator.mjs").TranslatorOptions>} */
     const options = {
         createChatCompletionRequest: {
             ...(opts.model && { model: opts.model }),
             ...(opts.temperature !== undefined && { temperature: opts.temperature }),
             ...(opts.top_p !== undefined && { top_p: opts.top_p }),
-            // ...(opts.n && { n: opts.n }),
             stream: opts.stream,
-            // ...(opts.stop && { stop: opts.stop }),
-            // ...(opts.max_tokens !== undefined && { max_tokens: opts.max_tokens }),
             ...(opts.presence_penalty !== undefined && { presence_penalty: opts.presence_penalty }),
             ...(opts.frequency_penalty !== undefined && { frequency_penalty: opts.frequency_penalty }),
             ...(opts.logit_bias && { logit_bias: opts.logit_bias }),
             ...(opts.reasoning_effort && { reasoning_effort: opts.reasoning_effort }),
-            // ...(opts.user && { user: opts.user }),
         },
         ...(opts.initialPrompts && { initialPrompts: opts.initialPrompts }),
         ...(opts.moderationModel !== undefined && { moderationModel: opts.moderationModel }),
@@ -113,8 +108,10 @@ export function createInstance(args) {
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),
         ...(opts.context !== undefined && { useFullContext: opts.context }),
         ...(opts.logLevel && { logLevel: opts.logLevel }),
-        ...(opts.input && { inputFile: opts.input })
-    };
+        ...(opts.input && { inputFile: opts.input }),
+        ...(opts.skipRefine && { skipRefineInstruction: true }),
+        ...(opts.contextSummary && { agentContextSummary: opts.contextSummary })
+    }
 
     log.setDefaultLevel("debug")
 
@@ -133,12 +130,53 @@ export function createInstance(args) {
         process.exit(1)
     }
 
+    return options
+}
+
+/**
+ * @param {readonly string[]} args
+ */
+export function createInstance(args) {
+    const program = addTranslatorOptions(new Command()
+        .description("Translation tool based on ChatGPT API"))
+        .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "timestamp", "object", "none"]).default("array"))
+        .parse(args)
+
+    const opts = program.opts()
+    const options = buildOptions(opts)
+
     return { opts, options }
 }
 
 if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
-    const { opts, options } = createInstance(process.argv)
+    const program = addTranslatorOptions(new Command()
+        .name("translator")
+        .description("Translation tool based on ChatGPT API"))
+        .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "timestamp", "object", "none"]).default("array"))
 
+    addTranslatorOptions(program.command("agent")
+        .description("Agentic 2-pass translation: planning pass observes content before translating"))
+        .option("--skip-refine", "Skip final instruction refinement and use the base instruction directly")
+        .option("--context-summary <summary>", "Provide a context summary directly, skipping the batch summary scanning pass")
+        .action(async (_, agentCmd) => {
+            const opts = agentCmd.optsWithGlobals()
+            await run(opts, buildOptions(opts), true)
+        })
+
+    program.action(async () => {
+        const opts = program.opts()
+        await run(opts, buildOptions(opts))
+    })
+
+    program.parseAsync(process.argv)
+}
+
+/**
+ * @param {Record<string, any>} opts
+ * @param {Partial<import("../src/translator.mjs").TranslatorOptions>} options
+ * @param {boolean} [agentMode]
+ */
+async function run(opts, options, agentMode = false) {
     /**
      * @type {import('../src/translator.mjs').TranslationServiceContext}
      */
@@ -162,14 +200,25 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     }
 
     function getTranslator() {
-        if (options.structuredMode == "array") {
+        if (agentMode) {
+            if (options.structuredMode == "array" || !options.structuredMode) {
+                const inner = new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
+                return new TranslatorAgent({ from: opts.from, to: opts.to }, services, options, inner);
+            }
+            else if (options.structuredMode == "timestamp") {
+                const inner = new TranslatorStructuredTimestamp({ from: opts.from, to: opts.to }, services, options);
+                return new TranslatorAgent({ from: opts.from, to: opts.to }, services, options, inner);
+            }
+            else {
+                log.error("[CLI]", `Unsupported agent delegate mode: ${options.structuredMode}`)
+                process.exit(1)
+            }
+        }
+        else if (options.structuredMode == "array") {
             return new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
         }
         else if (options.structuredMode == "timestamp") {
             return new TranslatorStructuredTimestamp({ from: opts.from, to: opts.to }, services, options);
-        }
-        else if (options.structuredMode == "agent") {
-            return new TranslatorAgent({ from: opts.from, to: opts.to }, services, options);
         }
         else if (options.structuredMode == "object") {
             return new TranslatorStructuredObject({ from: opts.from, to: opts.to }, services, options);
@@ -186,7 +235,7 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
     }
 
     if (opts.plainText) {
-        if (opts.structured === "timestamp" || opts.structured === "agent") {
+        if (opts.structured === "timestamp" || (agentMode && options.structuredMode === "timestamp")) {
             log.error("[CLI]", "--plain-text is not supported in timestamp/agent mode.")
             process.exit(1)
         }
@@ -200,31 +249,51 @@ if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
             const fileTag = `${opts.systemInstruction ? "Custom" : opts.to}`
             const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}.srt`
 
-            if (options.structuredMode === "timestamp" || options.structuredMode === "agent") {
-                // Timestamp/agent mode: model receives start/end seconds and may merge entries.
-                // Output count can differ from input, so progress file resume is not supported.
-                log.warn("[CLI]", `${options.structuredMode === "agent" ? "Agent" : "Timestamp"} mode: progress resumption is not supported, starting from beginning.`)
+            const isNoResumeMode = options.structuredMode === "timestamp" || agentMode
+            if (isNoResumeMode) {
+                // Timestamp and agent modes do not support progress resume.
+                // Timestamp: output count can differ from input due to merging.
+                // Agent: planning pass always runs from the beginning.
+                log.warn("[CLI]", `${agentMode ? "Agent" : "Timestamp"} mode: progress resumption is not supported, starting from beginning.`)
                 fs.writeFileSync(outputFile, '')
-                const timestampSource = srtArraySource.map(e => ({ start: e.startTime, end: e.endTime, text: e.text }))
-                let outputId = 1
-                try {
-                    for await (const srtOut of /** @type {import('../src/translatorStructuredTimestamp.mjs').TranslatorStructuredTimestamp} */ (translator).translateSrtLines(timestampSource)) {
-                        const entry = {
-                            id: String(outputId),
-                            startTime: srtOut.start,
-                            startSeconds: subtitleParser.timestampToSeconds(srtOut.start),
-                            endTime: srtOut.end,
-                            endSeconds: subtitleParser.timestampToSeconds(srtOut.end),
-                            text: srtOut.text
+                if (options.structuredMode === "timestamp") {
+                    const timestampSource = srtArraySource.map(e => ({ start: e.startTime, end: e.endTime, text: e.text }))
+                    let outputId = 1
+                    try {
+                        for await (const srtOut of /** @type {import('../src/translatorStructuredTimestamp.mjs').TranslatorStructuredTimestamp} */ (translator).translateSrtLines(timestampSource)) {
+                            const entry = {
+                                id: String(outputId),
+                                startTime: srtOut.start,
+                                startSeconds: subtitleParser.timestampToSeconds(srtOut.start),
+                                endTime: srtOut.end,
+                                endSeconds: subtitleParser.timestampToSeconds(srtOut.end),
+                                text: srtOut.text
+                            }
+                            const outSrt = subtitleParser.toSrt([entry])
+                            log.info(outputId, entry.startTime, "->", entry.endTime, wrapQuotes(entry.text))
+                            await fs.promises.appendFile(outputFile, outSrt)
+                            outputId++
                         }
-                        const outSrt = subtitleParser.toSrt([entry])
-                        log.info(outputId, entry.startTime, "->", entry.endTime, wrapQuotes(entry.text))
-                        await fs.promises.appendFile(outputFile, outSrt)
-                        outputId++
+                    } catch (error) {
+                        log.error("[CLI]", "Error", error)
+                        process.exit(1)
                     }
-                } catch (error) {
-                    log.error("[CLI]", "Error", error)
-                    process.exit(1)
+                } else {
+                    // Agent with array delegate: translate lines, write back into original SRT positions
+                    const srtArrayWorking = subtitleParser.fromSrt(text)
+                    const sourceLines = srtArraySource.map(x => x.text)
+                    try {
+                        for await (const output of translator.translateLines(sourceLines)) {
+                            const srtEntry = srtArrayWorking[output.index - 1]
+                            srtEntry.text = output.finalTransform
+                            const outSrt = subtitleParser.toSrt([srtEntry])
+                            log.info(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
+                            await fs.promises.appendFile(outputFile, outSrt)
+                        }
+                    } catch (error) {
+                        log.error("[CLI]", "Error", error)
+                        process.exit(1)
+                    }
                 }
             }
             else {

@@ -138,6 +138,21 @@ export class Translator extends TranslatorBase {
     }
 
     /**
+     * @param {any[]} batch
+     * @param {any[]} outputs
+     * @returns {boolean}
+     */
+    evaluateBatchOutput(batch, outputs) {
+        const isMismatch = this.options.lineMatching && batch.length !== outputs.length
+        if (isMismatch) {
+            log.debug(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
+            log.debug(`[Translator]`, "batch", batch)
+            log.debug(`[Translator]`, "transformed", outputs)
+        }
+        return isMismatch
+    }
+
+    /**
      * @param {string[]} batch
      */
     async * translateSingle(batch) {
@@ -192,19 +207,13 @@ export class Translator extends TranslatorBase {
 
             let outputs = output.content
 
-            if ((this.options.lineMatching && batch.length !== outputs.length) || (batch.length > 1 && output.refusal)) {
+            if (this.evaluateBatchOutput(batch, outputs) || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
                 this.completionTokensWasted += output.completionTokens
 
                 if (output.refusal) {
                     log.debug(`[Translator]`, "Refusal: ", output.refusal)
                 }
-                else {
-                    log.debug(`[Translator]`, "Lines count mismatch", batch.length, outputs.length)
-                }
-
-                log.debug(`[Translator]`, "batch", batch)
-                log.debug(`[Translator]`, "transformed", outputs)
 
                 if (this.changeBatchSize("decrease")) {
                     index -= this.currentBatchSize

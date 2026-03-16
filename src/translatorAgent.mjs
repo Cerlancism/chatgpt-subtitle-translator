@@ -3,11 +3,13 @@ import { z } from "zod"
 import log from "loglevel"
 import { countTokens } from "gpt-tokenizer"
 import { encode as encodeToon } from "@toon-format/toon"
+import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs"
 import { TranslatorStructuredTimestamp, toMsEntry } from "./translatorStructuredTimestamp.mjs"
+import { TranslatorStructuredArray } from "./translatorStructuredArray.mjs"
+import { Translator } from "./translator.mjs"
 
 const scanBatchSchema = z.object({
-    batchSummary: z.string().describe("Translation notes for this scan window."),
-    batchSize: z.int().describe("Number of entries from the start of this window to commit as one translation batch.")
+    batchSummary: z.string().describe("Translation notes for this scan window.")
 })
 
 const consolidateSchema = z.object({
@@ -37,35 +39,199 @@ const agentInstructionSchema = z.object({
 const agentInstructionTokenBudget = (useFullContext) => Math.floor(useFullContext / 2)
 
 /**
- * Agentic 2-pass subtitle translator.
- *
- * Pass 1 (Planning): Scans all entries in max-batch-size chunks. Each chunk produces
- * refined translation instructions and custom batch slice boundaries for that segment.
- * Results are aggregated into a final system instruction and a global slice list.
- *
- * Pass 2 (Translation): Uses the accumulated instruction and custom slices from Pass 1,
- * otherwise delegating all translation logic to TranslatorStructuredTimestamp.
- *
- * @extends {TranslatorStructuredTimestamp}
+ * @typedef {Object} ModeAdapter
+ * @property {() => void} buildContext - Build prompt context from translation history
+ * @property {(output: import('./translatorOutput.mjs').TranslationOutput) => any[]} extractOutputs - Extract output entries from TranslationOutput
+ * @property {(batch: any[], outputs: any[], output: import('./translatorOutput.mjs').TranslationOutput) => boolean} isMismatch - Check if batch output is a mismatch
+ * @property {(batch: any[], outputs: any[], completionTokens: number) => void} recordBatch - Record completed batch to delegate history
+ * @property {(batch: any[]) => AsyncGenerator} singleFallback - Single-entry fallback translation
+ * @property {(batch: any[], outputs: any[], completionTokens: number) => Generator} yieldResults - Yield translation results
  */
-export class TranslatorAgent extends TranslatorStructuredTimestamp {
+
+/**
+ * Creates a mode adapter for TranslatorStructuredTimestamp delegates.
+ * @param {TranslatorAgent} agent
+ * @param {TranslatorStructuredTimestamp} delegate
+ * @returns {ModeAdapter}
+ */
+function createTimestampAdapter(agent, delegate) {
+    return {
+        buildContext() {
+            if (agent._agentContextChunks.length === 0) return
+
+            const { includedChunks, tokenCount } = delegate.selectContextChunks(
+                agent._agentContextChunks,
+                ({ userContent, assistantContent }) => countTokens(userContent) + countTokens(assistantContent)
+            )
+
+            if (delegate.options.useFullContext > 0) {
+                const totalEntries = agent._agentContextChunks.reduce((s, c) => s + c.size, 0)
+                const includedEntries = includedChunks.reduce((s, c) => s + c.size, 0)
+                const logMsg = includedEntries < totalEntries
+                    ? `sliced ${totalEntries - includedEntries} entries (${includedEntries}/${totalEntries} kept, ${tokenCount} tokens)`
+                    : `all (${includedEntries} entries, ${tokenCount} tokens)`
+                log.debug("[TranslatorAgent]", "Context:", logMsg)
+            }
+
+            delegate.promptContext = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ (
+                includedChunks.flatMap(({ userContent, assistantContent }) => [
+                    { role: "user", content: userContent },
+                    { role: "assistant", content: assistantContent }
+                ])
+            )
+        },
+
+        extractOutputs(output) {
+            const parsed = /** @type {import('./translatorStructuredTimestamp.mjs').BatchTimestampOutput} */
+                (/** @type {unknown} */ (output.content ?? {}))
+            return parsed.outputs ?? []
+        },
+
+        isMismatch(batch, outputs, output) {
+            const parsed = /** @type {import('./translatorStructuredTimestamp.mjs').BatchTimestampOutput} */
+                (/** @type {unknown} */ (output.content ?? {}))
+            return delegate.evaluateBatchOutput(batch, outputs, parsed.remarksIfContainedMergers ?? "")
+        },
+
+        recordBatch(batch, outputs, completionTokens) {
+            const completionTokensPerEntry = completionTokens / batch.length
+            for (const input of batch) {
+                const exactMatch = outputs.find(o => o.start <= input.start && o.end >= input.end)
+                if (!exactMatch) {
+                    log.warn("[TranslatorAgent]",
+                        "No output entry covers input", input.start, "-", input.end,
+                        `"${input.text}" - using last output as fallback`)
+                }
+                const matchedOutput = exactMatch ?? outputs.at(-1)
+                delegate.entryHistory.push({ input, output: matchedOutput, completionTokens: completionTokensPerEntry })
+            }
+
+            // Record agent context chunk for dynamic context building
+            const userContent = encodeToon({ inputs: batch.map(toMsEntry) })
+            const assistantContent = JSON.stringify({ outputs: outputs.map(toMsEntry) })
+            agent._agentContextChunks.push({ userContent, assistantContent, size: batch.length })
+        },
+
+        async * singleFallback(batch) {
+            log.debug("[TranslatorAgent]", "Single entry mode (timestamp)")
+            for (const entry of batch) {
+                this.buildContext()
+                const output = await delegate.translatePrompt([entry])
+                /** @type {TimestampEntry[]} */
+                const outputEntries = /** @type {any} */ (output.content)?.outputs ?? []
+                const resultEntry = outputEntries?.[0] ?? entry
+
+                if (!outputEntries?.[0]) {
+                    log.warn("[TranslatorAgent]", "Empty output for single entry, using original:", entry.text)
+                }
+
+                // Record to both delegate history and agent context chunks
+                const userContent = encodeToon({ inputs: [entry].map(toMsEntry) })
+                const assistantContent = JSON.stringify({ outputs: [resultEntry].map(toMsEntry) })
+                agent._agentContextChunks.push({ userContent, assistantContent, size: 1 })
+                delegate.entryHistory.push({ input: entry, output: resultEntry, completionTokens: output.completionTokens })
+
+                yield resultEntry
+            }
+        },
+
+        * yieldResults(batch, outputs, completionTokens) {
+            yield* outputs
+        }
+    }
+}
+
+/**
+ * Creates a mode adapter for array-based delegates (TranslatorStructuredArray or Translator).
+ * @param {TranslatorAgent} agent
+ * @param {Translator} delegate
+ * @returns {ModeAdapter}
+ */
+function createArrayAdapter(agent, delegate) {
+    return {
+        buildContext() {
+            delegate.buildContext()
+        },
+
+        extractOutputs(output) {
+            return output.content ?? []
+        },
+
+        isMismatch(batch, outputs, output) {
+            return delegate.evaluateBatchOutput(batch, outputs)
+        },
+
+        recordBatch(batch, outputs, completionTokens) {
+            const completionTokensPerEntry = completionTokens / outputs.length
+            for (let i = 0; i < batch.length; i++) {
+                delegate.workingProgress.push({
+                    source: batch[i],
+                    transform: outputs[i] ?? "",
+                    completionTokens: completionTokensPerEntry
+                })
+            }
+        },
+
+        async * singleFallback(batch) {
+            yield* delegate.translateSingle(batch)
+        },
+
+        * yieldResults(batch, outputs, completionTokens) {
+            yield* delegate.yieldOutput(batch, outputs, completionTokens / outputs.length)
+        }
+    }
+}
+
+/**
+ * Agentic 2-pass translator using composition.
+ *
+ * Pass 0 (Overview): Samples first/last entries for content overview and scan guidance.
+ * Pass 1 (Planning): Scans all entries in fixed max-batch-size windows, accumulating
+ * batch summaries. After scanning, summaries are consolidated and optionally refined
+ * into a final instruction. Custom batch slice boundaries are committed per window.
+ * Pass 2 (Translation): Uses the accumulated instruction and custom slices,
+ * delegating translation to the inner translator via the mode adapter.
+ *
+ * @extends {TranslatorStructuredBase}
+ */
+export class TranslatorAgent extends TranslatorStructuredBase {
 
     /**
      * @param {{from?: string, to: string}} language
      * @param {import("./translator.mjs").TranslationServiceContext} services
-     * @param {Partial<import("./translator.mjs").TranslatorOptions>} [options]
+     * @param {Partial<import("./translator.mjs").TranslatorOptions>} options
+     * @param {TranslatorStructuredTimestamp | Translator} delegate - inner translator instance
      */
-    constructor(language, services, options) {
+    constructor(language, services, options, delegate) {
         super(language, services, options)
+
+        /** @type {TranslatorStructuredTimestamp | Translator} */
+        this.delegate = delegate
+
         /**
          * Pre-serialized context chunks recorded per completed translation batch.
-         * Each chunk uses the actual batch size from the agent's dynamic slicing,
-         * not a fixed re-grouping of entryHistory.
+         * Used by the timestamp adapter for dynamic context building.
          * @type {{ userContent: string, assistantContent: string, size: number }[]}
          */
         this._agentContextChunks = []
         this.planningPromptTokens = 0
         this.planningCompletionTokens = 0
+
+        /** @type {ModeAdapter} */
+        this._adapter = this._createAdapter()
+    }
+
+    /**
+     * @returns {ModeAdapter}
+     */
+    _createAdapter() {
+        if (this.delegate instanceof TranslatorStructuredTimestamp) {
+            return createTimestampAdapter(this, this.delegate)
+        }
+        if (this.delegate instanceof TranslatorStructuredArray || this.delegate instanceof Translator) {
+            return createArrayAdapter(this, /** @type {Translator} */ (this.delegate))
+        }
+        throw new Error(`[TranslatorAgent] Unsupported delegate type: ${/** @type {any} */ (this.delegate).constructor.name}`)
     }
 
     /**
@@ -78,7 +244,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
     }
 
     get usage() {
-        const base = super.usage
+        const base = this.delegate.usage
         const planningPromptTokens = this.planningPromptTokens
         const planningCompletionTokens = this.planningCompletionTokens
         return {
@@ -89,7 +255,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
     }
 
     async printUsage() {
-        await super.printUsage()
+        await this.delegate.printUsage()
         if (this.planningPromptTokens > 0 || this.planningCompletionTokens > 0) {
             log.debug(
                 `[TranslatorAgent] Planning tokens:`,
@@ -99,74 +265,14 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
         }
     }
 
-    /**
-     * Records a completed translation batch as a serialized context chunk.
-     * Both batch (inputs) and outputEntries are TimestampEntry (string timestamps).
-     *
-     * @param {import('./translatorStructuredTimestamp.mjs').TimestampEntry[]} batch
-     * @param {import('./translatorStructuredTimestamp.mjs').TimestampEntry[]} outputEntries
-     */
-    _recordContextChunk(batch, outputEntries) {
-        const userContent = encodeToon({ inputs: batch.map(toMsEntry) })
-        const assistantContent = JSON.stringify({ outputs: outputEntries.map(toMsEntry) })
-        this._agentContextChunks.push({ userContent, assistantContent, size: batch.length })
+    abort() {
+        super.abort()
+        this.delegate.abort()
     }
 
-    /**
-     * @override
-     * Uses _agentContextChunks (actual dynamic batch boundaries) instead of re-grouping
-     * entryHistory by a fixed batchSizes[last] chunk size.
-     */
-    buildTimestampContext() {
-        if (this._agentContextChunks.length === 0) return
-
-        const { includedChunks, tokenCount } = this.selectContextChunks(
-            this._agentContextChunks,
-            ({ userContent, assistantContent }) => countTokens(userContent) + countTokens(assistantContent)
-        )
-
-        if (this.options.useFullContext > 0) {
-            const totalEntries = this._agentContextChunks.reduce((s, c) => s + c.size, 0)
-            const includedEntries = includedChunks.reduce((s, c) => s + c.size, 0)
-            const logMsg = includedEntries < totalEntries
-                ? `sliced ${totalEntries - includedEntries} entries (${includedEntries}/${totalEntries} kept, ${tokenCount} tokens)`
-                : `all (${includedEntries} entries, ${tokenCount} tokens)`
-            log.debug("[TranslatorAgent]", "Context:", logMsg)
-        }
-
-        this.promptContext = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ (
-            includedChunks.flatMap(({ userContent, assistantContent }) => [
-                { role: "user", content: userContent },
-                { role: "assistant", content: assistantContent }
-            ])
-        )
-    }
-
-    /**
-     * @override
-     * Single-entry fallback: records each entry as a size-1 context chunk.
-     *
-     * @param {import('./translatorStructuredTimestamp.mjs').TimestampEntry[]} entries
-     */
-    async * translateSingleSrt(entries) {
-        log.debug("[TranslatorAgent]", "Single entry mode")
-        for (const entry of entries) {
-            this.buildTimestampContext()
-            const output = await this.translatePrompt([entry])
-            /** @type {import('./translatorStructuredTimestamp.mjs').TimestampEntry[]} */
-            const outputEntries = /** @type {any} */ (output.content)?.outputs ?? []
-            const resultEntry = outputEntries?.[0] ?? entry
-
-            if (!outputEntries?.[0]) {
-                log.warn("[TranslatorAgent]", "Empty output for single entry, using original:", entry.text)
-            }
-
-            this._recordContextChunk([entry], [resultEntry])
-            this.entryHistory.push({ input: entry, output: resultEntry, completionTokens: output.completionTokens })
-
-            yield resultEntry
-        }
-    }
+    // ────────────────────────────────────────────────────────────────
+    //  Pass 0: Overview
+    // ────────────────────────────────────────────────────────────────
 
     /**
      * Pass 0: Two-step overview and agent instruction generation.
@@ -305,13 +411,13 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
         }
     }
 
+    // ────────────────────────────────────────────────────────────────
+    //  Pass 1: Planning
+    // ────────────────────────────────────────────────────────────────
+
     /**
-     * Pass 1: scans all entries using a sliding window of size scanBatchSize.
-     * Each scan call returns a batchSize - the number of entries from the front of the
-     * window to commit as one translation slice. The window then advances by batchSize,
-     * so the next scan always sees fresh context ahead of the committed entries.
-     *
-     * After all scan batches are processed, slices are sorted and any overlaps are merged.
+     * Pass 1: scans all entries in fixed windows of scanBatchSize, accumulating batch summaries.
+     * Each window is committed as one translation slice.
      *
      * @param {TimestampEntry[]} entries
      * @param {{ overview: string, agentInstruction: string } | null} [overviewResult]
@@ -328,89 +434,57 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
 
         let accumulatedBatchSummary = ""
 
-        // windowStart: the leading edge of the current scan window.
-        // Advances by batchSize each iteration - the model commits batchSize entries from
-        // the front of the window as one translation slice, then the window slides forward.
-        let windowStart = 0
-
-        for (let batchStart = 0; batchStart < entries.length; batchStart = windowStart) {
-            const batch = entries.slice(batchStart, batchStart + scanBatchSize)
-            const batchEnd = batchStart + batch.length - 1
-
-            log.debug("[TranslatorAgent]", "Scanning window", batchStart, "-", batchEnd)
-
-            await this.services.cooler?.cool()
-
-            /** @type {SliceRange[]} */
-            let batchSlices = []
-            let scanOk = false
-
-            try {
-                const result = await this._runScanBatch(batch, batchStart, accumulatedBatchSummary, overviewResult?.agentInstruction)
-                if (result) {
-                    const newNote = result.batchSummary?.trim()
-                    if (newNote) {
-                        log.debug("[TranslatorAgent]", "Batch summary from window", batchStart, `(${countTokens(newNote)} tokens):\n`, newNote)
-                        const candidate = accumulatedBatchSummary
-                            ? `${accumulatedBatchSummary}\n${newNote}`
-                            : newNote
-
-                        const accumulatedBatchSummaryTokens = countTokens(candidate)
-                        log.debug("[TranslatorAgent]",
-                            "Accumulated batch summary length:", candidate.length, `(${accumulatedBatchSummaryTokens}/${budget} tokens)`)
-                        if (accumulatedBatchSummaryTokens > budget) {
-                            // Over budget - consolidate before adding new note
-                            log.debug("[TranslatorAgent]",
-                                "Batch summary accumulator over budget (>", budget, "tokens) - consolidating")
-                            await this.services.cooler?.cool()
-                            accumulatedBatchSummary = await this._consolidateBatchSummaries(
-                                accumulatedBatchSummary, newNote, budget
-                            )
-                            log.debug("[TranslatorAgent]", "Consolidated batch summary:", accumulatedBatchSummary)
-                            log.debug("[TranslatorAgent]",
-                                "Consolidated batch summary length:", accumulatedBatchSummary.length, `(${countTokens(accumulatedBatchSummary)} tokens)`)
-                        } else {
-                            accumulatedBatchSummary = candidate
-                        }
-                    }
-                    // Commit exactly one slice of batchSize entries from the front of the window.
-                    // The window advances by batchSize, so the next scan sees fresh context ahead.
-                    const size = Math.max(1, Math.min(result.batchSize ?? batch.length, batch.length))
-                    batchSlices = [{ start: batchStart, end: batchStart + size - 1 }]
-                    scanOk = true
-                } else {
-                    log.warn("[TranslatorAgent]",
-                        "Scan batch returned null, using default single slice for range",
-                        batchStart, "-", batchEnd)
-                }
-            } catch (error) {
-                log.warn("[TranslatorAgent]", "Scan batch error:", error?.message,
-                    "- falling back to default slice for range", batchStart, "-", batchEnd)
+        if (this.options.agentContextSummary) {
+            log.debug("[TranslatorAgent]", "Pass 1 skipped: using provided context summary")
+            accumulatedBatchSummary = this.options.agentContextSummary
+            for (let batchStart = 0; batchStart < entries.length; batchStart += scanBatchSize) {
+                rawSlices.push({ start: batchStart, end: Math.min(batchStart + scanBatchSize - 1, entries.length - 1) })
             }
+        } else {
+            for (let batchStart = 0; batchStart < entries.length; batchStart += scanBatchSize) {
+                const batch = entries.slice(batchStart, batchStart + scanBatchSize)
+                const batchEnd = batchStart + batch.length - 1
 
-            if (!scanOk || batchSlices.length === 0) {
-                // Fallback: treat entire window as one slice and advance past it
-                rawSlices.push({ start: batchStart, end: batchEnd })
-                windowStart = batchEnd + 1
-            } else {
-                const slice = batchSlices[0]
-                const sliceSize = slice.end - slice.start + 1
-                const minProgress = Math.max(1, Math.floor(scanBatchSize / 2))
+                log.debug("[TranslatorAgent]", "Scanning window", batchStart, "-", batchEnd)
 
-                if (sliceSize < minProgress) {
-                    // batchSize was too small - force progress to avoid O(n) scan calls
-                    log.warn("[TranslatorAgent]",
-                        "batchSize", sliceSize, "below minimum progress", minProgress,
-                        "- forcing full window coverage")
-                    rawSlices.push({ start: batchStart, end: batchEnd })
-                    windowStart = batchEnd + 1
-                } else {
-                    rawSlices.push(slice)
-                    windowStart = slice.end + 1
-                    log.debug("[TranslatorAgent]",
-                        "Committed slice", slice.start, "-", slice.end,
-                        "| next window starts at", windowStart)
+                await this.services.cooler?.cool()
+
+                try {
+                    const result = await this._runScanBatch(batch, batchStart, accumulatedBatchSummary, overviewResult?.agentInstruction)
+                    if (result) {
+                        const newNote = result.batchSummary?.trim()
+                        if (newNote) {
+                            log.debug("[TranslatorAgent]", "Batch summary from window", batchStart, `(${countTokens(newNote)} tokens):\n`, newNote)
+                            const candidate = accumulatedBatchSummary
+                                ? `${accumulatedBatchSummary}\n${newNote}`
+                                : newNote
+
+                            const accumulatedBatchSummaryTokens = countTokens(candidate)
+                            log.debug("[TranslatorAgent]",
+                                "Accumulated batch summary length:", candidate.length, `(${accumulatedBatchSummaryTokens}/${budget} tokens)`)
+                            if (accumulatedBatchSummaryTokens > budget) {
+                                log.debug("[TranslatorAgent]",
+                                    "Batch summary accumulator over budget (>", budget, "tokens) - consolidating")
+                                await this.services.cooler?.cool()
+                                accumulatedBatchSummary = await this._consolidateBatchSummaries(
+                                    accumulatedBatchSummary, newNote, budget
+                                )
+                                log.debug("[TranslatorAgent]", "Consolidated batch summary:", accumulatedBatchSummary)
+                                log.debug("[TranslatorAgent]",
+                                    "Consolidated batch summary length:", accumulatedBatchSummary.length, `(${countTokens(accumulatedBatchSummary)} tokens)`)
+                            } else {
+                                accumulatedBatchSummary = candidate
+                            }
+                        }
+                    } else {
+                        log.warn("[TranslatorAgent]", "Scan batch returned null for range", batchStart, "-", batchEnd)
+                    }
+                } catch (error) {
+                    log.warn("[TranslatorAgent]", "Scan batch error:", error?.message,
+                        "for range", batchStart, "-", batchEnd)
                 }
+
+                rawSlices.push({ start: batchStart, end: batchEnd })
             }
         }
 
@@ -419,14 +493,22 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
         // Final synthesis: consolidate all batch summaries, then produce refined directive
         let finalInstruction = accumulatedBatchSummary
         if (accumulatedBatchSummary) {
-            await this.services.cooler?.cool()
-            // Final consolidation: collapse all per-window batch summaries into one contextSummary
-            const consolidatedContextSummary = await this._consolidateBatchSummaries(accumulatedBatchSummary, undefined, budget)
+            let consolidatedContextSummary
+            if (this.options.agentContextSummary) {
+                // Provided summary is already consolidated — skip the consolidation API call
+                consolidatedContextSummary = accumulatedBatchSummary
+            } else {
+                await this.services.cooler?.cool()
+                consolidatedContextSummary = await this._consolidateBatchSummaries(accumulatedBatchSummary, undefined, budget)
+            }
             log.debug("[TranslatorAgent]", "Context summary:\n", consolidatedContextSummary)
 
-            await this.services.cooler?.cool()
-            const refinedDirective = await this._refineFinalInstruction(consolidatedContextSummary, budget)
-            log.debug("[TranslatorAgent]", "Refined instruction:\n", refinedDirective)
+            let refinedDirective
+            if (!this.options.skipRefineInstruction) {
+                await this.services.cooler?.cool()
+                refinedDirective = await this._refineFinalInstruction(consolidatedContextSummary, budget)
+                log.debug("[TranslatorAgent]", "Refined instruction:\n", refinedDirective)
+            }
 
             finalInstruction = [refinedDirective ?? this.systemInstruction, consolidatedContextSummary, subtitleMeta]
                 .filter(Boolean).join("\n---\n")
@@ -503,7 +585,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
      * @param {number} batchStart - absolute index of batch[0] in the full entries array
      * @param {string} accumulatedBatchSummary - running context from previous scan batches
      * @param {string} [agentInstruction] - self-instruction from overview pass
-     * @returns {Promise<{batchSummary: string, batchSize: number} | null>}
+     * @returns {Promise<{batchSummary: string} | null>}
      */
     async _runScanBatch(batch, batchStart, accumulatedBatchSummary, agentInstruction) {
         const contextSection = accumulatedBatchSummary
@@ -523,13 +605,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             `2. Open with your overall impression of this window's content.\n` +
             `3. Write only what is new or notable here - do not repeat or refine prior context.\n` +
             `4. Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
-            `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).\n\n` +
-            `Rules for batchSize:\n` +
-            `1. Decide how many entries from the start of this window (position ${batchStart}) ` +
-            `to commit as one translation batch - this sets where the next scan window begins.\n` +
-            `2. Must be between 1 and ${batch.length} (the current window size).\n` +
-            `3. Use the full window size if entries flow naturally together, ` +
-            `or a smaller number to break at a scene or topic boundary.`
+            `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).`
         ].join("")
 
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
@@ -558,11 +634,7 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
             return null
         }
 
-        const parsed = message.parsed
-        if (parsed?.batchSize != null) {
-            parsed.batchSize = Math.max(1, Math.min(parsed.batchSize, batch.length))
-        }
-        return parsed
+        return message.parsed
     }
 
     /**
@@ -671,9 +743,13 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
         return null
     }
 
+    // ────────────────────────────────────────────────────────────────
+    //  Pass 2: Translation orchestration
+    // ────────────────────────────────────────────────────────────────
+
     /**
-     * @override
-     * Orchestrates Pass 1 (planning) then Pass 2 (translation).
+     * Runs planning then translates SRT entries via the delegate.
+     * Entry point for timestamp-based delegates.
      *
      * @param {TimestampEntry[]} entries
      */
@@ -681,35 +757,20 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
         log.debug("[TranslatorAgent]", "Starting agentic 2-pass translation,",
             entries.length, "total entries")
 
-        // Build subtitle metadata - only passed to the overview call, not baked into systemInstruction.
-        // The model decides what metadata flows through to agent instruction and final instruction.
-        const fileParts = []
-        if (this.options.inputFile) fileParts.push(`File: ${path.basename(this.options.inputFile)}`)
-        fileParts.push(`Total entries: ${entries.length}`)
-        if (entries.length > 0) fileParts.push(`Duration: ${entries[0].start} -> ${entries.at(-1).end}`)
-        const subtitleMeta = fileParts.join(" | ")
+        const { instruction, customSlices } = await this._runPlanning(entries)
 
-        // Capture base instruction before planning (preserves any --system-instruction override)
-        const baseInstruction = this.systemInstruction
+        // Apply accumulated instruction to delegate
+        this.delegate.systemInstruction = instruction
 
-        // Pass 0: Overview - sample first/last entries for content overview and scan guidance
-        const overviewResult = await this._runOverviewPass(entries, subtitleMeta)
-
-        // Pass 1: Planning
-        const { accumulatedBatchSummary, customSlices } = await this.runPlanningPass(entries, overviewResult, subtitleMeta)
-
-        // Apply accumulated instruction: use as full replacement, or fall back to base
-        this.systemInstruction = accumulatedBatchSummary || baseInstruction
-
-        if (accumulatedBatchSummary) {
-            log.debug("[TranslatorAgent]", `System instruction updated:\n${this.systemInstruction}`)
+        if (instruction !== this.systemInstruction) {
+            log.debug("[TranslatorAgent]", `System instruction updated:\n${instruction}`)
         }
 
-        // Fall back to standard behavior if planning produced no slices
+        // Fall back to delegate's standard behavior if planning produced no slices
         if (customSlices.length === 0) {
             log.warn("[TranslatorAgent]",
-                "Pass 1 produced no slices - falling back to standard translateSrtLines")
-            yield* super.translateSrtLines(entries)
+                "Pass 1 produced no slices - falling back to delegate translateSrtLines")
+            yield* /** @type {TranslatorStructuredTimestamp} */ (/** @type {unknown} */ (this.delegate)).translateSrtLines(entries)
             return
         }
 
@@ -720,20 +781,92 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
     }
 
     /**
-     * Pass 2 loop: iterates over custom slices from Pass 1 instead of fixed batchSize steps.
-     * Mirrors the retry/fallback logic from TranslatorStructuredTimestamp.translateSrtLines,
-     * with slice-halving on mismatch instead of global batch size decrease.
+     * Runs planning then translates lines via the delegate.
+     * Entry point for array-based delegates.
      *
-     * @param {TimestampEntry[]} entries
-     * @param {SliceRange[]} customSlices - mutable; halved in-place on mismatch
+     * @param {string[]} lines
      */
-    async * _translateWithCustomSlices(entries, customSlices) {
-        this.aborted = false
+    async * translateLines(lines) {
+        log.debug("[TranslatorAgent]", "Starting agentic 2-pass translation (array mode),",
+            lines.length, "total lines")
+
+        // Convert lines to TimestampEntry for planning (synthesize dummy timestamps)
+        const entries = lines.map((text, i) => ({
+            start: `00:00:${String(i).padStart(2, '0')},000`,
+            end: `00:00:${String(i + 1).padStart(2, '0')},000`,
+            text
+        }))
+
+        const { instruction, customSlices } = await this._runPlanning(entries)
+
+        // Apply accumulated instruction to delegate
+        this.delegate.systemInstruction = instruction
+
+        // Set up delegate state for array mode
+        const arrayDelegate = /** @type {Translator} */ (this.delegate)
+        arrayDelegate.workingLines = lines
+
+        if (instruction !== this.systemInstruction) {
+            log.debug("[TranslatorAgent]", `System instruction updated:\n${instruction}`)
+        }
+
+        // Fall back to delegate's standard behavior if planning produced no slices
+        if (customSlices.length === 0) {
+            log.warn("[TranslatorAgent]",
+                "Pass 1 produced no slices - falling back to delegate translateLines")
+            yield* arrayDelegate.translateLines(lines)
+            return
+        }
+
+        // Pass 2: Translation with custom slices
+        log.debug("[TranslatorAgent]", "Pass 2 (Translation): using",
+            customSlices.length, "custom slices")
+        yield* this._translateWithCustomSlices(lines, customSlices)
+    }
+
+    /**
+     * Common planning logic for both SRT and array modes.
+     *
+     * @param {TimestampEntry[]} entries - TimestampEntry entries (real or synthesized)
+     * @returns {Promise<{ instruction: string, customSlices: SliceRange[] }>}
+     */
+    async _runPlanning(entries) {
+        // Build subtitle metadata
+        const fileParts = []
+        if (this.options.inputFile) fileParts.push(`File: ${path.basename(this.options.inputFile)}`)
+        fileParts.push(`Total entries: ${entries.length}`)
+        if (entries.length > 0) fileParts.push(`Duration: ${entries[0].start} -> ${entries.at(-1).end}`)
+        const subtitleMeta = fileParts.join(" | ")
+
+        // Capture base instruction before planning
+        const baseInstruction = this.systemInstruction
+
+        // Pass 0: Overview
+        const overviewResult = await this._runOverviewPass(entries, subtitleMeta)
+
+        // Pass 1: Planning
+        const { accumulatedBatchSummary, customSlices } = await this.runPlanningPass(entries, overviewResult, subtitleMeta)
+
+        const instruction = accumulatedBatchSummary || baseInstruction
+
+        return { instruction, customSlices }
+    }
+
+    /**
+     * Pass 2 loop: iterates over custom slices from Pass 1.
+     * Uses the mode adapter to handle delegate-specific operations.
+     * On mismatch: steps down through batchSizes to re-split the failed slice, then falls to single-entry.
+     *
+     * @param {any[]} allEntries - full entries array (TimestampEntry[] or string[])
+     * @param {SliceRange[]} customSlices - mutable; split in-place on mismatch
+     */
+    async * _translateWithCustomSlices(allEntries, customSlices) {
+        this.delegate.aborted = false
         let sliceIndex = 0
 
         while (sliceIndex < customSlices.length) {
             const slice = customSlices[sliceIndex]
-            const batch = entries.slice(slice.start, slice.end + 1)  // end is inclusive
+            const batch = allEntries.slice(slice.start, slice.end + 1)  // end is inclusive
 
             if (batch.length === 0) {
                 log.warn("[TranslatorAgent]", "Empty batch for slice", slice, "- skipping")
@@ -741,23 +874,20 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                 continue
             }
 
-            this.buildTimestampContext()
-            const output = await this.translatePrompt(batch)
+            this._adapter.buildContext()
+            const output = await this.delegate.translatePrompt(/** @type {any} */ (batch))
 
-            if (this.aborted) {
+            if (this.delegate.aborted) {
                 log.debug("[TranslatorAgent]", "Aborted")
                 return
             }
 
-            const parsed = /** @type {import('./translatorStructuredTimestamp.mjs').BatchTimestampOutput} */
-                (/** @type {unknown} */ (output.content ?? {}))
-            const outputEntries = parsed.outputs ?? []
-
-            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.remarksIfContainedMergers ?? "")
+            const outputs = this._adapter.extractOutputs(output)
+            const isMismatch = this._adapter.isMismatch(batch, outputs, output)
 
             if (isMismatch || (batch.length > 1 && output.refusal)) {
-                this.promptTokensWasted += output.promptTokens
-                this.completionTokensWasted += output.completionTokens
+                this.delegate.promptTokensWasted += output.promptTokens
+                this.delegate.completionTokensWasted += output.completionTokens
 
                 if (output.refusal) {
                     log.debug("[TranslatorAgent]", "Refusal on slice", slice)
@@ -778,24 +908,12 @@ export class TranslatorAgent extends TranslatorStructuredTimestamp {
                     // Do NOT increment sliceIndex; retry with first sub-slice
                 } else {
                     // Already at minimum batch size: fall back to entry-by-entry mode
-                    yield* this.translateSingleSrt(batch)
+                    yield* this._adapter.singleFallback(batch)
                     sliceIndex++
                 }
             } else {
-                const completionTokensPerEntry = output.completionTokens / batch.length
-                for (const input of batch) {
-                    const exactMatch = outputEntries.find(o => o.start <= input.start && o.end >= input.end)
-                    if (!exactMatch) {
-                        log.warn("[TranslatorAgent]",
-                            "No output entry covers input", input.start, "-", input.end,
-                            `"${input.text}" - using last output as fallback`)
-                    }
-                    const matchedOutput = exactMatch ?? outputEntries.at(-1)
-                    this.entryHistory.push({ input, output: matchedOutput, completionTokens: completionTokensPerEntry })
-                }
-
-                this._recordContextChunk(batch, outputEntries)
-                yield* outputEntries
+                this._adapter.recordBatch(batch, outputs, output.completionTokens)
+                yield* this._adapter.yieldResults(batch, outputs, output.completionTokens)
                 sliceIndex++
             }
 

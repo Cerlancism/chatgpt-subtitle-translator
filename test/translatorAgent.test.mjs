@@ -1,22 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert';
 
-import { createOpenAIClient, CooldownContext, TranslatorAgent } from '../src/main.mjs';
+import { createOpenAIClient, CooldownContext, TranslatorAgent, TranslatorStructuredTimestamp } from '../src/main.mjs';
 import 'dotenv/config'
 
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY)
 const cooler = new CooldownContext(2, 2000, "ChatGPTAPI")
 
 function makeAgent(systemInstruction) {
-    const agent = new TranslatorAgent(
-        { from: "Japanese", to: "English" },
-        { cooler, openai },
-        {
-            createChatCompletionRequest: { model: process.env.OPENAI_DEFAULT_MODEL, temperature: 0, stream: false },
-            batchSizes: [10, 50],
-            useFullContext: 2000,
-        }
-    )
+    const lang = { from: "Japanese", to: "English" }
+    const services = { cooler, openai }
+    const options = {
+        createChatCompletionRequest: { model: process.env.OPENAI_DEFAULT_MODEL, temperature: 0, stream: false },
+        batchSizes: [10, 50],
+        useFullContext: 2000,
+    }
+    const delegate = new TranslatorStructuredTimestamp(lang, services, { ...options })
+    const agent = new TranslatorAgent(lang, services, options, delegate)
     agent.systemInstruction = systemInstruction
     return agent
 }
