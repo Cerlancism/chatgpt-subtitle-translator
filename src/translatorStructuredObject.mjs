@@ -3,6 +3,7 @@ import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
+import { streamParse } from "./openai.mjs";
 
 const NestedPlaceholder = "nested_"
 
@@ -13,12 +14,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
      * @param {Partial<import("./translator.mjs").TranslatorOptions>} [options]
      */
     constructor(language, services, options) {
-        if (options.batchSizes[0] === 10 && options.batchSizes[1] === 50) {
-            const reducedBatchSizes = [10, 20]
-            log.warn("[TranslatorStructuredObject]", "--batch-sizes is to be reduced to", JSON.stringify(reducedBatchSizes))
-            options.batchSizes = reducedBatchSizes
-        }
-        else if (options.batchSizes.some(x => x > 100)) {
+        if (options.batchSizes?.some(x => x > 100)) {
             throw new Error("[TranslatorStructuredObject] Batch sizes should not exceed 100")
         }
 
@@ -57,7 +53,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
         try {
             await this.services.cooler?.cool()
 
-            const output = await this.streamParse({
+            const output = await streamParse(this.services, {
                 messages,
                 ...this.options.createChatCompletionRequest,
                 stream: this.options.createChatCompletionRequest.stream,
@@ -65,7 +61,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
             }, {
                 structure: translationBatch,
                 name: "translation_object"
-            })
+            }, { onController: (c) => { this.streamController = c } })
 
             // log.debug("[TranslatorStructuredObject]", output.choices[0].message.content)
 

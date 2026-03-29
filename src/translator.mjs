@@ -8,6 +8,9 @@ import { TranslationOutput } from './translatorOutput.mjs';
 
 export { DefaultOptions }
 
+export const AUTO_BATCH_MIN = 3
+export const AUTO_BATCH_REDUCTION = 3
+
 /**
  * @typedef {import('./translatorBase.mjs').TranslationServiceContext} TranslationServiceContext
  * @typedef {import('./translatorBase.mjs').TranslatorOptions} TranslatorOptions
@@ -168,6 +171,30 @@ export class Translator extends TranslatorBase {
     }
 
     /**
+     * Computes how many lines starting at startIndex fit within 15% of the context token budget.
+     * Returns at least 3.
+     * @param {any[]} lines
+     * @param {number} startIndex
+     * @returns {number}
+     */
+    computeDynamicBatchSize(lines, startIndex) {
+        const useFullContext = this.options.useFullContext
+        if (!useFullContext) {
+            return lines.length - startIndex
+        }
+        const budget = Math.floor(useFullContext * 0.15)
+        let tokensSoFar = 0
+        let count = 0
+        for (let i = startIndex; i < lines.length; i++) {
+            const lineTokens = countTokens(String(lines[i]))
+            if (count > 0 && tokensSoFar + lineTokens > budget) break
+            tokensSoFar += lineTokens
+            count++
+        }
+        return Math.max(AUTO_BATCH_MIN, count)
+    }
+
+    /**
      * @param {string[]} lines
      */
     async * translateLines(lines) {
@@ -177,6 +204,13 @@ export class Translator extends TranslatorBase {
         const theEnd = this.end ?? lines.length
 
         for (let index = this.offset, reducedBatchSessions = 0; index < theEnd; index += this.currentBatchSize) {
+            if (this.isDynamicBatch) {
+                const computed = this.computeDynamicBatchSize(lines, index)
+                this.currentBatchSize = Math.max(AUTO_BATCH_MIN, Math.floor(computed / this.dynamicReductionFactor))
+                log.debug("[Translator]", "Dynamic batch size:", this.currentBatchSize,
+                    this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * 0.15)} tokens)`)
+            }
+
             let batch = lines.slice(index, index + this.currentBatchSize).map((x, i) => this.preprocessLine(x, i, index))
 
             if (this.options.useModerator && !this.services.moderationService) {
@@ -187,12 +221,20 @@ export class Translator extends TranslatorBase {
                 const inputForModeration = batch.join("\n\n")
                 const moderationData = await checkModeration(inputForModeration, this.services.moderationService, this.options.moderationModel)
                 if (moderationData.flagged) {
-                    if (!this.changeBatchSize('decrease')) // Already at smallest batch size
-                    {
-                        yield* this.translateSingle(batch)
-                    }
-                    else {
-                        index -= this.currentBatchSize
+                    if (this.isDynamicBatch) {
+                        if (this.currentBatchSize <= AUTO_BATCH_MIN) {
+                            yield* this.translateSingle(batch)
+                            this.dynamicReductionFactor = 1
+                        } else {
+                            this.dynamicReductionFactor *= AUTO_BATCH_REDUCTION
+                            index -= this.currentBatchSize
+                        }
+                    } else {
+                        if (!this.changeBatchSize('decrease')) {
+                            yield* this.translateSingle(batch)
+                        } else {
+                            index -= this.currentBatchSize
+                        }
                     }
                     continue
                 }
@@ -215,11 +257,20 @@ export class Translator extends TranslatorBase {
                     log.debug(`[Translator]`, "Refusal: ", output.refusal)
                 }
 
-                if (this.changeBatchSize("decrease")) {
-                    index -= this.currentBatchSize
-                }
-                else {
-                    yield* this.translateSingle(batch)
+                if (this.isDynamicBatch) {
+                    if (this.currentBatchSize <= AUTO_BATCH_MIN) {
+                        yield* this.translateSingle(batch)
+                        this.dynamicReductionFactor = 1
+                    } else {
+                        this.dynamicReductionFactor *= AUTO_BATCH_REDUCTION
+                        index -= this.currentBatchSize
+                    }
+                } else {
+                    if (this.changeBatchSize("decrease")) {
+                        index -= this.currentBatchSize
+                    } else {
+                        yield* this.translateSingle(batch)
+                    }
                 }
             }
             else {
@@ -229,11 +280,15 @@ export class Translator extends TranslatorBase {
                 // summing any subset of entries approximates the proportional token cost.
                 yield* this.yieldOutput(batch, outputs, output.completionTokens / outputs.length)
 
-                if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
-                    reducedBatchSessions = 0
-                    const old = this.currentBatchSize
-                    this.changeBatchSize("increase")
-                    index -= (this.currentBatchSize - old)
+                if (this.isDynamicBatch) {
+                    this.dynamicReductionFactor = 1
+                } else {
+                    if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
+                        reducedBatchSessions = 0
+                        const old = this.currentBatchSize
+                        this.changeBatchSize("increase")
+                        index -= (this.currentBatchSize - old)
+                    }
                 }
             }
 
@@ -314,7 +369,7 @@ export class Translator extends TranslatorBase {
             return;
         }
 
-        const chunkSize = this.options.batchSizes[this.options.batchSizes.length - 1]
+        const chunkSize = this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? this.currentBatchSize
 
         // Group all history into fixed-size chunks of batchSizes[last]
         const allChunks = []
@@ -362,7 +417,7 @@ export class Translator extends TranslatorBase {
      */
     getContext(sourceLines, transformLines) {
         const chunks = [];
-        const chunkSize = this.options.batchSizes[this.options.batchSizes.length - 1];
+        const chunkSize = this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? this.currentBatchSize;
         for (let i = 0; i < sourceLines.length; i += chunkSize) {
             const sourceChunk = sourceLines.slice(i, i + chunkSize);
             const transformChunk = transformLines.slice(i, i + chunkSize);
