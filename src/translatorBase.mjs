@@ -30,14 +30,20 @@ import { roundWithPrecision, sleep } from './helpers.mjs'
  * Enforce one-to-one line quantity matching between input and output
  * @property {number} useFullContext `2000` \
  * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to include history without a token limit check.
- * @property {number[]} batchSizes `[10, 50]` \
+ * @property {number[] | undefined} batchSizes \
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
+ * When `undefined` (not explicitly provided), batch size is determined dynamically per batch: each batch takes as many
+ * entries as fit within 15% of the `useFullContext` token budget (estimated from entry tokens, leaving room for output),
+ * with a x3 reduction on failure down to a minimum of 3. Resets to the full dynamic size on the next successful batch.
  *
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
- * @property {"array" | "object" | "none" | "timestamp" | false} structuredMode
- * @property {boolean} skipRefineInstruction
+ * @property {"array" | "object" | "none" | "timestamp"} structuredMode
+ * @property {boolean} skipRefineInstruction `false` \
+ * Skip the final instruction refinement API call in agent mode; use the base system instruction directly
+ * @property {string} agentContextSummary \
+ * Pre-supplied context summary for agent mode; skips the batch scanning pass entirely
  * @property {number} max_token
  * @property {number} inputMultiplier
  * @property {import('loglevel').LogLevelDesc} logLevel
@@ -55,7 +61,7 @@ export const DefaultOptions = {
     prefixNumber: true,
     lineMatching: true,
     useFullContext: 2000,
-    batchSizes: [10, 50],
+    batchSizes: undefined,
     structuredMode: "array",
     max_token: 0,
     inputMultiplier: 0,
@@ -96,8 +102,10 @@ export class TranslatorBase {
         this.contextPromptTokens = 0
         this.contextCompletionTokens = 0
         
-        this.workingBatchSizes = [...this.options.batchSizes]
-        this.currentBatchSize = this.workingBatchSizes[this.workingBatchSizes.length - 1]
+        this.isDynamicBatch = !this.options.batchSizes
+        this.dynamicReductionFactor = 1
+        this.workingBatchSizes = this.options.batchSizes ? [...this.options.batchSizes] : []
+        this.currentBatchSize = this.options.batchSizes ? this.workingBatchSizes[this.workingBatchSizes.length - 1] : 0
         
         this.aborted = false
         /** @type {AbortController | undefined} */
@@ -158,6 +166,7 @@ export class TranslatorBase {
      * @param {"increase" | "decrease"} mode
      */
     changeBatchSize(mode) {
+        if (!this.options.batchSizes) return false
         const old = this.currentBatchSize
         if (mode === "decrease") {
             if (this.currentBatchSize === this.options.batchSizes[0]) {

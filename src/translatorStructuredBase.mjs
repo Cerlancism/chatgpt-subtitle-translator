@@ -1,5 +1,4 @@
 import { APIUserAbortError } from "openai/error.mjs";
-import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import log from "loglevel"
 import { Translator } from "./translator.mjs";
 import { TranslationOutput } from "./translatorOutput.mjs";
@@ -44,58 +43,4 @@ export class TranslatorStructuredBase extends Translator {
         throw error
     }
 
-    /**
-     * @template {import('zod').ZodType} ZodInput
-     * @param {import('openai').OpenAI.ChatCompletionCreateParams} params
-     * @param {{structure: ZodInput, name: string}} zFormat
-     * @param {boolean} jsonStream
-     */
-    async streamParse(params, zFormat, jsonStream = false) {
-        const zodResponseFormatOutput = zodResponseFormat(zFormat.structure, zFormat.name)
-        if (params.stream) {
-            const runner = this.services.openai.chat.completions.stream({
-                ...params,
-                response_format: zodResponseFormatOutput,
-                stream: true,
-                stream_options: {
-                    include_usage: true,
-                },
-            })
-
-            this.streamController = runner.controller
-
-            if (jsonStream) {
-                this.jsonStreamParse(runner)
-            }
-            else {
-                runner.on("content.delta", (e) => {
-                    this.services.onStreamChunk?.(e.delta)
-                })
-            }
-            await runner.done()
-
-            this.services.onStreamEnd?.()
-
-            const final = await runner.finalChatCompletion()
-
-            return final
-
-        } else {
-            const output = await this.services.openai.chat.completions.parse({
-                ...params,
-                response_format: zodResponseFormatOutput,
-                stream: false,
-            })
-            return output
-        }
-    }
-
-    /**
-     * @abstract
-     * @template T
-     * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<T>} runner 
-     */
-    jsonStreamParse(runner) {
-
-    }
 }

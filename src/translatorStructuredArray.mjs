@@ -5,6 +5,7 @@ import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
+import { streamParse } from "./openai.mjs";
 
 export class TranslatorStructuredArray extends TranslatorStructuredBase {
     /**
@@ -37,7 +38,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
         try {
             await this.services.cooler?.cool()
 
-            const output = await this.streamParse({
+            const output = await streamParse(this.services, {
                 messages,
                 ...this.options.createChatCompletionRequest,
                 stream: this.options.createChatCompletionRequest.stream,
@@ -45,7 +46,11 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             }, {
                 structure: structuredArray,
                 name: "translation_array"
-            }, true)
+            }, {
+                jsonStream: true,
+                onJsonStream: (runner) => this.jsonStreamParse(runner),
+                onController: (c) => { this.streamController = c },
+            })
 
             // log.debug("[TranslatorStructuredArray]", output.choices[0].message.content)
 
@@ -83,9 +88,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
     }
 
     /**
-     * @override
-     * @template T
-     * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<T>} runner 
+     * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<any>} runner
      */
     jsonStreamParse(runner) {
         this.services.onStreamChunk?.("\n")
@@ -99,15 +102,12 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
                 writeBuffer = ''
             }
         })
-
         runner.on("content.done", () => {
             passThroughStream.end()
             this.services.onClearLine?.()
         })
-
         const pipeline = passThroughStream
             .pipe(new JSONParser({ paths: ['$.outputs.*'], keepStack: false }))
-
         pipeline.on("data", (/** @type {{ value: string }} */ { value: output }) => {
             try {
                 this.services.onClearLine?.()
@@ -116,7 +116,6 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
                 log.error("[TranslatorStructuredArray]", "Parsing error:", err)
             }
         })
-
         pipeline.on("error", (/** @type {Error} */ err) => {
             log.error("[TranslatorStructuredArray]", "stream-json parsing error:", err)
         })

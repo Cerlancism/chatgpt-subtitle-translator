@@ -1,4 +1,5 @@
 import { OpenAI } from "openai";
+import { zodResponseFormat } from "openai/helpers/zod.mjs";
 import log from "loglevel"
 import { retryWrapper, sleep } from './helpers.mjs';
 
@@ -66,8 +67,46 @@ export async function openaiRetryWrapper(func, maxRetries, description) {
 }
 
 /**
+ * Calls the OpenAI structured completion API (streaming or non-streaming) and returns the final completion.
+ *
+ * @param {import('./translator.mjs').TranslationServiceContext} services
+ * @param {import('openai').OpenAI.ChatCompletionCreateParams} params
+ * @param {{structure: import('zod').ZodType, name: string}} zFormat
+ * @param {{jsonStream?: boolean, onJsonStream?: (runner: any) => void, onController?: (controller: AbortController) => void}} [opts]
+ * @returns {Promise<import('openai/resources/chat/completions/completions.js').ParsedChatCompletion<any>>}
+ */
+export async function streamParse(services, params, zFormat, { jsonStream = false, onJsonStream, onController } = {}) {
+    const zodResponseFormatOutput = zodResponseFormat(zFormat.structure, zFormat.name)
+    if (params.stream) {
+        const runner = services.openai.chat.completions.stream({
+            ...params,
+            response_format: zodResponseFormatOutput,
+            stream: true,
+            stream_options: { include_usage: true },
+        })
+        onController?.(runner.controller)
+        if (jsonStream && onJsonStream) {
+            onJsonStream(runner)
+        } else {
+            runner.on("content.delta", (e) => {
+                services.onStreamChunk?.(e.delta)
+            })
+        }
+        await runner.done()
+        services.onStreamEnd?.()
+        return runner.finalChatCompletion()
+    } else {
+        return services.openai.chat.completions.parse({
+            ...params,
+            response_format: zodResponseFormatOutput,
+            stream: false,
+        })
+    }
+}
+
+/**
  * @param {import("openai/streaming").Stream<import("openai").OpenAI.Chat.Completions.ChatCompletionChunk>} response
- * @param {(d: string) => void} onData 
+ * @param {(d: string) => void} onData
  * @param {(u: import('openai').OpenAI.Completions.CompletionUsage) => void} onEnd
  * @returns {Promise<string>}
  */

@@ -6,6 +6,8 @@ import { countTokens } from "gpt-tokenizer"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
+import { AUTO_BATCH_MIN, AUTO_BATCH_REDUCTION } from "./translator.mjs";
+import { streamParse } from "./openai.mjs";
 import { timestampToMilliseconds, millisecondsToTimestamp } from "./subtitle.mjs";
 import { encode as encodeToon } from "@toon-format/toon";
 
@@ -21,10 +23,18 @@ const timestampEntriesSchema = z.array(z.object({
  */
 
 /** @param {TimestampEntry} e @returns {MsEntry} */
-export const toMsEntry = (e) => ({ start: timestampToMilliseconds(e.start), end: timestampToMilliseconds(e.end), text: e.text })
+export const toMsEntry = (e) => ({
+    start: timestampToMilliseconds(e.start),
+    end: timestampToMilliseconds(e.end),
+    text: e.text
+})
 
 /** @param {MsEntry} e @returns {TimestampEntry} */
-const fromMsEntry = (e) => ({ start: millisecondsToTimestamp(e.start), end: millisecondsToTimestamp(e.end), text: e.text })
+const fromMsEntry = (e) => ({
+    start: millisecondsToTimestamp(e.start),
+    end: millisecondsToTimestamp(e.end),
+    text: e.text
+})
 
 const singleTimestampSchema = z.object({
     outputs: timestampEntriesSchema
@@ -41,7 +51,7 @@ const schemaDescriptions = {
     ].join("\n"),
     batch: [
         "outputs: Subtitle entries with start and end as milliseconds",
-        "remarksIfContainedMergers: MUST be empty if no merges! Otherwise: briefly explain why entries were merged in 1 short sentence.",
+        "remarksIfContainedMergers: MUST be empty if no merges! Otherwise: briefly explain why entries were merged in 1 short sentence. Only merge if the combined text remains readable as a subtitle (prefer keeping entries separate if the merged text would exceed ~42 characters).",
     ].join("\n"),
 }
 
@@ -91,7 +101,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
             await this.services.cooler?.cool()
 
-            const output = await this.streamParse({
+            const output = await streamParse(this.services, {
                 messages,
                 ...this.options.createChatCompletionRequest,
                 stream: this.options.createChatCompletionRequest.stream,
@@ -99,7 +109,11 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             }, {
                 structure: schema,
                 name: "translation_timestamp"
-            }, true)
+            }, {
+                jsonStream: true,
+                onJsonStream: (runner) => this.jsonStreamParse(runner),
+                onController: (c) => { this.streamController = c },
+            })
 
             const translationCandidate = output.choices[0].message
 
@@ -116,7 +130,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     buildTimestampContext() {
         if (this.entryHistory.length === 0) return
 
-        const chunkSize = this.options.batchSizes[this.options.batchSizes.length - 1]
+        const chunkSize = this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? this.currentBatchSize
 
         // Precompute all chunks with their serialized message content
         const allChunks = []
@@ -249,6 +263,30 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     }
 
     /**
+     * Computes how many timestamp entries starting at startIndex fit within 15% of the context token budget.
+     * Returns at least AUTO_BATCH_MIN.
+     * @param {TimestampEntry[]} entries
+     * @param {number} startIndex
+     * @returns {number}
+     */
+    computeDynamicBatchSizeTimestamp(entries, startIndex) {
+        const useFullContext = this.options.useFullContext
+        if (!useFullContext) {
+            return entries.length - startIndex
+        }
+        const budget = Math.floor(useFullContext * 0.15)
+        let tokensSoFar = 0
+        let count = 0
+        for (let i = startIndex; i < entries.length; i++) {
+            const lineTokens = countTokens(entries[i].text)
+            if (count > 0 && tokensSoFar + lineTokens > budget) break
+            tokensSoFar += lineTokens
+            count++
+        }
+        return Math.max(AUTO_BATCH_MIN, count)
+    }
+
+    /**
      * @param {TimestampEntry[]} entries
      */
     async * translateSrtLines(entries) {
@@ -256,6 +294,13 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         this.aborted = false
 
         for (let index = 0, reducedBatchSessions = 0; index < entries.length; index += this.currentBatchSize) {
+            if (this.isDynamicBatch) {
+                const computed = this.computeDynamicBatchSizeTimestamp(entries, index)
+                this.currentBatchSize = Math.max(AUTO_BATCH_MIN, Math.floor(computed / this.dynamicReductionFactor))
+                log.debug("[TranslatorStructuredTimestamp]", "Dynamic batch size:", this.currentBatchSize,
+                    this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * 0.15)} tokens)`)
+            }
+
             const batch = entries.slice(index, index + this.currentBatchSize)
 
             this.buildTimestampContext()
@@ -279,10 +324,20 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     log.debug("[TranslatorStructuredTimestamp]", "Refusal:", output.refusal)
                 }
 
-                if (this.changeBatchSize("decrease")) {
-                    index -= this.currentBatchSize
+                if (this.isDynamicBatch) {
+                    if (this.currentBatchSize <= AUTO_BATCH_MIN) {
+                        yield* this.translateSingleSrt(batch)
+                        this.dynamicReductionFactor = 1
+                    } else {
+                        this.dynamicReductionFactor *= AUTO_BATCH_REDUCTION
+                        index -= this.currentBatchSize
+                    }
                 } else {
-                    yield* this.translateSingleSrt(batch)
+                    if (this.changeBatchSize("decrease")) {
+                        index -= this.currentBatchSize
+                    } else {
+                        yield* this.translateSingleSrt(batch)
+                    }
                 }
             } else {
                 const completionTokensPerEntry = output.completionTokens / batch.length
@@ -294,11 +349,15 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
                 yield* outputEntries
 
-                if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
-                    reducedBatchSessions = 0
-                    const old = this.currentBatchSize
-                    this.changeBatchSize("increase")
-                    index -= (this.currentBatchSize - old)
+                if (this.isDynamicBatch) {
+                    this.dynamicReductionFactor = 1
+                } else {
+                    if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
+                        reducedBatchSessions = 0
+                        const old = this.currentBatchSize
+                        this.changeBatchSize("increase")
+                        index -= (this.currentBatchSize - old)
+                    }
                 }
             }
 
@@ -307,9 +366,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     }
 
     /**
-     * @override
-     * @template T
-     * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<T>} runner
+     * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<any>} runner
      */
     jsonStreamParse(runner) {
         const passThroughStream = new PassThrough()
