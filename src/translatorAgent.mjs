@@ -48,13 +48,26 @@ const agentInstructionSchema = z.object({
     agentInstruction: z.string().describe("Self-instruction for scanning and translating this subtitle file.")
 })
 
+/** Fraction of useFullContext allocated to each scan window in Pass 1. */
+export const SCAN_WINDOW_BUDGET_FRACTION = 0.5
+/** Fraction of useFullContext used as the base context budget (overview, language detection, etc.). */
+export const BASE_CONTEXT_BUDGET_FRACTION = 0.1
+/** Fraction of useFullContext allocated to the agent instruction token budget. */
+export const INSTRUCTION_BUDGET_FRACTION = 0.5
+/** Fraction of the consolidation budget used as the target token count. */
+export const CONSOLIDATION_TARGET_FRACTION = 0.5
+/** Lower-bound fraction when expressing a target range (e.g. "~lower–upper tokens"). */
+export const SUMMARY_RANGE_LOWER_FRACTION = 0.67
+/** Multiplier over target tokens used as max_tokens for consolidation calls. */
+export const CONSOLIDATION_MAX_TOKENS_MULTIPLIER = 1.5
+
 /**
  * @typedef {import('./translatorStructuredTimestamp.mjs').TimestampEntry} TimestampEntry
  * @typedef {{ finalInstruction: string }} PlanningResult
  */
 
 /** @param {number} useFullContext @returns {number} */
-const agentInstructionTokenBudget = (useFullContext) => Math.floor(useFullContext / 2)
+const agentInstructionTokenBudget = (useFullContext) => Math.floor(useFullContext * INSTRUCTION_BUDGET_FRACTION)
 
 /**
  * Returns the inclusive end index of a scan window starting at startIdx,
@@ -83,7 +96,7 @@ function computeScanWindowEnd(entries, startIdx, tokenBudget) {
  * Agentic multi-pass translator using composition.
  *
  * Pass 0 (Overview): Samples first/last entries for content overview and scan guidance.
- * Pass 1 (Planning): Scans all entries in token-bounded windows (25% of useFullContext), accumulating
+ * Pass 1 (Planning): Scans all entries in token-bounded windows (SCAN_WINDOW_BUDGET_FRACTION of useFullContext), accumulating
  * batch summaries. After scanning, summaries are consolidated and optionally refined
  * into a final instruction. Custom batch slice boundaries are committed per window.
  * Pass 2 (Translation): Uses the accumulated instruction and custom slices,
@@ -125,7 +138,7 @@ export class TranslatorAgent {
     }
 
     get baseContextBudget() {
-        return this.options.useFullContext ? Math.floor(this.options.useFullContext * 0.1) : undefined
+        return this.options.useFullContext ? Math.floor(this.options.useFullContext * BASE_CONTEXT_BUDGET_FRACTION) : undefined
     }
 
     /** @returns {string} Target language for use in prompts — falls back to language.to */
@@ -393,7 +406,7 @@ export class TranslatorAgent {
     // ────────────────────────────────────────────────────────────────
 
     /**
-     * Pass 1: scans all entries in token-bounded windows (up to 50% of useFullContext each),
+     * Pass 1: scans all entries in token-bounded windows (SCAN_WINDOW_BUDGET_FRACTION of useFullContext each),
      * accumulating batch summaries into a final instruction.
      *
      * @param {TimestampEntry[]} entries
@@ -403,7 +416,7 @@ export class TranslatorAgent {
      */
     async runPlanningPass(entries, overviewResult, subtitleMeta) {
         const scanTokenBudget = this.options.useFullContext > 0
-            ? Math.floor(this.options.useFullContext * 0.5)
+            ? Math.floor(this.options.useFullContext * SCAN_WINDOW_BUDGET_FRACTION)
             : Infinity
         const budget = agentInstructionTokenBudget(this.options.useFullContext)
 
@@ -507,6 +520,9 @@ export class TranslatorAgent {
      */
     async _runScanBatch(batch, batchStart, accumulatedBatchSummary, agentInstruction) {
         const budget = this.baseContextBudget
+        const summaryTokenRange = budget
+            ? `5. Keep the summary between ~${Math.floor(budget * SUMMARY_RANGE_LOWER_FRACTION)} and ~${budget} tokens.`
+            : ""
         const contextSection = accumulatedBatchSummary
             ? `\n---\nContext from previous segments:\n${accumulatedBatchSummary}\n---\n`
             : "\n---\n"
@@ -525,7 +541,7 @@ export class TranslatorAgent {
             `3. Write only what is new or notable here - do not repeat or refine prior context.\n` +
             `4. Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
             `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).\n` +
-            (budget ? `5. Keep the summary between ~${Math.floor(budget * 0.67)} and ~${budget} tokens.` : ``)
+            summaryTokenRange
         ].join("")
 
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
@@ -567,17 +583,19 @@ export class TranslatorAgent {
      */
     async _consolidateBatchSummaries(existing, newNote = "", budget, agentInstruction) {
         const isFinal = !newNote
-        const targetTokens = Math.floor(budget * 0.5)
+        const targetTokens = Math.floor(budget * CONSOLIDATION_TARGET_FRACTION)
+        const targetLower = Math.floor(targetTokens * SUMMARY_RANGE_LOWER_FRACTION)
+        const targetRange = `~${targetLower}-${targetTokens} tokens`
         const agentSection = agentInstruction ? `\nScan guidance:\n${agentInstruction}` : ""
         const messages = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ ([
             {
                 role: "system",
                 content: agentSection + (isFinal
                     ? `You are doing a final consolidation of all batch summaries for a subtitle file ` +
-                    `into a single complete set of notes (target: ~${Math.floor(targetTokens * 0.67)}-${targetTokens} tokens). ` +
+                    `into a single complete set of notes (target: ${targetRange}). ` +
                     `This will be used as the full context for the subtitles - preserve all details.`
                     : `You are doing consolidation of all given batch summary windows for a subtitle file ` +
-                    `into a single condensed set of notes (target: ~${Math.floor(targetTokens * 0.67)}-${targetTokens} tokens). ` +
+                    `into a single condensed set of notes (target: ${targetRange}). ` +
                     `More batches will follow - stay concise but keep all unique facts.`) + "\n\n" +
                     `# Rules:\n` +
                     `1. Write in ${this.targetLanguage}.\n` +
@@ -595,7 +613,7 @@ export class TranslatorAgent {
                 messages,
                 ...this.options.createChatCompletionRequest,
                 stream: this.options.createChatCompletionRequest.stream,
-                max_tokens: Math.floor(targetTokens * 1.5)
+                max_tokens: Math.floor(targetTokens * CONSOLIDATION_MAX_TOKENS_MULTIPLIER)
             }, { structure: consolidateSchema, name: "agent_consolidate" })
             this._accumulatePlanningUsage(output, "consolidate")
             const result = output.choices[0]?.message?.parsed?.consolidatedBatchSummary?.trim()

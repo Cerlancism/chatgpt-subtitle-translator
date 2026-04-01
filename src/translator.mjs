@@ -10,6 +10,8 @@ export { DefaultOptions }
 
 export const AUTO_BATCH_MIN = 3
 export const AUTO_BATCH_REDUCTION = 3
+/** Fraction of the context budget used to size each dynamic batch. */
+export const DYNAMIC_BATCH_BUDGET_FRACTION = 0.15
 
 /**
  * @typedef {import('./translatorBase.mjs').TranslationServiceContext} TranslationServiceContext
@@ -168,7 +170,7 @@ export class Translator extends TranslatorBase {
     }
 
     /**
-     * Computes how many lines starting at startIndex fit within 15% of the context token budget.
+     * Computes how many lines starting at startIndex fit within the dynamic batch budget fraction of the context token budget.
      * Returns at least 3.
      * @param {any[]} lines
      * @param {number} startIndex
@@ -179,7 +181,7 @@ export class Translator extends TranslatorBase {
         if (!useFullContext) {
             return lines.length - startIndex
         }
-        const budget = Math.floor(useFullContext * 0.15)
+        const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)
         let tokensSoFar = 0
         let count = 0
         for (let i = startIndex; i < lines.length; i++) {
@@ -205,7 +207,7 @@ export class Translator extends TranslatorBase {
                 const computed = this.computeDynamicBatchSize(lines, index)
                 this.currentBatchSize = Math.max(AUTO_BATCH_MIN, Math.floor(computed / this.dynamicReductionFactor))
                 log.debug("[Translator]", "Dynamic batch size:", this.currentBatchSize,
-                    this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * 0.15)} tokens)`)
+                    this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`)
             }
 
             let batch = lines.slice(index, index + this.currentBatchSize).map((x, i) => this.preprocessLine(x, i, index))

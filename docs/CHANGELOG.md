@@ -1,5 +1,47 @@
 # Changelog
 
+## 3.2.0 (2026-04-02)
+
+### New Features
+
+#### Auto Batch Size
+
+When `--batch-sizes` is omitted entirely, the batch size is now derived automatically from the context budget (`-c, --context`). Previously omitting `--batch-sizes` was not a valid configuration.
+
+#### Agent Mode Improvements (`-r agent`)
+
+The agent mode has been significantly expanded:
+
+**Pass 0 - Overview:** A new initial pass generates a content overview (file identity, duration, entry count, genre/tone, character names) and detects the source language before scanning begins.
+
+**Pass 1 - Planning:** Now scans in token-bounded windows derived from the context budget rather than fixed max-batch-size chunks. Produces batch summaries and determines natural batch boundaries. The final instruction refinement step can be skipped with `--skip-refine`.
+
+**Pass 2 - Translation:** Uses the enriched instruction and agent-determined batch boundaries. The delegate translation mode defaults to `array`; pass `-r timestamp` alongside the `agent` subcommand to use timestamp mode instead.
+
+```bash
+# Default (array delegate)
+cli/translator.mjs agent -i subtitles.srt --from Japanese --to English
+
+# Timestamp delegate
+cli/translator.mjs agent -i subtitles.srt -r timestamp --from Japanese --to English
+```
+
+New options:
+- `--context-summary`: Skip the batch scanning pass (Pass 1) and proceed directly to translation using only the overview summary.
+- `--skip-refine`: Bypass the final instruction refinement step at the end of Pass 1.
+
+**Language verification:** After the first batch of translations, the output is sampled to confirm the target language matches before proceeding.
+
+#### Timestamp Mode: Streaming Merge Remarks
+
+Merge remarks (`remarksIfContainedMergers`) are now streamed to the terminal in real time during JSON stream parsing instead of being buffered until the full response is received.
+
+### Fixes
+
+- Agent enhanced instruction now echoes glossary, cast names, and term mappings verbatim from the base instruction.
+
+---
+
 ## 3.1.0 (2026-03-15)
 
 ### New Features
