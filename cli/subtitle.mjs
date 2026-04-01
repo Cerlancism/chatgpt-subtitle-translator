@@ -79,7 +79,7 @@ export function mergeFiles(files) {
 
 
 if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
-    const { opts } = createInstance(process.argv)
-
+    // const { opts } = createInstance(process.argv)
     // console.log(opts)
+    createInstance(process.argv)
 }

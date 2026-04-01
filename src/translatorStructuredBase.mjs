@@ -17,9 +17,6 @@ export class TranslatorStructuredBase extends Translator {
      */
     constructor(language, services, options) {
         log.debug(`[TranslatorStructuredBase]`, "Structured Mode:", options.structuredMode)
-        if (options.prefixNumber) {
-            log.warn("[TranslatorStructuredBase]", "--no-prefix-number must be used in structured mode, overriding.")
-        }
         options.prefixNumber = false
         super(language, services, options)
     }

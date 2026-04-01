@@ -22,32 +22,33 @@ import { roundWithPrecision, sleep } from './helpers.mjs'
  * Moderation model
  * @property {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} initialPrompts
  * Initial prompt messages before the translation request messages
- * @property {boolean} useModerator `false` \
+ * @property {boolean} useModerator `false`  
  * Verify with the free OpenAI Moderation tool before submitting the prompt to the ChatGPT model
- * @property {boolean} prefixNumber `true` \
+ * @property {boolean} prefixNumber `true`  
  * Label lines with numerical prefixes to improve the one-to-one correlation between input and output line quantities
- * @property {boolean} lineMatching `true`
+ * @property {boolean} lineMatching `true`  
  * Enforce one-to-one line quantity matching between input and output
- * @property {number} useFullContext `2000` \
+ * @property {number} useFullContext `2000`  
  * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to include history without a token limit check.
- * @property {number[] | undefined} batchSizes \
+ * @property {number[] | undefined} batchSizes
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
- * When `undefined` (not explicitly provided), batch size is determined dynamically per batch: each batch takes as many
- * entries as fit within 15% of the `useFullContext` token budget (estimated from entry tokens, leaving room for output),
- * with a x3 reduction on failure down to a minimum of 3. Resets to the full dynamic size on the next successful batch.
+ * When `undefined` (not explicitly provided), batch size is determined dynamically per batch based on the `useFullContext`
+ * token budget. On failure, the size is reduced and retried down to a minimum, then resets on the next successful batch.
  *
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
- * @property {"array" | "object" | "none" | "timestamp"} structuredMode
- * @property {boolean} skipRefineInstruction `false` \
+ * @property {"array" | "object" | "none" | "timestamp"} structuredMode `"array"`
+ * Structured response format mode
+ * @property {boolean} skipRefineInstruction
  * Skip the final instruction refinement API call in agent mode; use the base system instruction directly
- * @property {string} agentContextSummary \
+ * @property {string} agentContextSummary  
  * Pre-supplied context summary for agent mode; skips the batch scanning pass entirely
- * @property {number} max_token
- * @property {number} inputMultiplier
+ * @property {number} max_token `0`
+ * @property {number} inputMultiplier `0`
  * @property {import('loglevel').LogLevelDesc} logLevel
- * @property {string} [inputFile] - Optional input file path, used by agent mode to provide file context during planning
+ * @property {string} [inputFile] 
+ * Input file path, used by agent mode to provide file context during planning
  */
 
 export const DefaultOptions = {
