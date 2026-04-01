@@ -6,7 +6,7 @@ import { countTokens } from "gpt-tokenizer"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
-import { AUTO_BATCH_MIN, AUTO_BATCH_REDUCTION } from "./translator.mjs";
+import { AUTO_BATCH_MIN, AUTO_BATCH_REDUCTION, DYNAMIC_BATCH_BUDGET_FRACTION } from "./translator.mjs";
 import { streamParse } from "./openai.mjs";
 import { timestampToMilliseconds, millisecondsToTimestamp } from "./subtitle.mjs";
 import { encode as encodeToon } from "@toon-format/toon";
@@ -260,7 +260,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     }
 
     /**
-     * Computes how many timestamp entries starting at startIndex fit within 15% of the context token budget.
+     * Computes how many timestamp entries starting at startIndex fit within the dynamic batch budget fraction of the context token budget.
      * Returns at least AUTO_BATCH_MIN.
      * @param {TimestampEntry[]} entries
      * @param {number} startIndex
@@ -271,7 +271,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         if (!useFullContext) {
             return entries.length - startIndex
         }
-        const budget = Math.floor(useFullContext * 0.15)
+        const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)
         let tokensSoFar = 0
         let count = 0
         for (let i = startIndex; i < entries.length; i++) {
@@ -295,7 +295,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 const computed = this.computeDynamicBatchSizeTimestamp(entries, index)
                 this.currentBatchSize = Math.max(AUTO_BATCH_MIN, Math.floor(computed / this.dynamicReductionFactor))
                 log.debug("[TranslatorStructuredTimestamp]", "Dynamic batch size:", this.currentBatchSize,
-                    this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * 0.15)} tokens)`)
+                    this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`)
             }
 
             const batch = entries.slice(index, index + this.currentBatchSize)
