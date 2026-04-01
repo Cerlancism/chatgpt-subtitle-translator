@@ -159,10 +159,12 @@ export class TranslatorAgent {
         const completion_ = completion?.usage?.completion_tokens ?? 0
         this.planningPromptTokens += prompt
         this.planningCompletionTokens += completion_
+        const { planningPromptRate, planningCompletionRate, planningRate } = this.usage
         log.debug(
             `[TranslatorAgent]${label ? ` [${label}]` : ""} planning tokens:`,
             "\n\tStep:", prompt, "+", completion_, "=", prompt + completion_,
-            "\n\tTotal:", this.planningPromptTokens, "+", this.planningCompletionTokens, "=", this.planningPromptTokens + this.planningCompletionTokens
+            "\n\tTotal:", this.planningPromptTokens, "+", this.planningCompletionTokens, "=", this.planningPromptTokens + this.planningCompletionTokens,
+            ...(planningRate !== undefined ? ["\n\tRate:", planningPromptRate, "+", planningCompletionRate, "=", planningRate, "TPM"] : []),
         )
     }
 
@@ -184,8 +186,7 @@ export class TranslatorAgent {
         }
     }
 
-    async printUsage() {
-        await this.delegate.printUsage()
+    printUsage() {
         if (this.planningPromptTokens > 0 || this.planningCompletionTokens > 0) {
             const { planningPromptTokens, planningCompletionTokens, planningPromptRate, planningCompletionRate, planningRate } = this.usage
             log.debug(
@@ -434,7 +435,8 @@ export class TranslatorAgent {
                 const batchEnd = computeScanWindowEnd(entries, batchStart, scanTokenBudget)
                 const batch = entries.slice(batchStart, batchEnd + 1)
 
-                log.debug("[TranslatorAgent]", "Scanning window", batchStart, "-", batchEnd, `(${batch.length} entries)`)
+                const scanPct = roundWithPrecision(batchStart / entries.length * 100, 0)
+                log.debug("[TranslatorAgent]", `Scanning window ${batchStart}-${batchEnd} (${batch.length} entries) [${scanPct}%]`)
 
                 await this.services.cooler?.cool()
 
@@ -905,6 +907,8 @@ export class TranslatorAgent {
      * @returns {Promise<{ instruction: string }>}
      */
     async _runPlanning(entries) {
+        this._planningLastCallTime = Date.now()
+
         // Build subtitle metadata
         const fileParts = []
         if (this.options.inputFile) fileParts.push(`File: ${this.options.inputFile}`)
@@ -923,6 +927,7 @@ export class TranslatorAgent {
 
         const instruction = finalInstruction || baseInstruction
 
+        this.printUsage()
         return { instruction }
     }
 
