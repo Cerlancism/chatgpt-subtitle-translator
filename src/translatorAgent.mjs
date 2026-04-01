@@ -141,7 +141,7 @@ export class TranslatorAgent {
         return this.options.useFullContext ? Math.floor(this.options.useFullContext * BASE_CONTEXT_BUDGET_FRACTION) : undefined
     }
 
-    /** @returns {string} Target language for use in prompts — falls back to language.to */
+    /** @returns {string} Target language for use in prompts - falls back to language.to */
     get targetLanguage() {
         return this.detectedTo || this.language.to
     }
@@ -352,7 +352,7 @@ export class TranslatorAgent {
             }
             this.detectedFrom = parsed.from
             this.detectedTo = parsed.to
-            log.debug("[TranslatorAgent]", "Detected languages — from:", this.detectedFrom || "(unknown)", "| to:", this.detectedTo)
+            log.debug("[TranslatorAgent]", "Detected languages - from:", this.detectedFrom || "(unknown)", "| to:", this.detectedTo)
         } catch (error) {
             log.warn("[TranslatorAgent]", "Language detection failed:", error?.message)
         }
@@ -484,7 +484,7 @@ export class TranslatorAgent {
         if (accumulatedBatchSummary) {
             let consolidatedContextSummary
             if (this.options.agentContextSummary) {
-                // Provided summary is already consolidated — skip the consolidation API call
+                // Provided summary is already consolidated - skip the consolidation API call
                 consolidatedContextSummary = accumulatedBatchSummary
             } else {
                 await this.services.cooler?.cool()
@@ -715,7 +715,7 @@ export class TranslatorAgent {
                 log.warn("[TranslatorAgent]", "Output language verification refusal or empty response - skipping")
                 return { detectedLanguage: "", matches: true }
             }
-            log.debug("[TranslatorAgent]", "Output language verification — detected:", parsed.detectedLanguage, "| matches:", parsed.matches)
+            log.debug("[TranslatorAgent]", "Output language verification - detected:", parsed.detectedLanguage, "| matches:", parsed.matches)
             return parsed
         } catch (error) {
             log.warn("[TranslatorAgent]", "Output language verification failed:", error?.message, "- skipping")
@@ -826,7 +826,7 @@ export class TranslatorAgent {
             }
         }
 
-        log.warn("[TranslatorAgent]", "Language verification exhausted — proceeding with corrective instructions")
+        log.warn("[TranslatorAgent]", "Language verification exhausted - proceeding with corrective instructions")
     }
 
     /**

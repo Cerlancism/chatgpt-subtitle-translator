@@ -56,7 +56,7 @@ function addTranslatorOptions(cmd) {
         .option("-i, --input <file>", "Text file name to use as input, .srt or plain text")
         .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}`")
-        .option("-p, --plain-text <text>", "Only translate this input plain text. Not supported in timestamp or agent mode")
+        .option("-p, --plain-text <text>", "Only translate this input plain text. Not supported in timestamp mode, or with the agent subcommand using -r timestamp")
         .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "object", "timestamp", "agent", "none"]).default("array"))
 
         .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
@@ -66,7 +66,7 @@ function addTranslatorOptions(cmd) {
         .option("--initial-prompts <prompts>", "Initial prompt messages before the translation request messages, as a JSON array", JSON.parse, DefaultOptions.initialPrompts)
         .option("--use-moderator", "Use the OpenAI Moderation tool")
         .option("--no-prefix-number", "Don't prefix lines with numerical indices")
-        .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
+        .option("--no-line-matching", "Don't enforce one-to-one line quantity input output matching")
         .option("-b, --batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array. When omitted, batch size is determined automatically based on the context token budget", JSON.parse)
         .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value such as 0 to be more deterministic", parseFloat, DefaultOptions.createChatCompletionRequest.temperature)
         .option("--no-stream", "Disable stream progress output to terminal (streaming is on by default)")
@@ -228,7 +228,7 @@ async function run(opts, options, agentMode = false) {
 
     if (opts.plainText) {
         if (opts.structured === "timestamp" || (agentMode && options.structuredMode === "timestamp")) {
-            log.error("[CLI]", "--plain-text is not supported in timestamp/agent mode.")
+            log.error("[CLI]", "--plain-text is not supported in timestamp mode.")
             process.exit(1)
         }
         if (!(translator instanceof Translator)) throw new Error("Expected Translator")
