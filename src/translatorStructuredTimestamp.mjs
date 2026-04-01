@@ -406,8 +406,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             }
         }
 
+        let remarksPrevLen = 0
+
         const pipeline = passThroughStream
-            .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
+            .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text', '$.remarksIfContainedMergers'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
 
         pipeline.on("data", (/** @type {{ value: string | number, key: string, partial: boolean }} */ { value, key, partial }) => {
             try {
@@ -428,6 +430,19 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     if (!partial) emitField("end", "  ", millisecondsToTimestamp(/** @type {number} */(value)), partial)
                 } else if (key === "text") {
                     emitField("text", "\n", /** @type {string} */(value), partial, () => { textDone = true })
+                } else if (key === "remarksIfContainedMergers") {
+                    const strValue = /** @type {string} */(value)
+                    if (strValue) {
+                        const delta = strValue.slice(remarksPrevLen)
+                        if (delta) {
+                            if (remarksPrevLen === 0) this.services.onStreamChunk?.("[remarks] ")
+                            this.services.onStreamChunk?.(delta)
+                        }
+                        remarksPrevLen = strValue.length
+                        if (!partial) {
+                            this.services.onStreamChunk?.("\n")
+                        }
+                    }
                 }
             } catch (err) {
                 log.error("[TranslatorStructuredTimestamp]", "Parsing error:", err)

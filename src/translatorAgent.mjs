@@ -6,6 +6,7 @@ import { encode as encodeToon } from "@toon-format/toon"
 import { streamParse } from "./openai.mjs"
 import { timestampToMilliseconds } from "./subtitle.mjs"
 import { DefaultOptions } from "./translatorBase.mjs"
+import { roundWithPrecision } from "./helpers.mjs"
 import { Translator } from "./translator.mjs"
 import { TranslatorStructuredTimestamp, toMsEntry } from "./translatorStructuredTimestamp.mjs"
 
@@ -114,6 +115,9 @@ export class TranslatorAgent {
 
         this.planningPromptTokens = 0
         this.planningCompletionTokens = 0
+        this.planningElapsedTimeMs = 0
+        /** @type {number | undefined} */
+        this._planningLastCallTime = undefined
 
         /** @type {string} Detected source language from Pass 0 (empty if unknown) */
         this.detectedFrom = ""
@@ -136,6 +140,9 @@ export class TranslatorAgent {
      * @param {string} [label] - step name for logging
      */
     _accumulatePlanningUsage(completion, label) {
+        const now = Date.now()
+        if (this._planningLastCallTime !== undefined) this.planningElapsedTimeMs += now - this._planningLastCallTime
+        this._planningLastCallTime = now
         const prompt = completion?.usage?.prompt_tokens ?? 0
         const completion_ = completion?.usage?.completion_tokens ?? 0
         this.planningPromptTokens += prompt
@@ -151,19 +158,28 @@ export class TranslatorAgent {
         const base = this.delegate.usage
         const planningPromptTokens = this.planningPromptTokens
         const planningCompletionTokens = this.planningCompletionTokens
+        const planningMinutesElapsed = this.planningElapsedTimeMs > 0 ? this.planningElapsedTimeMs / 1000 / 60 : undefined
+        const planningPromptRate = planningMinutesElapsed ? roundWithPrecision(planningPromptTokens / planningMinutesElapsed, 0) : undefined
+        const planningCompletionRate = planningMinutesElapsed ? roundWithPrecision(planningCompletionTokens / planningMinutesElapsed, 0) : undefined
+        const planningRate = planningMinutesElapsed ? roundWithPrecision((planningPromptTokens + planningCompletionTokens) / planningMinutesElapsed, 0) : undefined
         return {
             ...base,
             planningPromptTokens,
             planningCompletionTokens,
+            planningPromptRate,
+            planningCompletionRate,
+            planningRate,
         }
     }
 
     async printUsage() {
         await this.delegate.printUsage()
         if (this.planningPromptTokens > 0 || this.planningCompletionTokens > 0) {
+            const { planningPromptTokens, planningCompletionTokens, planningPromptRate, planningCompletionRate, planningRate } = this.usage
             log.debug(
                 `[TranslatorAgent] Planning tokens:`,
-                "\n\tTokens:", this.planningPromptTokens, "+", this.planningCompletionTokens, "=", this.planningPromptTokens + this.planningCompletionTokens
+                "\n\tTokens:", planningPromptTokens, "+", planningCompletionTokens, "=", planningPromptTokens + planningCompletionTokens,
+                ...(planningRate !== undefined ? ["\n\tRate:", planningPromptRate, "+", planningCompletionRate, "=", planningRate, "TPM", this.services.cooler?.rate, "RPM"] : []),
             )
         }
     }
@@ -819,7 +835,7 @@ export class TranslatorAgent {
 
         // Pass 2: delegate handles batching
         log.debug("[TranslatorAgent]", "Pass 2 (Translation): delegating to translateSrtLines")
-        const delegate = /** @type {TranslatorStructuredTimestamp} */ (/** @type {unknown} */ (this.delegate))
+        const delegate = /** @type {TranslatorStructuredTimestamp} */ (this.delegate)
         yield* delegate.translateSrtLines(entries)
     }
 
@@ -834,9 +850,15 @@ export class TranslatorAgent {
             lines.length, "total lines")
 
         // Convert lines to TimestampEntry for planning (synthesize dummy timestamps)
+        const toTimestamp = (s) => {
+            const h = Math.floor(s / 3600)
+            const m = Math.floor((s % 3600) / 60)
+            const sec = s % 60
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')},000`
+        }
         const entries = lines.map((text, i) => ({
-            start: `00:00:${String(i).padStart(2, '0')},000`,
-            end: `00:00:${String(i + 1).padStart(2, '0')},000`,
+            start: toTimestamp(i),
+            end: toTimestamp(i + 1),
             text
         }))
 
