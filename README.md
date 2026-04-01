@@ -570,7 +570,7 @@ inputs[5]{start,end,text}:
     { "start": 8000, "end": 12000, "text": "The weather is nice today, isn't it?" },
     { "start": 12000, "end": 16000, "text": "Yes, it's very nice weather." }
   ],
-  "mergedRemarks": ""
+  "remarksIfContainedMergers": ""
 }
 ```
 
