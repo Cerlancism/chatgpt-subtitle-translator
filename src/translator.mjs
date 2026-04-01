@@ -117,7 +117,6 @@ export class Translator extends TranslatorBase {
                 const streamOutput = await completeChatStream(promptResponse, /** @param {string} data */(data) => {
                     const hasNewline = data.includes("\n")
                     if (writeQueue.length === 0 && !hasNewline) {
-                        // process.stdout.write(data)
                         this.services.onStreamChunk?.(data)
                     }
                     else if (hasNewline) {
@@ -126,13 +125,11 @@ export class Translator extends TranslatorBase {
                     }
                     else {
                         writeQueue += data
-                        // process.stdout.write(writeQueue)
                         this.services.onStreamChunk?.(writeQueue)
                         writeQueue = ''
                     }
                 }, (u) => {
                     usage = u
-                    // process.stdout.write("\n")
                     this.services.onStreamEnd?.()
                 })
                 return TranslationOutput.fromUsage(this.getOutput(lines, streamOutput), usage)

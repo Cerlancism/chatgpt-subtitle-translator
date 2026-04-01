@@ -57,7 +57,7 @@ function addTranslatorOptions(cmd) {
         .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}`")
         .option("-p, --plain-text <text>", "Only translate this input plain text. Not supported in timestamp or agent mode")
-        .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "object", "timestamp", "none"]).default("array"))
+        .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "object", "timestamp", "agent", "none"]).default("array"))
 
         .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
         .option("--experimental-input-multiplier <value>", "", val => parseInt(val, 10), 0)
@@ -99,7 +99,9 @@ export async function createInstance(args) {
 
     program.action(async () => {
         const opts = program.opts()
-        await run(opts, buildOptions(opts))
+        const isAgentAlias = opts.structured === "agent"
+        if (isAgentAlias) opts.structured = "array"
+        await run(opts, buildOptions(opts), isAgentAlias)
     })
 
     await program.parseAsync(args)
@@ -454,7 +456,5 @@ async function checkFileExists(filePath) {
 }
 
 if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
-    // const { opts } = await createInstance(process.argv)
-    // log.debug("[CLI]", opts)
     createInstance(process.argv)
 }

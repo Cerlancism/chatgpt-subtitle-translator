@@ -6,7 +6,7 @@
 
 #### Agent Mode (`-r agent`)
 
-A two-pass agentic translation mode built on `timestamp`.
+A multi-pass agentic translation mode.
 
 **Pass 1 - Planning:** Scans the full subtitle file in max-batch-size chunks. For each chunk the model produces a batch summary (character names, locations, events, tone, dialect) and decides a natural batch boundary. Summaries accumulate and are consolidated when they exceed the token budget. At the end of the scan, a refined system instruction is generated that filters the glossary and stylistic notes down to only what was observed in the file.
 
