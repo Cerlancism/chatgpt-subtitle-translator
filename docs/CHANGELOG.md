@@ -4,19 +4,17 @@
 
 ### New Features
 
-#### Auto Batch Size
+#### Agent Mode Improvements (`agent` subcommand)
 
-When `--batch-sizes` is omitted entirely, the batch size is now derived automatically from the context budget (`-c, --context`). Previously omitting `--batch-sizes` was not a valid configuration.
+A new `agent` subcommand comes with a set of specific configurable options. It is still also available as `--structured agent` for the default configuration, which uses now `array` mode as the delegate.
 
-#### Agent Mode Improvements (`-r agent`)
+The agent mode has been expanded into a multi-pass pipeline:
 
-The agent mode has been significantly expanded:
+**Overview pass:** Samples the file to generate a content overview (file identity, duration, entry count, genre/tone, character names) and detects the source language.
 
-**Pass 0 - Overview:** A new initial pass generates a content overview (file identity, duration, entry count, genre/tone, character names) and detects the source language before scanning begins.
+**Planning pass:** Scans the file in token-bounded windows derived from the context budget, rather than fixed max-batch-size chunks. Each window produces a batch summary and determines a natural batch boundary. Summaries are consolidated and used to generate a refined translation instruction. The final refinement step can be skipped with `--skip-refine`.
 
-**Pass 1 - Planning:** Now scans in token-bounded windows derived from the context budget rather than fixed max-batch-size chunks. Produces batch summaries and determines natural batch boundaries. The final instruction refinement step can be skipped with `--skip-refine`.
-
-**Pass 2 - Translation:** Uses the enriched instruction and agent-determined batch boundaries. The delegate translation mode defaults to `array`; pass `-r timestamp` alongside the `agent` subcommand to use timestamp mode instead.
+**Translation pass:** Uses the enriched instruction and agent-determined batch boundaries. The delegate translation mode defaults to `array`; pass `-r timestamp` alongside the `agent` subcommand to use timestamp mode instead.
 
 ```bash
 # Default (array delegate)
@@ -26,19 +24,15 @@ cli/translator.mjs agent -i subtitles.srt --from Japanese --to English
 cli/translator.mjs agent -i subtitles.srt -r timestamp --from Japanese --to English
 ```
 
-New options:
-- `--context-summary`: Skip the batch scanning pass (Pass 1) and proceed directly to translation using only the overview summary.
-- `--skip-refine`: Bypass the final instruction refinement step at the end of Pass 1.
+New options available for `agent` subcommand:
+- `--context-summary`: Provide a context summary directly, skipping the planning pass entirely.
+- `--skip-refine`: Bypass the final instruction refinement step at the end of the planning pass.
 
-**Language verification:** After the first batch of translations, the output is sampled to confirm the target language matches before proceeding.
+**Language verification:** Before translation begins, a sample of the input is checked to confirm the detected source language. A sample of the first batch output is then verified to confirm it matches the target language before proceeding.
 
-#### Timestamp Mode: Streaming Merge Remarks
+#### Auto Batch Size
 
-Merge remarks (`remarksIfContainedMergers`) are now streamed to the terminal in real time during JSON stream parsing instead of being buffered until the full response is received.
-
-### Fixes
-
-- Agent enhanced instruction now echoes glossary, cast names, and term mappings verbatim from the base instruction.
+When `--batch-sizes` is omitted, the batch size is now derived automatically from the context budget (`-c, --context`).
 
 ---
 
@@ -50,9 +44,9 @@ Merge remarks (`remarksIfContainedMergers`) are now streamed to the terminal in 
 
 A multi-pass agentic translation mode.
 
-**Pass 1 - Planning:** Scans the full subtitle file in max-batch-size chunks. For each chunk the model produces a batch summary (character names, locations, events, tone, dialect) and decides a natural batch boundary. Summaries accumulate and are consolidated when they exceed the token budget. At the end of the scan, a refined system instruction is generated that filters the glossary and stylistic notes down to only what was observed in the file.
+**Planning pass:** Scans the full subtitle file in max-batch-size chunks. For each chunk the model produces a batch summary (character names, locations, events, tone, dialect) and decides a natural batch boundary. Summaries accumulate and are consolidated when they exceed the token budget. At the end of the scan, a refined system instruction is generated that filters the glossary and stylistic notes down to only what was observed in the file.
 
-**Pass 2 - Translation:** Runs identically to `timestamp` mode using the enriched instruction and the agent-determined batch boundaries from Pass 1.
+**Translation pass:** Runs identically to `timestamp` mode using the enriched instruction and the agent-determined batch boundaries from the planning pass.
 
 Best suited for content with recurring characters, specialized vocabulary, or stylistic consistency requirements. Costs additional API calls for the planning pass. Progress file resumption is not supported.
 

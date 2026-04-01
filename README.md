@@ -45,7 +45,7 @@ Reference: <https://github.com/openai/openai-quickstart-node#setup>
 - Add your [API key](https://platform.openai.com/account/api-keys) to the newly created `.env` file
 
 ## CLI
-```
+```bash
 cli/translator.mjs --help
 ```
 
@@ -70,7 +70,7 @@ Options:
       - `array` Structures the input and output into an array format.
       - `object` Structures the input and output as a keyed object.
       - `timestamp` Provides the model with start/end timestamps alongside each entry's text, allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and a merge remarks field in output. Output entry count may differ from input, so progress file resumption is not supported.
-      - `agent` Multi-pass agentic mode. Use the `agent` subcommand for full configuration — see [Agent Mode](#agent-mode).
+      - `agent` Alias for the `agent` subcommand with default options. Use the dedicated subcommand for full configuration. See [Agent Mode](#agent-mode).
       - `none` Legacy compatibility mode, disables structured output.
 
   - `-c, --context <tokens>`
@@ -98,9 +98,9 @@ Options:
   - `--no-prefix-number`
     Don't prefix lines with numerical indices. Ignored in `-r, --structured` `array|object|timestamp` - prefix numbers are always disabled there.
   - `--no-line-matching`
-    Don't enforce one to one line quantity input output matching. Ignored in `-r, --structured` `timestamp` - line matching is always disabled there since entries may be merged.
+    Don't enforce one-to-one line quantity input output matching. Ignored in `-r, --structured` `timestamp` - line matching is always disabled there since entries may be merged.
   - `-p, --plain-text <text>`
-    Input source text with this plain text argument. Not supported in `-r, --structured` `timestamp` or `agent` mode.
+    Input source text with this plain text argument. Not supported in `-r, --structured` `timestamp` mode, or when using the `agent` subcommand with `-r timestamp`.
   - `--no-stream`
     Disable stream progress output to terminal (streaming is on by default)
   - `--log-level <level>`  
@@ -129,16 +129,32 @@ Additional Options for GPT: https://developers.openai.com/api/reference/resource
 
 ### Agent Mode
 
-Subcommand for multi-pass agentic translation. Accepts all standard translation options. Structured mode defaults to `array`; `timestamp` is also supported via `-r timestamp`. Progress file resumption is not supported.
+Subcommand for multi-pass agentic translation. Accepts all standard translation options.
 
 ```bash
-cli/translator.mjs agent [options]
+cli/translator.mjs agent --help
+```
+
+Agent mode runs multiple passes before translating:
+
+**Overview** - Samples the file to produce a content overview (file identity, duration, genre/tone, character names) and detects the source language.  
+**Planning** - Scans the file in token-bounded windows. Each window produces a batch summary (characters, locations, events, tone) and determines a natural batch boundary. Summaries are consolidated and used to generate a refined translation instruction.  
+**Translation** - Translates using the enriched instruction and the agent-determined batch boundaries. After the first batch, a sample of the output is checked to confirm the target language before proceeding.  
+
+Structured mode defaults to `array`; pass `--structured timestamp` to use timestamp mode instead.  
+
+```bash
+# Default (array delegate)
+cli/translator.mjs agent --input subtitles.srt --from Japanese --to English
+
+# Timestamp delegate
+cli/translator.mjs agent --input subtitles.srt --structured timestamp --from Japanese --to English
 ```
 
 - `--skip-refine`  
-  Skip the final instruction refinement pass and use the base system instruction directly.
+  Skip the final instruction refinement step at the end of the planning pass and use the accumulated summaries directly.
 - `--context-summary <summary>`  
-  Provide a context summary directly, bypassing the batch scanning pass entirely.
+  Provide a context summary directly, bypassing the planning pass entirely and proceeding straight to translation.
 
 ## Examples
 ### Plain text  
