@@ -80,7 +80,7 @@ function computeScanWindowEnd(entries, startIdx, tokenBudget) {
 
 
 /**
- * Agentic 2-pass translator using composition.
+ * Agentic multi-pass translator using composition.
  *
  * Pass 0 (Overview): Samples first/last entries for content overview and scan guidance.
  * Pass 1 (Planning): Scans all entries in token-bounded windows (25% of useFullContext), accumulating
@@ -105,10 +105,9 @@ export class TranslatorAgent {
             ...options,
             createChatCompletionRequest: { ...DefaultOptions.createChatCompletionRequest, ...options.createChatCompletionRequest }
         })
-        this.systemInstruction = `Translate ${language.from ? language.from + " " : ""}to ${language.to}`
-
         /** @type {TranslatorStructuredTimestamp | Translator} */
         this.delegate = delegate
+        this.systemInstruction = delegate.systemInstruction
 
         /** @type {AbortController | undefined} */
         this.streamController = undefined
@@ -817,7 +816,7 @@ export class TranslatorAgent {
      * @param {TimestampEntry[]} entries
      */
     async * translateSrtLines(entries) {
-        log.debug("[TranslatorAgent]", "Starting agentic 2-pass translation,",
+        log.debug("[TranslatorAgent]", "Starting agentic multi-pass translation,",
             entries.length, "total entries")
 
         const { instruction } = await this._runPlanning(entries)
@@ -846,7 +845,7 @@ export class TranslatorAgent {
      * @param {string[]} lines
      */
     async * translateLines(lines) {
-        log.debug("[TranslatorAgent]", "Starting agentic 2-pass translation (array mode),",
+        log.debug("[TranslatorAgent]", "Starting agentic multi-pass translation (array mode),",
             lines.length, "total lines")
 
         // Convert lines to TimestampEntry for planning (synthesize dummy timestamps)

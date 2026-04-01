@@ -65,22 +65,13 @@ Options:
     Input source text with the content of this file, in `.srt` format or plain text
   - `-o, --output <file>`  
     Output file name, defaults to be based on input file name
-  - `-b, --batch-sizes <sizes>`
-    Batch sizes of increasing order for translation prompt slices in JSON Array (default: `"[10,50]"`)  
-
-    The number of lines to include in each translation prompt, provided that they are estimated to be within the token limit.  
-    In case of mismatched output line quantities, this number will be decreased step by step according to the values in the array, ultimately reaching one.
-
-    Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.  
-    However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
   - `-r, --structured <mode>`
-    [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode with timestamp support. (default: `array`, choices: `array`, `timestamp`, `agent`, `agent+timestamp`, `agent+array`, `object`, `none`)
+    [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode. (default: `array`, choices: `array`, `object`, `timestamp`, `agent`, `none`)
       - `array` Structures the input and output into an array format.
-      - `timestamp` Provides the model with start/end timestamps alongside each entry's text, allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and a merge remarks field in output. Output entry count may differ from input, so progress file resumption is not supported.
-      - `agent` / `agent+timestamp` Two-pass agentic mode built on `timestamp`. **Pass 1 (Planning):** scans the full subtitle file in batches to observe character names, genre/tone, terminology, and dialect, accumulating a refined system instruction and suggested custom batch boundaries. **Pass 2 (Translation):** translates using the enriched instruction and agent-determined batching, delegating to `timestamp` mode. Best for content with recurring characters, specialized vocabulary, or stylistic consistency requirements. Uses more API calls than `timestamp` due to the planning pass. Progress file resumption is not supported.
-      - `agent+array` Two-pass agentic mode built on `array`. Same planning pass as `agent`, but **Pass 2 (Translation)** delegates to `array` mode. Supports plain text input. Progress file resumption is not supported.
       - `object` Structures the input and output as a keyed object.
-      - `none` Disables structured output.
+      - `timestamp` Provides the model with start/end timestamps alongside each entry's text, allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and a merge remarks field in output. Output entry count may differ from input, so progress file resumption is not supported.
+      - `agent` Multi-pass agentic mode. Use the `agent` subcommand for full configuration — see [Agent Mode](#agent-mode).
+      - `none` Legacy compatibility mode, disables structured output.
 
   - `-c, --context <tokens>`
     Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Default: `2000`. Set to `0` to include history without a token limit check.
@@ -88,10 +79,20 @@ Options:
     The token budget is tracked from actual model response token counts. The history is chunked into user/assistant message pairs using the last value in `--batch-sizes`.
 
     Recommended value: set `<tokens>` to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--context 90000`.
+  - `-b, --batch-sizes <sizes>`
+    Batch sizes of increasing order for translation prompt slices in JSON Array  
+
+    The number of lines to include in each translation prompt, provided that they are estimated to be within the token limit.  
+    In case of mismatched output line quantities, this number will be decreased step by step according to the values in the array, ultimately reaching one.
+
+    Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.  
+    However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
+
+    When omitted, batch size is determined automatically per batch based on the `--context` token budget. On failure, the size is reduced and retried down to a minimum, then resets on the next successful batch.
   - `--initial-prompts <prompts>`  
     Initial prompts for the translation in JSON (default: `"[]"`) 
   - `--use-moderator`
-    Use the OpenAI API Moderation endpoint
+    Use the OpenAI Moderation tool
   - `--moderation-model <model>`
     (default: `"omni-moderation-latest"`) https://developers.openai.com/api/docs/models  
   - `--no-prefix-number`
@@ -99,7 +100,7 @@ Options:
   - `--no-line-matching`
     Don't enforce one to one line quantity input output matching. Ignored in `-r, --structured` `timestamp` - line matching is always disabled there since entries may be merged.
   - `-p, --plain-text <text>`
-    Input source text with this plain text argument. Not supported in `-r, --structured` `timestamp`.
+    Input source text with this plain text argument. Not supported in `-r, --structured` `timestamp` or `agent` mode.
   - `--no-stream`
     Disable stream progress output to terminal (streaming is on by default)
   - `--log-level <level>`  
@@ -125,6 +126,19 @@ Additional Options for GPT: https://developers.openai.com/api/reference/resource
   - `--logit_bias <logit_bias>`
     Modify the likelihood of specified tokens appearing in the completion
 
+
+### Agent Mode
+
+Subcommand for multi-pass agentic translation. Accepts all standard translation options. Structured mode defaults to `array`; `timestamp` is also supported via `-r timestamp`. Progress file resumption is not supported.
+
+```bash
+cli/translator.mjs agent [options]
+```
+
+- `--skip-refine`  
+  Skip the final instruction refinement pass and use the base system instruction directly.
+- `--context-summary <summary>`  
+  Provide a context summary directly, bypassing the batch scanning pass entirely.
 
 ## Examples
 ### Plain text  
@@ -589,14 +603,6 @@ Yes, it's very nice weather.
 </tr>
 </table>
 
-#### `agent` / `agent+timestamp` / `agent+array`
-
-Two-pass agentic mode. Pass 1 (Planning) scans the full file in max-batch-size chunks, collecting character names, tone, terminology, and suggested batch boundaries into a refined system instruction. Pass 2 (Translation) uses that instruction and the agent-determined batching, delegating to the chosen inner translator:
-
-- `agent` / `agent+timestamp` — delegates to `timestamp` mode (default; SRT files only)
-- `agent+array` — delegates to `array` mode (supports plain text and SRT files)
-
-Costs additional API calls for the planning pass; progress file resumption is not supported.
 
 #### `none`
 

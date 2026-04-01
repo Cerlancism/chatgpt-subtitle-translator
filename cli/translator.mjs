@@ -55,8 +55,9 @@ function addTranslatorOptions(cmd) {
 
         .option("-i, --input <file>", "Text file name to use as input, .srt or plain text")
         .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
-        .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}` with this plain text")
-        .option("-p, --plain-text <text>", "Only translate this input plain text")
+        .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}`")
+        .option("-p, --plain-text <text>", "Only translate this input plain text. Not supported in timestamp or agent mode")
+        .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "object", "timestamp", "none"]).default("array"))
 
         .option("--experimental-max_token <value>", "", val => parseInt(val, 10), 0)
         .option("--experimental-input-multiplier <value>", "", val => parseInt(val, 10), 0)
@@ -66,7 +67,7 @@ function addTranslatorOptions(cmd) {
         .option("--use-moderator", "Use the OpenAI Moderation tool")
         .option("--no-prefix-number", "Don't prefix lines with numerical indices")
         .option("--no-line-matching", "Don't enforce one to one line quantity input output matching")
-        .option("-b, --batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array", JSON.parse)
+        .option("-b, --batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array. When omitted, batch size is determined automatically based on the context token budget", JSON.parse)
         .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value such as 0 to be more deterministic", parseFloat, DefaultOptions.createChatCompletionRequest.temperature)
         .option("--no-stream", "Disable stream progress output to terminal (streaming is on by default)")
         .option("--top_p <top_p>", "Nucleus sampling parameter, top_p probability mass", parseFloat)
@@ -77,6 +78,33 @@ function addTranslatorOptions(cmd) {
         .addOption(new Option("--log-level <level>", "Log level").choices(["trace", "debug", "info", "warn", "error", "silent"]))
         .option("--silent", "Same as --log-level silent")
         .option("--quiet", "Same as --log-level silent")
+}
+
+/**
+ * @param {readonly string[]} args
+ */
+export async function createInstance(args) {
+    const program = addTranslatorOptions(new Command()
+        .name("translator")
+        .description("Translation tool based on ChatGPT API"))
+
+    addTranslatorOptions(program.command("agent")
+        .description("Agentic multi-pass translation: planning pass observes content before translating"))
+        .option("--skip-refine", "Skip final instruction refinement and use the base instruction directly")
+        .option("--context-summary <summary>", "Provide a context summary directly, skipping the batch summary scanning pass")
+        .action(async (_, agentCmd) => {
+            const opts = agentCmd.optsWithGlobals()
+            await run(opts, buildOptions(opts), true)
+        })
+
+    program.action(async () => {
+        const opts = program.opts()
+        await run(opts, buildOptions(opts))
+    })
+
+    await program.parseAsync(args)
+    const opts = program.opts()
+    return { program, opts }
 }
 
 /**
@@ -131,44 +159,6 @@ function buildOptions(opts) {
     }
 
     return options
-}
-
-/**
- * @param {readonly string[]} args
- */
-export function createInstance(args) {
-    const program = addTranslatorOptions(new Command()
-        .description("Translation tool based on ChatGPT API"))
-        .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "timestamp", "object", "none"]).default("array"))
-        .parse(args)
-
-    const opts = program.opts()
-    const options = buildOptions(opts)
-
-    return { opts, options }
-}
-
-if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
-    const program = addTranslatorOptions(new Command()
-        .name("translator")
-        .description("Translation tool based on ChatGPT API"))
-        .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "timestamp", "object", "none"]).default("array"))
-
-    addTranslatorOptions(program.command("agent")
-        .description("Agentic 2-pass translation: planning pass observes content before translating"))
-        .option("--skip-refine", "Skip final instruction refinement and use the base instruction directly")
-        .option("--context-summary <summary>", "Provide a context summary directly, skipping the batch summary scanning pass")
-        .action(async (_, agentCmd) => {
-            const opts = agentCmd.optsWithGlobals()
-            await run(opts, buildOptions(opts), true)
-        })
-
-    program.action(async () => {
-        const opts = program.opts()
-        await run(opts, buildOptions(opts))
-    })
-
-    program.parseAsync(process.argv)
 }
 
 /**
@@ -461,4 +451,10 @@ async function checkFileExists(filePath) {
     } catch (error) {
         return false // file does not exist
     }
+}
+
+if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
+    // const { opts } = await createInstance(process.argv)
+    // log.debug("[CLI]", opts)
+    createInstance(process.argv)
 }
