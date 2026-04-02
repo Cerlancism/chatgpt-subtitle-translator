@@ -1,6 +1,7 @@
 import log from "loglevel"
 import { countTokens } from "gpt-tokenizer"
 import { openaiRetryWrapper, completeChatStream } from './openai.mjs';
+import { detectRepetition } from 'llm-summary';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { TranslatorBase, DefaultOptions } from './translatorBase.mjs';
@@ -133,6 +134,12 @@ export class Translator extends TranslatorBase {
                 }, (u) => {
                     usage = u
                     this.services.onStreamEnd?.()
+                }, (buffer) => {
+                    if (!buffer.endsWith('\n')) return false
+                    const lines = buffer.split('\n').filter(Boolean)
+                    if (lines.length < 3) return false
+                    const last10 = lines.slice(-10).join('\n') + '\n'
+                    return !!detectRepetition(last10, 3, 500, 3)
                 })
                 return TranslationOutput.fromUsage(this.getOutput(lines, streamOutput), usage)
             }
