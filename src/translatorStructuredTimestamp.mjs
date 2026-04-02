@@ -3,6 +3,7 @@ import { z } from "zod";
 import { JSONParser } from "@streamparser/json-node";
 import log from "loglevel"
 import { countTokens } from "gpt-tokenizer"
+import { detectRepetition } from "llm-summary";
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
@@ -119,7 +120,9 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
             return TranslationOutput.fromCompletion(/** @type {any} */(parsed), output)
         } catch (error) {
-            log.error("[TranslatorStructuredTimestamp]", `Error ${error?.constructor?.name}`, error?.message)
+            if (!this._repetitionDetected) {
+                log.error("[TranslatorStructuredTimestamp]", `Error ${error?.constructor?.name}`, error?.message)
+            }
             return this.handleTranslateError(error, entries.length)
         }
     }
@@ -363,6 +366,21 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     }
 
     /**
+     * @override
+     * @param {Error} error
+     * @param {number} lineCount
+     * @returns {TranslationOutput | undefined}
+     */
+    handleTranslateError(error, lineCount) {
+        if (this._repetitionDetected) {
+            this._repetitionDetected = false
+            log.warn("[TranslatorStructuredTimestamp]", "Retrying after repetition abort")
+            return new TranslationOutput([], 0, 0, 0, 0)
+        }
+        return super.handleTranslateError(error, lineCount)
+    }
+
+    /**
      * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<any>} runner
      */
     jsonStreamParse(runner) {
@@ -380,6 +398,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         let textDone = true
         let expectedIdx = -1
         const currentBatchEntries = /** @type {TimestampEntry[]} */ (this.currentBatchEntries ?? [])
+
+        /** Text-only buffer for repetition detection (timestamps excluded) */
+        let textBuffer = ''
+        let textBufEntryLen = 0
 
         /**
          * @param {"start"|"end"|"text"} fieldKey
@@ -413,6 +435,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 if (key === "start") {
                     if (textDone) {
                         prevLen.start = prevLen.end = prevLen.text = 0
+                        textBufEntryLen = 0
                         textDone = false
                         expectedIdx++
                     }
@@ -427,6 +450,24 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     if (!partial) emitField("end", "  ", millisecondsToTimestamp(/** @type {number} */(value)), partial)
                 } else if (key === "text") {
                     emitField("text", "\n", /** @type {string} */(value), partial, () => { textDone = true })
+                    const strValue = /** @type {string} */(value)
+                    const delta = strValue.slice(textBufEntryLen)
+                    textBuffer += delta
+                    textBufEntryLen = strValue.length
+                    if (!partial) {
+                        textBuffer += '\n'
+                        textBufEntryLen = 0
+                        const entries = textBuffer.split('\n').filter(Boolean)
+                        if (entries.length >= 3) {
+                            const last10 = entries.slice(-10).join('\n') + '\n'
+                            const pattern = detectRepetition(last10, 3, 500, 3)
+                            if (pattern) {
+                                log.warn("[TranslatorStructuredTimestamp]", `Repetition detected: "${pattern.slice(0, 50)}"`)
+                                this._repetitionDetected = true
+                                runner.controller.abort()
+                            }
+                        }
+                    }
                 } else if (key === "remarksIfContainedMergers") {
                     const strValue = /** @type {string} */(value)
                     if (strValue) {

@@ -30,6 +30,14 @@ export class ChatStreamSyntaxError extends SyntaxError {
     }
 }
 
+export class ChatStreamRepetitionError extends ChatStreamSyntaxError {
+    /** @param {string} pattern */
+    constructor(pattern) {
+        super(`Repetition detected in stream: "${pattern}"`, { cause: "repetition" })
+        this.pattern = pattern
+    }
+}
+
 /**
  * Retry the Openai API function until it succeeds or the maximum number of retries is reached
  * @template T
@@ -108,23 +116,37 @@ export async function streamParse(services, params, zFormat, { jsonStream = fals
  * @param {import("openai/streaming").Stream<import("openai").OpenAI.Chat.Completions.ChatCompletionChunk>} response
  * @param {(d: string) => void} onData
  * @param {(u: import('openai').OpenAI.Completions.CompletionUsage) => void} onEnd
+ * @param {(buffer: string) => boolean} [shouldAbort] - return true to abort the stream (e.g. on repetition detection)
  * @returns {Promise<string>}
  */
-export async function completeChatStream(response, onData = (d) => { }, onEnd = (u) => { }) {
+export async function completeChatStream(response, onData = (d) => { }, onEnd = (u) => { }, shouldAbort = undefined) {
     let output = ''
     return await new Promise(async (resolve, reject) => {
         try {
             /** @type {import('openai').OpenAI.Completions.CompletionUsage} */
             let usage;
+            let repetitionPattern = null
             for await (const part of response) {
                 const text = part.choices[0]?.delta?.content
                 if (text) {
                     output += text
                     onData(text)
+                    if (shouldAbort) {
+                        const detected = shouldAbort(output)
+                        if (detected) {
+                            repetitionPattern = typeof detected === 'string' ? detected : text
+                            try { response.controller.abort() } catch (_) { }
+                            break
+                        }
+                    }
                 }
                 else if (part.usage) {
                     usage = part.usage
                 }
+            }
+            if (repetitionPattern !== null) {
+                reject(new ChatStreamRepetitionError(repetitionPattern))
+                return
             }
             onEnd(usage)
             resolve(output)

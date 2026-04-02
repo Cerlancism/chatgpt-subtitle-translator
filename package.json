@@ -16,6 +16,7 @@
     "commander": "^14.0.3",
     "dotenv": "^17.3.1",
     "gpt-tokenizer": "^3.4.0",
+    "llm-summary": "github:Cerlancism/llm-summary#3391cc3e51f00c81629d2d7a721ce50f7e537ed2",
     "loglevel": "^1.9.2",
     "openai": "^6.22.0",
     "srt-parser-2": "^1.2.3",
