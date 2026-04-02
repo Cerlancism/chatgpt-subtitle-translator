@@ -457,16 +457,12 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     if (!partial) {
                         textBuffer += '\n'
                         textBufEntryLen = 0
-                        const entries = textBuffer.split('\n').filter(Boolean)
-                        if (entries.length >= 3) {
-                            const last10 = entries.slice(-10).join('\n') + '\n'
-                            const pattern = detectRepetition(last10, 3, 500, 3)
-                            if (pattern) {
-                                log.warn("[TranslatorStructuredTimestamp]", `Repetition detected: "${pattern.slice(0, 50)}"`)
-                                this._repetitionDetected = true
-                                runner.controller.abort()
-                            }
-                        }
+                    }
+                    const pattern = detectRepetition(textBuffer, 2, 500, 3)
+                    if (pattern) {
+                        log.warn("[TranslatorStructuredTimestamp]", `Repetition detected: "${pattern.slice(0, 50)}"`)
+                        this._repetitionDetected = true
+                        runner.controller.abort()
                     }
                 } else if (key === "remarksIfContainedMergers") {
                     const strValue = /** @type {string} */(value)
