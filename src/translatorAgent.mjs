@@ -3,6 +3,7 @@ import { z } from "zod"
 import { countTokens } from "gpt-tokenizer"
 import { encode as encodeToon } from "@toon-format/toon"
 
+import { summarise } from "llm-summary"
 import { streamParse } from "./openai.mjs"
 import { timestampToMilliseconds } from "./subtitle.mjs"
 import { DefaultOptions } from "./translatorBase.mjs"
@@ -147,24 +148,45 @@ export class TranslatorAgent {
     }
 
     /**
+     * Core usage accumulation: adds prompt/completion counts, updates elapsed time, and logs.
+     * @param {number} promptTokens
+     * @param {number} completionTokens
+     * @param {string} [label]
+     */
+    _addPlanningUsage(promptTokens, completionTokens, label) {
+        const now = Date.now()
+        if (this._planningLastCallTime !== undefined) this.planningElapsedTimeMs += now - this._planningLastCallTime
+        this._planningLastCallTime = now
+        this.planningPromptTokens += promptTokens
+        this.planningCompletionTokens += completionTokens
+        const { planningPromptRate, planningCompletionRate, planningRate } = this.usage
+        log.debug(
+            `[TranslatorAgent]${label ? ` [${label}]` : ""} planning tokens:`,
+            "\n\tStep:", promptTokens, "+", completionTokens, "=", promptTokens + completionTokens,
+            "\n\tTotal:", this.planningPromptTokens, "+", this.planningCompletionTokens, "=", this.planningPromptTokens + this.planningCompletionTokens,
+            ...(planningRate !== undefined ? ["\n\tRate:", planningPromptRate, "+", planningCompletionRate, "=", planningRate, "TPM"] : []),
+        )
+    }
+
+    /**
+     * Accumulates token usage from a SummariseResult and logs it.
+     * @param {import('llm-summary').SummariseResult} result
+     * @param {string} [label]
+     */
+    _accumulateSummariseUsage(result, label) {
+        return this._addPlanningUsage(result.usage.input, result.usage.output, label)
+    }
+
+    /**
      * Accumulates token usage from a planning-pass streamParse response and logs it.
      * @param {import('openai').OpenAI.Chat.ChatCompletion} completion
      * @param {string} [label] - step name for logging
      */
     _accumulatePlanningUsage(completion, label) {
-        const now = Date.now()
-        if (this._planningLastCallTime !== undefined) this.planningElapsedTimeMs += now - this._planningLastCallTime
-        this._planningLastCallTime = now
-        const prompt = completion?.usage?.prompt_tokens ?? 0
-        const completion_ = completion?.usage?.completion_tokens ?? 0
-        this.planningPromptTokens += prompt
-        this.planningCompletionTokens += completion_
-        const { planningPromptRate, planningCompletionRate, planningRate } = this.usage
-        log.debug(
-            `[TranslatorAgent]${label ? ` [${label}]` : ""} planning tokens:`,
-            "\n\tStep:", prompt, "+", completion_, "=", prompt + completion_,
-            "\n\tTotal:", this.planningPromptTokens, "+", this.planningCompletionTokens, "=", this.planningPromptTokens + this.planningCompletionTokens,
-            ...(planningRate !== undefined ? ["\n\tRate:", planningPromptRate, "+", planningCompletionRate, "=", planningRate, "TPM"] : []),
+        return this._addPlanningUsage(
+            completion?.usage?.prompt_tokens ?? 0,
+            completion?.usage?.completion_tokens ?? 0,
+            label
         )
     }
 
@@ -570,70 +592,106 @@ export class TranslatorAgent {
             return null
         }
 
+        const batchSummary = message.parsed?.batchSummary?.trim()
+        if (batchSummary && budget) {
+            const summaryTokens = countTokens(batchSummary)
+            const targetLower = Math.floor(budget * SUMMARY_RANGE_LOWER_FRACTION)
+            if (summaryTokens < targetLower || summaryTokens > budget) {
+                log.debug("[TranslatorAgent]",
+                    `Scan batch summary out of range (${summaryTokens} tokens, target: ${targetLower}-${budget}) - fitting`)
+                const scanFitInstructions =
+                    `Write in ${this.targetLanguage}.\n` +
+                    `Open with your overall impression of this window's content.\n` +
+                    `Write only what is new or notable - do not repeat or refine prior context.\n` +
+                    `Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
+                    `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).\n\n` +
+                    `Summary:\n${batchSummary}`
+                try {
+                    await this.services.cooler?.cool()
+                    const result = await summarise(
+                        this.services.openai,
+                        scanFitInstructions,
+                        targetLower,
+                        budget,
+                        {
+                            model: this.options.createChatCompletionRequest.model,
+                            contextBudget: budget
+                        }
+                    )
+                    this._accumulateSummariseUsage(result, "scan_fit")
+                    log.debug("[TranslatorAgent]",
+                        `Scan fit: ${result.tokens} tokens, ${result.attempts} attempts, withinRange: ${result.withinRange}`)
+                    return { batchSummary: result.summary }
+                } catch (error) {
+                    log.warn("[TranslatorAgent]", "Scan batch fit failed:", error?.message, "- using original")
+                }
+            }
+        }
+
         return message.parsed
     }
 
     /**
-     * Calls the model to consolidate an over-budget accumulator with a new note.
-     * Falls back to simple truncation if the model call fails.
+     * Consolidates an over-budget accumulator with a new note into the target token range.
+     * Uses two-phase summarisation (draft → fit) for reliable token range enforcement.
+     * Falls back to simple truncation if the summarise call fails.
      *
      * @param {string} existing - current accumulated batch summaries
      * @param {string} newNote - newly observed batch summary to merge in; pass `""` for final consolidation
-     * @param {number} budget - token budget; also used as max_tokens for the model call
-     * @param {string} agentInstruction - scan guidance from overview pass
+     * @param {number} budget - token budget for the consolidation output
+     * @param {string} [agentInstruction] - scan guidance included in the summarisation instructions
      * @returns {Promise<string>}
      */
     async _consolidateBatchSummaries(existing, newNote = "", budget, agentInstruction) {
         const isFinal = !newNote
         const targetTokens = Math.floor(budget * CONSOLIDATION_TARGET_FRACTION)
         const targetLower = Math.floor(targetTokens * SUMMARY_RANGE_LOWER_FRACTION)
+        const combined = newNote ? `${existing}\n${newNote}` : existing
         const targetRange = `~${targetLower}-${targetTokens} tokens`
         const agentSection = agentInstruction ? `\nScan guidance:\n${agentInstruction}` : ""
-        const messages = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ ([
-            {
-                role: "system",
-                content: agentSection + (isFinal
-                    ? `You are doing a final consolidation of all batch summaries for a subtitle file ` +
-                    `into a single complete set of notes (target: ${targetRange}). ` +
-                    `This will be used as the full context for the subtitles - preserve all details.`
-                    : `You are doing consolidation of all given batch summary windows for a subtitle file ` +
-                    `into a single condensed set of notes (target: ${targetRange}). ` +
-                    `More batches will follow - stay concise but keep all unique facts.`) + "\n\n" +
-                    `# Rules:\n` +
-                    `1. Write in ${this.targetLanguage}.\n` +
-                    `2. Open with your overall impression of the content so far.\n` +
-                    `3. Preserve all unique 5W1H facts (who, what, where, when, why/how - names, locations, terms, tone, dialect).\n` +
-                    `4. Remove duplicate or contradictory information. ${isFinal ? "Be thorough - this is the last pass." : "Keep it concise - more content is coming."}`
-            },
-            {
-                role: "user",
-                content: `Batch summaries:\n${existing}`
-            }
-        ])
+        const consolidationInstructions = agentSection +
+            (isFinal
+                ? `You are doing a final consolidation of all batch summaries for a subtitle file ` +
+                `into a single complete set of notes (target: ${targetRange}). ` +
+                `This will be used as the full context for the subtitles - preserve all details.`
+                : `You are doing consolidation of all given batch summary windows for a subtitle file ` +
+                `into a single condensed set of notes (target: ${targetRange}). ` +
+                `More batches will follow - stay concise but keep all unique facts.`) + "\n\n" +
+            `# Rules:\n` +
+            `1. Write in ${this.targetLanguage}.\n` +
+            `2. Open with your overall impression of the content so far.\n` +
+            `3. Preserve all unique 5W1H facts (who, what, where, when, why/how - names, locations, terms, tone, dialect).\n` +
+            `4. Remove duplicate or contradictory information. ${isFinal ? "Be thorough - this is the last pass." : "Keep it concise - more content is coming."}`
+        const inputWithInstructions = `${consolidationInstructions}\n\nBatch summaries:\n${combined}`
         try {
-            const output = await this._streamParse({
-                messages,
-                ...this.options.createChatCompletionRequest,
-                stream: this.options.createChatCompletionRequest.stream,
-                max_tokens: Math.floor(targetTokens * CONSOLIDATION_MAX_TOKENS_MULTIPLIER)
-            }, { structure: consolidateSchema, name: "agent_consolidate" })
-            this._accumulatePlanningUsage(output, "consolidate")
-            const result = output.choices[0]?.message?.parsed?.consolidatedBatchSummary?.trim()
-            if (result) return result
+            const result = await summarise(
+                this.services.openai,
+                inputWithInstructions,
+                targetLower,
+                targetTokens,
+                {
+                    model: this.options.createChatCompletionRequest.model,
+                    contextBudget: budget
+                }
+            )
+            this._accumulateSummariseUsage(result, isFinal ? "consolidate_final" : "consolidate")
+            log.debug("[TranslatorAgent]",
+                `Consolidation${isFinal ? " (final)" : ""}: ${result.tokens} tokens,`,
+                `${result.attempts} attempts, withinRange: ${result.withinRange}`)
+            if (result.summary) return result.summary
         } catch (error) {
             log.warn("[TranslatorAgent]", "Consolidation failed:", error?.message, "- truncating")
         }
         // Fallback: keep as much as fits within budget
-        const combined = `${existing}\n${newNote}`
         if (countTokens(combined) <= budget) return combined
         // Over budget - trim from front of existing to make room for newNote
         const existingLines = existing.split("\n")
         for (let drop = 1; drop < existingLines.length; drop++) {
-            const trimmed = existingLines.slice(drop).join("\n") + "\n" + newNote
+            const trimmed = existingLines.slice(drop).join("\n") + (newNote ? "\n" + newNote : "")
             if (countTokens(trimmed) <= budget) return trimmed
         }
-        // Nothing from existing fits - keep only newNote
-        return newNote
+        // Nothing from existing fits - keep only newNote (or existing if final)
+        return newNote || existing
     }
 
     /**
