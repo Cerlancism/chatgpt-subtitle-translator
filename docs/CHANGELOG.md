@@ -6,7 +6,7 @@
 
 #### Agent Mode Improvements (`agent` subcommand)
 
-A new `agent` subcommand comes with a set of specific configurable options. It is still also available as `--structured agent` for the default configuration, which uses now `array` mode as the delegate.
+A new `agent` subcommand comes with a set of specific configurable options. It is still also available as `-r, --structured agent` for the default configuration, which uses now `array` mode as the delegate.
 
 The agent mode has been expanded into a multi-pass pipeline:
 
@@ -40,7 +40,7 @@ When `--batch-sizes` is omitted, the batch size is now derived automatically fro
 
 ### New Features
 
-#### Agent Mode (`-r agent`)
+#### Agent Mode (`-r, --structured agent`)
 
 A multi-pass agentic translation mode.
 
