@@ -604,18 +604,18 @@ export class TranslatorAgent {
                     `Open with your overall impression of this window's content.\n` +
                     `Write only what is new or notable - do not repeat or refine prior context.\n` +
                     `Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
-                    `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).\n\n` +
-                    `Summary:\n${batchSummary}`
+                    `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).`
                 try {
                     await this.services.cooler?.cool()
                     const result = await summarise(
                         this.services.openai,
-                        scanFitInstructions,
+                        batchSummary,
                         targetLower,
                         budget,
                         {
                             model: this.options.createChatCompletionRequest.model,
-                            contextBudget: budget
+                            contextBudget: budget,
+                            instructions: scanFitInstructions
                         }
                     )
                     this._accumulateSummariseUsage(result, "scan_fit")
@@ -662,16 +662,16 @@ export class TranslatorAgent {
             `2. Open with your overall impression of the content so far.\n` +
             `3. Preserve all unique 5W1H facts (who, what, where, when, why/how - names, locations, terms, tone, dialect).\n` +
             `4. Remove duplicate or contradictory information. ${isFinal ? "Be thorough - this is the last pass." : "Keep it concise - more content is coming."}`
-        const inputWithInstructions = `${consolidationInstructions}\n\nBatch summaries:\n${combined}`
         try {
             const result = await summarise(
                 this.services.openai,
-                inputWithInstructions,
+                combined,
                 targetLower,
                 targetTokens,
                 {
                     model: this.options.createChatCompletionRequest.model,
-                    contextBudget: budget
+                    contextBudget: budget,
+                    instructions: consolidationInstructions
                 }
             )
             this._accumulateSummariseUsage(result, isFinal ? "consolidate_final" : "consolidate")
