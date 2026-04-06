@@ -450,7 +450,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     if (!partial) emitField("end", "  ", millisecondsToTimestamp(/** @type {number} */(value)), partial)
                 } else if (key === "text") {
                     emitField("text", "\n", /** @type {string} */(value), partial, () => { textDone = true })
-                    const strValue = /** @type {string} */(value)
+                    const strValue = /** @type {string} */(value ?? '')
                     const delta = strValue.slice(textBufEntryLen)
                     textBuffer += delta
                     textBufEntryLen = strValue.length
