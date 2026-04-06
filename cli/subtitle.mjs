@@ -8,7 +8,7 @@ import { offsetSrt, parseTimeOffset, parser } from '../src/subtitle.mjs'
 /**
  * @param {readonly string[]} args
  */
-export function createInstance(args) {
+function createInstance(args) {
     const commandOffsetFile = new Command("offset")
         .description("Offsets all timestamps in .srt file, currently implemented using floating points, sub-second operations will have precision issues\n"
             + "For negative offsets, pass -- first, eg: \n./subtitle.mjs -- offset file.srt -01:02:03.456")
@@ -33,10 +33,11 @@ export function createInstance(args) {
 }
 
 /**
+ * TODO: Move this to another module
  * @param {string} file
  * @param {string} offset
  */
-export function offsetFile(file, offset) {
+function offsetFile(file, offset) {
     const offsetSeconds = parseTimeOffset(offset)
 
     if (isNaN(offsetSeconds)) {
@@ -56,10 +57,10 @@ export function offsetFile(file, offset) {
 }
 
 /**
- * 
+ * TODO: Move this to another module
  * @param {string[]} files 
  */
-export function mergeFiles(files) {
+function mergeFiles(files) {
     let output = []
 
     for (const file of files) {
@@ -78,8 +79,6 @@ export function mergeFiles(files) {
 }
 
 
-if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
-    // const { opts } = createInstance(process.argv)
-    // console.log(opts)
-    createInstance(process.argv)
-}
+// const { opts } = createInstance(process.argv)
+// console.log(opts)
+createInstance(process.argv)

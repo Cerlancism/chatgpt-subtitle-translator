@@ -83,7 +83,7 @@ function addTranslatorOptions(cmd) {
 /**
  * @param {readonly string[]} args
  */
-export async function createInstance(args) {
+async function createInstance(args) {
     const program = addTranslatorOptions(new Command()
         .name("translator")
         .description("Translation tool based on ChatGPT API"))
@@ -455,6 +455,4 @@ async function checkFileExists(filePath) {
     }
 }
 
-if (import.meta.url === url.pathToFileURL(process.argv[1]).href) {
-    createInstance(process.argv)
-}
+createInstance(process.argv)
