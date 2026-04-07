@@ -50,6 +50,19 @@ export class Translator extends TranslatorBase {
     }
 
     /**
+     * Repetition detection callback for streaming abort guards.
+     * Returns the repeated pattern if detected, or `null`.
+     * Disabled when `options.guardRepetition` is `0`.
+     * @param {string} buffer
+     * @returns {string | null}
+     */
+    checkRepetition(buffer) {
+        const threshold = this.options.guardRepetition
+        if (!threshold) return null
+        return detectRepetition(buffer, 2, 500, threshold)
+    }
+
+    /**
      * @param {any[]} inputLines
      * @param {string} rawContent
      */
@@ -135,7 +148,7 @@ export class Translator extends TranslatorBase {
                     usage = u
                     this.services.onStreamEnd?.()
                 }, (buffer) => {
-                    return !!detectRepetition(buffer, 2, 500, 3)
+                    return this.checkRepetition(buffer)
                 })
                 return TranslationOutput.fromUsage(this.getOutput(lines, streamOutput), usage)
             }

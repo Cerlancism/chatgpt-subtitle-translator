@@ -44,6 +44,8 @@ import { roundWithPrecision, sleep } from './helpers.mjs'
  * Skip the final instruction refinement API call in agent mode; use the base system instruction directly
  * @property {string} agentContextSummary  
  * Pre-supplied context summary for agent mode; skips the batch scanning pass entirely
+ * @property {number} guardRepetition `10`
+ * Minimum number of pattern repeats before aborting a streaming response. Set to `0` to disable repetition detection.
  * @property {number} max_token `0`
  * @property {number} inputMultiplier `0`
  * @property {import('loglevel').LogLevelDesc} logLevel
@@ -64,6 +66,7 @@ export const DefaultOptions = {
     useFullContext: 2000,
     batchSizes: undefined,
     structuredMode: "array",
+    guardRepetition: 10,
     max_token: 0,
     inputMultiplier: 0,
     logLevel: undefined

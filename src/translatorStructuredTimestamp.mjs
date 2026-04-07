@@ -3,7 +3,6 @@ import { z } from "zod";
 import { JSONParser } from "@streamparser/json-node";
 import log from "loglevel"
 import { countTokens } from "gpt-tokenizer"
-import { detectRepetition } from "llm-summary";
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
@@ -365,20 +364,6 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         }
     }
 
-    /**
-     * @override
-     * @param {Error} error
-     * @param {number} lineCount
-     * @returns {TranslationOutput | undefined}
-     */
-    handleTranslateError(error, lineCount) {
-        if (this._repetitionDetected) {
-            this._repetitionDetected = false
-            log.warn("[TranslatorStructuredTimestamp]", "Retrying after repetition abort")
-            return new TranslationOutput([], 0, 0, 0, 0)
-        }
-        return super.handleTranslateError(error, lineCount)
-    }
 
     /**
      * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<any>} runner
@@ -458,11 +443,9 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                         textBuffer += '\n'
                         textBufEntryLen = 0
                     }
-                    const pattern = detectRepetition(textBuffer, 2, 500, 3)
+                    const pattern = this.checkRepetition(textBuffer)
                     if (pattern) {
-                        log.warn("[TranslatorStructuredTimestamp]", `Repetition detected: "${pattern.slice(0, 50)}"`)
-                        this._repetitionDetected = true
-                        runner.controller.abort()
+                        this.abortOnRepetition(pattern, runner)
                     }
                 } else if (key === "remarksIfContainedMergers") {
                     const strValue = /** @type {string} */(value)

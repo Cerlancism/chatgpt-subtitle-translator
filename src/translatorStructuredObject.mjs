@@ -3,7 +3,7 @@ import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
-import { streamParse } from "./openai.mjs";
+import { streamParse, ChatStreamRepetitionError } from "./openai.mjs";
 
 const NestedPlaceholder = "nested_"
 
@@ -61,7 +61,10 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
             }, {
                 structure: translationBatch,
                 name: "translation_object"
-            }, { onController: (c) => { this.streamController = c } })
+            }, {
+                onController: (c) => { this.streamController = c },
+                shouldAbort: (buffer) => this.checkRepetition(buffer),
+            })
 
             // log.debug("[TranslatorStructuredObject]", output.choices[0].message.content)
 
@@ -102,7 +105,9 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
 
             return TranslationOutput.fromCompletion(linesOut, output)
         } catch (error) {
-            log.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
+            if (!(error instanceof ChatStreamRepetitionError)) {
+                log.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
+            }
             return this.handleTranslateError(error, lines.length)
         }
     }
