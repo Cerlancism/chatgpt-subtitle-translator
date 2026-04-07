@@ -15,14 +15,9 @@ const scanBatchSchema = z.object({
     batchSummary: z.string().describe("Translation notes for this scan window.")
 })
 
-const consolidateSchema = z.object({
-    consolidatedBatchSummary: z.string().describe("Synthesis of the provided batch summaries.")
-})
-
 const finalInstructionSchema = z.object({
     finalInstruction: z.string().describe("Translation system instruction for this subtitle file.")
 })
-
 
 const overviewSchema = z.object({
     overview: z.string().describe("Content overview of the subtitle file.")
