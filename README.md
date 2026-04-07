@@ -89,7 +89,9 @@ Options:
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
 
     When omitted, batch size is determined automatically per batch based on the `--context` token budget. On failure, the size is reduced and retried down to a minimum, then resets on the next successful batch.
-  - `--initial-prompts <prompts>`  
+  - `-g, --guard-repetition <threshold>`
+    Minimum number of pattern repeats before aborting a streaming response (default: `10`). When the model falls into a repetition loop during streaming, the response is aborted and retried with a smaller batch. Set to `0` to disable repetition detection.
+  - `--initial-prompts <prompts>`
     Initial prompts for the translation in JSON (default: `"[]"`) 
   - `--use-moderator`
     Use the OpenAI Moderation tool
