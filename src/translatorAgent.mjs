@@ -178,6 +178,20 @@ export class TranslatorAgent {
     }
 
     /**
+     * Builds a base {@link import('llm-summary').SummariseOptions} object with model and verbose
+     * derived from current options and log level, merged with any call-specific overrides.
+     * @param {import('llm-summary').SummariseOptions} [extras] - call-specific overrides
+     * @returns {import('llm-summary').SummariseOptions}
+     */
+    _summariseOptions(extras = {}) {
+        return {
+            model: this.options.createChatCompletionRequest.model,
+            verbose: log.getLevel() <= log.levels.DEBUG,
+            ...extras
+        }
+    }
+
+    /**
      * Accumulates token usage from a planning-pass streamParse response and logs it.
      * @param {import('openai').OpenAI.Chat.ChatCompletion} completion
      * @param {string} [label] - step name for logging
@@ -612,11 +626,7 @@ export class TranslatorAgent {
                         batchSummary,
                         targetLower,
                         budget,
-                        {
-                            model: this.options.createChatCompletionRequest.model,
-                            contextBudget: budget,
-                            instructions: scanFitInstructions
-                        }
+                        this._summariseOptions({ contextBudget: budget, instructions: scanFitInstructions })
                     )
                     this._accumulateSummariseUsage(result, "scan_fit")
                     log.debug("[TranslatorAgent]",
@@ -668,11 +678,7 @@ export class TranslatorAgent {
                 combined,
                 targetLower,
                 targetTokens,
-                {
-                    model: this.options.createChatCompletionRequest.model,
-                    contextBudget: budget,
-                    instructions: consolidationInstructions
-                }
+                this._summariseOptions({ contextBudget: budget, instructions: consolidationInstructions })
             )
             this._accumulateSummariseUsage(result, isFinal ? "consolidate_final" : "consolidate")
             log.debug("[TranslatorAgent]",
