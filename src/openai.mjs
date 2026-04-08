@@ -30,6 +30,14 @@ export class ChatStreamSyntaxError extends SyntaxError {
     }
 }
 
+export class ChatStreamRepetitionError extends ChatStreamSyntaxError {
+    /** @param {string} pattern */
+    constructor(pattern) {
+        super(`Repetition detected in stream: "${pattern}"`, { cause: "repetition" })
+        this.pattern = pattern
+    }
+}
+
 /**
  * Retry the Openai API function until it succeeds or the maximum number of retries is reached
  * @template T
@@ -53,6 +61,10 @@ export async function openaiRetryWrapper(func, maxRetries, description) {
             log.error(`[Error_${description}]`, "Retries", retryContext.currentTry, "Delay", delay)
             await sleep(delay)
         }
+        else if (error instanceof ChatStreamRepetitionError) {
+            log.warn(`[Error_${description}] ${error.message} - retrying (use --guard-repetition 0 to disable)`, "Retries", retryContext.currentTry, "Delay", delay)
+            await sleep(delay)
+        }
         else if (error instanceof ChatStreamSyntaxError) {
             log.error(`[Error_${description}] ${error.message}`, "Retries", retryContext.currentTry, "Delay", delay)
             await sleep(delay)
@@ -72,12 +84,13 @@ export async function openaiRetryWrapper(func, maxRetries, description) {
  * @param {import('./translator.mjs').TranslationServiceContext} services
  * @param {import('openai').OpenAI.ChatCompletionCreateParams} params
  * @param {{structure: import('zod').ZodType, name: string}} zFormat
- * @param {{jsonStream?: boolean, onJsonStream?: (runner: any) => void, onController?: (controller: AbortController) => void}} [opts]
+ * @param {{jsonStream?: boolean, onJsonStream?: (runner: any) => void, onController?: (controller: AbortController) => void, shouldAbort?: (buffer: string) => string | null}} [opts]
  * @returns {Promise<import('openai/resources/chat/completions/completions.js').ParsedChatCompletion<any>>}
  */
-export async function streamParse(services, params, zFormat, { jsonStream = false, onJsonStream, onController } = {}) {
+export async function streamParse(services, params, zFormat, { jsonStream = false, onJsonStream, onController, shouldAbort } = {}) {
     const zodResponseFormatOutput = zodResponseFormat(zFormat.structure, zFormat.name)
     if (params.stream) {
+        let repetitionPattern = null
         const runner = services.openai.chat.completions.stream({
             ...params,
             response_format: zodResponseFormatOutput,
@@ -88,11 +101,27 @@ export async function streamParse(services, params, zFormat, { jsonStream = fals
         if (jsonStream && onJsonStream) {
             onJsonStream(runner)
         } else {
+            let contentBuffer = ''
             runner.on("content.delta", (e) => {
                 services.onStreamChunk?.(e.delta)
+                if (shouldAbort) {
+                    contentBuffer += e.delta
+                    const pattern = shouldAbort(contentBuffer)
+                    if (pattern) {
+                        repetitionPattern = pattern
+                        runner.controller.abort()
+                    }
+                }
             })
         }
-        await runner.done()
+        try {
+            await runner.done()
+        } catch (error) {
+            if (repetitionPattern) {
+                throw new ChatStreamRepetitionError(repetitionPattern)
+            }
+            throw error
+        }
         services.onStreamEnd?.()
         return runner.finalChatCompletion()
     } else {
@@ -108,23 +137,37 @@ export async function streamParse(services, params, zFormat, { jsonStream = fals
  * @param {import("openai/streaming").Stream<import("openai").OpenAI.Chat.Completions.ChatCompletionChunk>} response
  * @param {(d: string) => void} onData
  * @param {(u: import('openai').OpenAI.Completions.CompletionUsage) => void} onEnd
+ * @param {(buffer: string) => string | boolean | null} [shouldAbort] - return a truthy value to abort the stream; if a string is returned it is used as the repetition pattern
  * @returns {Promise<string>}
  */
-export async function completeChatStream(response, onData = (d) => { }, onEnd = (u) => { }) {
+export async function completeChatStream(response, onData = (d) => { }, onEnd = (u) => { }, shouldAbort = undefined) {
     let output = ''
     return await new Promise(async (resolve, reject) => {
         try {
             /** @type {import('openai').OpenAI.Completions.CompletionUsage} */
             let usage;
+            let repetitionPattern = null
             for await (const part of response) {
                 const text = part.choices[0]?.delta?.content
                 if (text) {
                     output += text
                     onData(text)
+                    if (shouldAbort) {
+                        const detected = shouldAbort(output)
+                        if (detected) {
+                            repetitionPattern = typeof detected === 'string' ? detected : text
+                            try { response.controller.abort() } catch (_) { }
+                            break
+                        }
+                    }
                 }
                 else if (part.usage) {
                     usage = part.usage
                 }
+            }
+            if (repetitionPattern !== null) {
+                reject(new ChatStreamRepetitionError(repetitionPattern))
+                return
             }
             onEnd(usage)
             resolve(output)

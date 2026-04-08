@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.3.0 (2026-04-09)
+
+### New Features
+
+#### Stream Repetition Guard (`-g, --guard-repetition`)
+
+A new option that monitors streaming responses for looping output and aborts the request before it wastes too many tokens.
+
+- **`-g, --guard-repetition <threshold>`** - minimum number of times a pattern must repeat before the stream is aborted. Defaults to `10`. Set to `0` to disable.
+- On detection, the current batch is retried automatically.
+- Applied across all translation modes: plain, `array`, `object`, and `timestamp`.
+
+#### Agent Planning: LLM-Based Summary Fitting
+
+Planning pass summaries that fall outside the target token range are now re-fit using the `llm-summary` `summarise` function (two-phase draft → fit), replacing the previous direct model call for consolidation. This applies to both per-window batch summaries and accumulated consolidation steps.
+
+- **`--no-fitting`** — skip LLM-based fitting for both scan-window summaries and consolidation. Summaries are used as-is regardless of token range.
+
 ## 3.2.0 (2026-04-02)
 
 ### New Features
@@ -12,9 +30,9 @@ The agent mode has been expanded into a multi-pass pipeline:
 
 **Overview pass:** Samples the file to generate a content overview (file identity, duration, entry count, genre/tone, character names) and detects the source language.
 
-**Planning pass:** Scans the file in token-bounded windows derived from the context budget, rather than fixed max-batch-size chunks. Each window produces a batch summary and determines a natural batch boundary. Summaries are consolidated and used to generate a refined translation instruction. The final refinement step can be skipped with `--skip-refine`.
+**Planning pass:** Scans the file in token-bounded windows derived from the context budget, rather than fixed max-batch-size chunks. Each window produces a batch summary. Summaries are consolidated and used to generate a refined translation instruction. The final refinement step can be skipped with `--skip-refine`.
 
-**Translation pass:** Uses the enriched instruction and agent-determined batch boundaries. The delegate translation mode defaults to `array`; pass `-r timestamp` alongside the `agent` subcommand to use timestamp mode instead.
+**Translation pass:** Uses the enriched instruction. The delegate translation mode defaults to `array`; pass `-r timestamp` alongside the `agent` subcommand to use timestamp mode instead.
 
 ```bash
 # Default (array delegate)
@@ -44,9 +62,9 @@ When `--batch-sizes` is omitted, the batch size is now derived automatically fro
 
 A multi-pass agentic translation mode.
 
-**Planning pass:** Scans the full subtitle file in max-batch-size chunks. For each chunk the model produces a batch summary (character names, locations, events, tone, dialect) and decides a natural batch boundary. Summaries accumulate and are consolidated when they exceed the token budget. At the end of the scan, a refined system instruction is generated that filters the glossary and stylistic notes down to only what was observed in the file.
+**Planning pass:** Scans the full subtitle file in max-batch-size chunks. For each chunk the model produces a batch summary (character names, locations, events, tone, dialect). Summaries accumulate and are consolidated when they exceed the token budget. At the end of the scan, a refined system instruction is generated that filters the glossary and stylistic notes down to only what was observed in the file.
 
-**Translation pass:** Runs identically to `timestamp` mode using the enriched instruction and the agent-determined batch boundaries from the planning pass.
+**Translation pass:** Runs identically to `timestamp` mode using the enriched instruction.
 
 Best suited for content with recurring characters, specialized vocabulary, or stylistic consistency requirements. Costs additional API calls for the planning pass. Progress file resumption is not supported.
 

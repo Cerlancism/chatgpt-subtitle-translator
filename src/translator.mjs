@@ -1,6 +1,7 @@
 import log from "loglevel"
 import { countTokens } from "gpt-tokenizer"
 import { openaiRetryWrapper, completeChatStream } from './openai.mjs';
+import { detectRepetition } from 'llm-summary';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { TranslatorBase, DefaultOptions } from './translatorBase.mjs';
@@ -46,6 +47,19 @@ export class Translator extends TranslatorBase {
             start: "<think>",
             end: "</think>"
         }
+    }
+
+    /**
+     * Repetition detection callback for streaming abort guards.
+     * Returns the repeated pattern if detected, or `null`.
+     * Disabled when `options.guardRepetition` is `0`.
+     * @param {string} buffer
+     * @returns {string | null}
+     */
+    checkRepetition(buffer) {
+        const threshold = this.options.guardRepetition
+        if (!threshold) return null
+        return detectRepetition(buffer, 2, 500, threshold)
     }
 
     /**
@@ -133,6 +147,8 @@ export class Translator extends TranslatorBase {
                 }, (u) => {
                     usage = u
                     this.services.onStreamEnd?.()
+                }, (buffer) => {
+                    return this.checkRepetition(buffer)
                 })
                 return TranslationOutput.fromUsage(this.getOutput(lines, streamOutput), usage)
             }

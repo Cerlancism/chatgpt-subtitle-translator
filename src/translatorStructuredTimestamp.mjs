@@ -119,7 +119,9 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
             return TranslationOutput.fromCompletion(/** @type {any} */(parsed), output)
         } catch (error) {
-            log.error("[TranslatorStructuredTimestamp]", `Error ${error?.constructor?.name}`, error?.message)
+            if (!this._repetitionDetected) {
+                log.error("[TranslatorStructuredTimestamp]", `Error ${error?.constructor?.name}`, error?.message)
+            }
             return this.handleTranslateError(error, entries.length)
         }
     }
@@ -362,6 +364,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         }
     }
 
+
     /**
      * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<any>} runner
      */
@@ -380,6 +383,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         let textDone = true
         let expectedIdx = -1
         const currentBatchEntries = /** @type {TimestampEntry[]} */ (this.currentBatchEntries ?? [])
+
+        /** Text-only buffer for repetition detection (timestamps excluded) */
+        let textBuffer = ''
+        let textBufEntryLen = 0
 
         /**
          * @param {"start"|"end"|"text"} fieldKey
@@ -413,6 +420,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 if (key === "start") {
                     if (textDone) {
                         prevLen.start = prevLen.end = prevLen.text = 0
+                        textBufEntryLen = 0
                         textDone = false
                         expectedIdx++
                     }
@@ -427,6 +435,18 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     if (!partial) emitField("end", "  ", millisecondsToTimestamp(/** @type {number} */(value)), partial)
                 } else if (key === "text") {
                     emitField("text", "\n", /** @type {string} */(value), partial, () => { textDone = true })
+                    const strValue = /** @type {string} */(value ?? '')
+                    const delta = strValue.slice(textBufEntryLen)
+                    textBuffer += delta
+                    textBufEntryLen = strValue.length
+                    if (!partial) {
+                        textBuffer += '\n'
+                        textBufEntryLen = 0
+                    }
+                    const pattern = this.checkRepetition(textBuffer)
+                    if (pattern) {
+                        this.abortOnRepetition(pattern, runner)
+                    }
                 } else if (key === "remarksIfContainedMergers") {
                     const strValue = /** @type {string} */(value)
                     if (strValue) {

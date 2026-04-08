@@ -89,7 +89,9 @@ Options:
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
 
     When omitted, batch size is determined automatically per batch based on the `--context` token budget. On failure, the size is reduced and retried down to a minimum, then resets on the next successful batch.
-  - `--initial-prompts <prompts>`  
+  - `-g, --guard-repetition <threshold>`
+    Minimum number of pattern repeats before aborting a streaming response (default: `10`). When the model falls into a repetition loop during streaming, the response is aborted and retried with a smaller batch. Set to `0` to disable repetition detection.
+  - `--initial-prompts <prompts>`
     Initial prompts for the translation in JSON (default: `"[]"`) 
   - `--use-moderator`
     Use the OpenAI Moderation tool
@@ -138,8 +140,8 @@ cli/translator.mjs agent --help
 Agent mode runs multiple passes before translating:
 
 **Overview** - Samples the file to produce a content overview (file identity, duration, genre/tone, character names) and detects the source language.  
-**Planning** - Scans the file in token-bounded windows. Each window produces a batch summary (characters, locations, events, tone) and determines a natural batch boundary. Summaries are consolidated and used to generate a refined translation instruction.  
-**Translation** - Translates using the enriched instruction and the agent-determined batch boundaries. After the first batch, a sample of the output is checked to confirm the target language before proceeding.  
+**Planning** - Scans the file in token-bounded windows. Each window produces a batch summary (characters, locations, events, tone). Summaries are consolidated and used to generate a refined translation instruction.  
+**Translation** - Translates using the enriched instruction. After the first batch, a sample of the output is checked to confirm the target language before proceeding.  
 
 Structured mode defaults to `array`; pass `--structured timestamp` to use timestamp mode instead.  
 
@@ -152,7 +154,7 @@ cli/translator.mjs agent --input subtitles.srt --structured timestamp --from Jap
 ```
 
 - `--skip-refine`  
-  Skip the final instruction refinement step at the end of the planning pass and use the accumulated summaries directly.
+  Skip the final instruction refinement step at the end of the planning pass and use the original system instruction directly.
 - `--context-summary <summary>`  
   Provide a context summary directly, bypassing the planning pass entirely and proceeding straight to translation.
 

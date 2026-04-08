@@ -68,7 +68,9 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
 
             return TranslationOutput.fromCompletion(linesOut, output)
         } catch (error) {
-            log.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
+            if (!this._repetitionDetected) {
+                log.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
+            }
             return this.handleTranslateError(error, lines.length)
         }
     }
@@ -94,12 +96,18 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
         this.services.onStreamChunk?.("\n")
         const passThroughStream = new PassThrough()
         let writeBuffer = ''
+        let contentBuffer = ''
         runner.on("content.delta", (e) => {
             writeBuffer += e.delta
+            contentBuffer += e.delta
             passThroughStream.write(e.delta)
             if (writeBuffer) {
                 this.services.onStreamChunk?.(writeBuffer)
                 writeBuffer = ''
+            }
+            const pattern = this.checkRepetition(contentBuffer)
+            if (pattern) {
+                this.abortOnRepetition(pattern, runner)
             }
         })
         runner.on("content.done", () => {
