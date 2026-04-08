@@ -142,6 +142,15 @@ export class TranslatorAgent {
         return this.detectedTo || this.language.to
     }
 
+    /** @returns {string} Shared scan summary writing rules used in both the scan prompt and fit instructions */
+    get _scanSummaryRules() {
+        return `1. Write in ${this.targetLanguage}.\n` +
+            `2. Open with your overall impression of this window's content.\n` +
+            `3. Write only what is new or notable - do not repeat or refine prior context.\n` +
+            `4. Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
+            `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).`
+    }
+
     /**
      * Core usage accumulation: adds prompt/completion counts, updates elapsed time, and logs.
      * @param {number} promptTokens
@@ -569,16 +578,13 @@ export class TranslatorAgent {
             `(${timestampToMilliseconds(batch[0].start)}-${timestampToMilliseconds(batch[batch.length - 1].end)} ms, ` +
             `${batch[0].start}-${batch[batch.length - 1].end}).\n\n` +
             `# Rules for batchSummary:\n` +
-            `1. Write in ${this.targetLanguage}.\n` +
-            `2. Open with your overall impression of this window's content.\n` +
-            `3. Write only what is new or notable here - do not repeat or refine prior context.\n` +
-            `4. Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
-            `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).\n` +
+            this._scanSummaryRules + "\n" +
             summaryTokenRange
         ].join("")
 
+        const encodedBatch = encodeToon({ inputs: batch.map(toMsEntry) })
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
-        const userMessage = { role: "user", content: encodeToon({ inputs: batch.map(toMsEntry) }) }
+        const userMessage = { role: "user", content: encodedBatch }
         /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
         const messages = [
             { role: "system", content: systemContent },
@@ -608,17 +614,12 @@ export class TranslatorAgent {
             if (summaryTokens < targetLower || summaryTokens > budget) {
                 log.debug("[TranslatorAgent]",
                     `Scan batch summary out of range (${summaryTokens} tokens, target: ${targetLower}-${budget}) - fitting`)
-                const scanFitInstructions =
-                    `Write in ${this.targetLanguage}.\n` +
-                    `Open with your overall impression of this window's content.\n` +
-                    `Write only what is new or notable - do not repeat or refine prior context.\n` +
-                    `Cover the 5W1H: who (names, roles, relationships), what (events, terms, objects), ` +
-                    `where (locations, settings), when (time context), why/how (tone, register, dialect, intent).`
+                const scanFitInstructions = this._scanSummaryRules
                 try {
                     await this.services.cooler?.cool()
                     const result = await summarise(
                         this.services.openai,
-                        batchSummary,
+                        `Subtitle entries:\n${encodedBatch}\n\nDraft summary:\n${batchSummary}`,
                         targetLower,
                         budget,
                         this._summariseOptions({ contextBudget: budget, instructions: scanFitInstructions })
