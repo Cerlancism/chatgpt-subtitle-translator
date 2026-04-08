@@ -61,6 +61,10 @@ export async function openaiRetryWrapper(func, maxRetries, description) {
             log.error(`[Error_${description}]`, "Retries", retryContext.currentTry, "Delay", delay)
             await sleep(delay)
         }
+        else if (error instanceof ChatStreamRepetitionError) {
+            log.warn(`[Error_${description}] ${error.message} - retrying (use --guard-repetition 0 to disable)`, "Retries", retryContext.currentTry, "Delay", delay)
+            await sleep(delay)
+        }
         else if (error instanceof ChatStreamSyntaxError) {
             log.error(`[Error_${description}] ${error.message}`, "Retries", retryContext.currentTry, "Delay", delay)
             await sleep(delay)

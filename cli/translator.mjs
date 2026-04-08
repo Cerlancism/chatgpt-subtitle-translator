@@ -92,6 +92,7 @@ async function createInstance(args) {
     addTranslatorOptions(program.command("agent")
         .description("Agentic multi-pass translation: planning pass observes content before translating"))
         .option("--skip-refine", "Skip final instruction refinement and use the base instruction directly")
+        .option("--no-fitting", "Skip LLM-based token-range fitting for planning summaries and consolidation")
         .option("--context-summary <summary>", "Provide a context summary directly, skipping the batch summary scanning pass")
         .action(async (_, agentCmd) => {
             const opts = agentCmd.optsWithGlobals()
@@ -142,6 +143,7 @@ function buildOptions(opts) {
         ...(opts.logLevel && { logLevel: opts.logLevel }),
         ...(opts.input && { inputFile: opts.input }),
         ...(opts.skipRefine && { skipRefineInstruction: true }),
+        ...(opts.fitting === false && { skipFitting: true }),
         ...(opts.contextSummary && { agentContextSummary: opts.contextSummary })
     }
 

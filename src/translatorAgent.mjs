@@ -602,7 +602,7 @@ export class TranslatorAgent {
         }
 
         const batchSummary = message.parsed?.batchSummary?.trim()
-        if (batchSummary && budget) {
+        if (batchSummary && budget && !this.options.skipFitting) {
             const summaryTokens = countTokens(batchSummary)
             const targetLower = Math.floor(budget * SUMMARY_RANGE_LOWER_FRACTION)
             if (summaryTokens < targetLower || summaryTokens > budget) {
@@ -667,21 +667,23 @@ export class TranslatorAgent {
             `2. Open with your overall impression of the content so far.\n` +
             `3. Preserve all unique 5W1H facts (who, what, where, when, why/how - names, locations, terms, tone, dialect).\n` +
             `4. Remove duplicate or contradictory information. ${isFinal ? "Be thorough - this is the last pass." : "Keep it concise - more content is coming."}`
-        try {
-            const result = await summarise(
-                this.services.openai,
-                combined,
-                targetLower,
-                targetTokens,
-                this._summariseOptions({ contextBudget: budget, instructions: consolidationInstructions })
-            )
-            this._accumulateSummariseUsage(result, isFinal ? "consolidate_final" : "consolidate")
-            log.debug("[TranslatorAgent]",
-                `Consolidation${isFinal ? " (final)" : ""}: ${result.tokens} tokens,`,
-                `${result.attempts} attempts, withinRange: ${result.withinRange}`)
-            if (result.summary) return result.summary
-        } catch (error) {
-            log.warn("[TranslatorAgent]", "Consolidation failed:", error?.message, "- truncating")
+        if (!this.options.skipFitting) {
+            try {
+                const result = await summarise(
+                    this.services.openai,
+                    combined,
+                    targetLower,
+                    targetTokens,
+                    this._summariseOptions({ contextBudget: budget, instructions: consolidationInstructions })
+                )
+                this._accumulateSummariseUsage(result, isFinal ? "consolidate_final" : "consolidate")
+                log.debug("[TranslatorAgent]",
+                    `Consolidation${isFinal ? " (final)" : ""}: ${result.tokens} tokens,`,
+                    `${result.attempts} attempts, withinRange: ${result.withinRange}`)
+                if (result.summary) return result.summary
+            } catch (error) {
+                log.warn("[TranslatorAgent]", "Consolidation failed:", error?.message, "- truncating")
+            }
         }
         // Fallback: keep as much as fits within budget
         if (countTokens(combined) <= budget) return combined
