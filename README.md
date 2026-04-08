@@ -140,8 +140,8 @@ cli/translator.mjs agent --help
 Agent mode runs multiple passes before translating:
 
 **Overview** - Samples the file to produce a content overview (file identity, duration, genre/tone, character names) and detects the source language.  
-**Planning** - Scans the file in token-bounded windows. Each window produces a batch summary (characters, locations, events, tone) and determines a natural batch boundary. Summaries are consolidated and used to generate a refined translation instruction.  
-**Translation** - Translates using the enriched instruction and the agent-determined batch boundaries. After the first batch, a sample of the output is checked to confirm the target language before proceeding.  
+**Planning** - Scans the file in token-bounded windows. Each window produces a batch summary (characters, locations, events, tone). Summaries are consolidated and used to generate a refined translation instruction.  
+**Translation** - Translates using the enriched instruction. After the first batch, a sample of the output is checked to confirm the target language before proceeding.  
 
 Structured mode defaults to `array`; pass `--structured timestamp` to use timestamp mode instead.  
 
@@ -154,7 +154,7 @@ cli/translator.mjs agent --input subtitles.srt --structured timestamp --from Jap
 ```
 
 - `--skip-refine`  
-  Skip the final instruction refinement step at the end of the planning pass and use the accumulated summaries directly.
+  Skip the final instruction refinement step at the end of the planning pass and use the original system instruction directly.
 - `--context-summary <summary>`  
   Provide a context summary directly, bypassing the planning pass entirely and proceeding straight to translation.
 
