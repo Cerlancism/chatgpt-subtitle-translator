@@ -155,6 +155,8 @@ cli/translator.mjs agent --input subtitles.srt --structured timestamp --from Jap
 
 - `--skip-refine`  
   Skip the final instruction refinement step at the end of the planning pass and use the original system instruction directly.
+- `--no-fitting`  
+  Skip LLM-based token-range fitting for planning summaries and consolidation. Summaries are used as-is regardless of token range.
 - `--context-summary <summary>`  
   Provide a context summary directly, bypassing the planning pass entirely and proceeding straight to translation.
 
