@@ -639,7 +639,7 @@ export class TranslatorAgent {
 
     /**
      * Consolidates an over-budget accumulator with a new note into the target token range.
-     * Uses two-phase summarisation (draft → fit) for reliable token range enforcement.
+     * Uses two-phase summarisation (draft -> fit) for reliable token range enforcement.
      * Falls back to simple truncation if the summarise call fails.
      *
      * @param {string} existing - current accumulated batch summaries

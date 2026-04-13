@@ -86,7 +86,7 @@ export class Translator extends TranslatorBase {
         if (count > threshold / 2) {
             const boosted = count * 3
             this._effectiveGuardRepetition = boosted
-            log.warn(`[Translator]`, `Input contains repeated pattern "${pattern.slice(0, 50)}" ×${count} — raising repetition guard threshold from ${threshold} to ${boosted}`)
+            log.warn(`[Translator]`, `Input contains repeated pattern "${pattern.slice(0, 50)}" ×${count} - raising repetition guard threshold from ${threshold} to ${boosted}`)
         }
     }
 

@@ -78,7 +78,7 @@ Options:
 
     The token budget is tracked from actual model response token counts. The history is chunked into user/assistant message pairs using the last value in `--batch-sizes`.
 
-    Recommended value: set `<tokens>` to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--context 90000`.
+    Recommended value: set `<tokens>` up to ~30% less than the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--context 90000`.
   - `-b, --batch-sizes <sizes>`
     Batch sizes of increasing order for translation prompt slices in JSON Array  
 
@@ -116,7 +116,7 @@ Additional Options for GPT: https://developers.openai.com/api/reference/resource
   - `-m, --model <model>`
     (default: `"gpt-4o-mini"`) https://developers.openai.com/api/docs/models
   - `--reasoning_effort <reasoning_effort>`
-    Constrains effort on reasoning for reasoning models. Accepted values depend on the model (e.g. `"low"`, `"medium"`, `"high"`); follows the model's default when not set. `"none"` disables reasoning/thinking entirely (supported by OpenAI o-series/GPT-5+ and open models via Ollama such as Qwen3).
+    Constrains effort on reasoning for reasoning models. Accepted values depend on the model (e.g. `"low"`, `"medium"`, `"high"`), follows the model's default when not set. `"none"` disables reasoning/thinking entirely (supported by OpenAI o-series/GPT-5+ and open models via Ollama such as Qwen3).
   - `-t, --temperature <temperature>`
     Sampling temperature to use, should set a low value such as `0` to be more deterministic for translation (default: `0`)
   - `--top_p <top_p>`
@@ -143,7 +143,7 @@ Agent mode runs multiple passes before translating:
 **Planning** - Scans the file in token-bounded windows. Each window produces a batch summary (characters, locations, events, tone). Summaries are consolidated and used to generate a refined translation instruction.  
 **Translation** - Translates using the enriched instruction. After the first batch, a sample of the output is checked to confirm the target language before proceeding.  
 
-Structured mode defaults to `array`; pass `--structured timestamp` to use timestamp mode instead.  
+Structured mode defaults to `array`, pass `--structured timestamp` to use timestamp mode instead.  
 
 ```bash
 # Default (array delegate)
@@ -171,11 +171,7 @@ Hello.
 ```
 ### Emojis
 ```bash
-cli/translator.mjs --to "Emojis" --plain-text "$(curl 'https://api.chucknorris.io/jokes/0ECUwLDTTYSaeFCq6YMa5A' | jq .value)"
-```  
-Input Argument
-```
-Chuck Norris can walk with the animals, talk with the animals; grunt and squeak and squawk with the animals... and the animals, without fail, always say 'yessir Mr. Norris'.
+cli/translator.mjs --to "Emojis" --plain-text "Chuck Norris can walk with the animals, talk with the animals; grunt and squeak and squawk with the animals... and the animals, without fail, always say 'yessir Mr. Norris'."
 ```
 Standard Output
 ```
@@ -626,7 +622,7 @@ Yes, it's very nice weather.
 
 #### `none`
 
-No structured output. Lines are sent as plain text and the model returns plain text.
+No structured output. Lines are sent as text and the model returns text.
 
 <table>
 <tr>

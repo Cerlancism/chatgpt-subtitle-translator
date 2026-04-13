@@ -30,7 +30,7 @@ export class TranslatorStructuredBase extends Translator {
      * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<any>} runner
      */
     abortOnRepetition(pattern, runner) {
-        log.warn(`[${this.constructor.name}]`, `Repetition detected: "${pattern.slice(0, 50)}" — retrying (use --guard-repetition 0 to disable)`)
+        log.warn(`[${this.constructor.name}]`, `Repetition detected: "${pattern.slice(0, 50)}" - retrying (use --guard-repetition 0 to disable)`)
         this._repetitionDetected = true
         runner.controller.abort()
     }

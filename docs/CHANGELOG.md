@@ -1,6 +1,10 @@
 # Changelog
 
-## 3.3.0 (2026-04-09)
+## 3.3.2 (2026-04-14)
+
+- Repetition guard now checks input for existing repetition before translating. When the source text itself contains a pattern repeated more than half the guard threshold, the threshold is automatically raised to 3x the detected count to avoid false-positive aborts.
+
+## 3.3.1 (2026-04-09)
 
 ### New Features
 
@@ -14,9 +18,9 @@ A new option that monitors streaming responses for looping output and aborts the
 
 #### Agent Planning: LLM-Based Summary Fitting
 
-Planning pass summaries that fall outside the target token range are now re-fit using the `llm-summary` `summarise` function (two-phase draft → fit), replacing the previous direct model call for consolidation. This applies to both per-window batch summaries and accumulated consolidation steps.
+Planning pass summaries that fall outside the target token range are now re-fit using the `llm-summary` `summarise` function (two-phase draft -> fit), replacing the previous direct model call for consolidation. This applies to both per-window batch summaries and accumulated consolidation steps.
 
-- **`--no-fitting`** — skip LLM-based fitting for both scan-window summaries and consolidation. Summaries are used as-is regardless of token range.
+- **`--no-fitting`** - skip LLM-based fitting for both scan-window summaries and consolidation. Summaries are used as-is regardless of token range.
 
 ## 3.2.0 (2026-04-02)
 
