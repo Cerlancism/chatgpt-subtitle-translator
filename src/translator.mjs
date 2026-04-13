@@ -57,9 +57,37 @@ export class Translator extends TranslatorBase {
      * @returns {string | null}
      */
     checkRepetition(buffer) {
-        const threshold = this.options.guardRepetition
+        const threshold = this._effectiveGuardRepetition ?? this.options.guardRepetition
         if (!threshold) return null
         return detectRepetition(buffer, 2, 500, threshold)
+    }
+
+    /**
+     * Checks input lines for existing repetition patterns.
+     * If the input itself has a pattern repeated more than half the guard threshold,
+     * the effective guard threshold is raised to 3× the detected repeat count and a warning is logged.
+     * @param {any[]} lines
+     */
+    adjustGuardForInputRepetition(lines) {
+        this._effectiveGuardRepetition = undefined
+        const threshold = this.options.guardRepetition
+        if (!threshold) return
+        const text = lines.map(l => typeof l === 'string' ? l : (l.text ?? String(l))).join("\n")
+        // Detect any pattern repeated at least 2 times in the input
+        const pattern = detectRepetition(text, 2, 500, 2)
+        if (!pattern) return
+        // Count how many consecutive times the pattern appears at the tail
+        let count = 0
+        let pos = text.length
+        while (pos >= pattern.length && text.slice(pos - pattern.length, pos) === pattern) {
+            count++
+            pos -= pattern.length
+        }
+        if (count > threshold / 2) {
+            const boosted = count * 3
+            this._effectiveGuardRepetition = boosted
+            log.warn(`[Translator]`, `Input contains repeated pattern "${pattern.slice(0, 50)}" ×${count} — raising repetition guard threshold from ${threshold} to ${boosted}`)
+        }
     }
 
     /**
@@ -178,8 +206,10 @@ export class Translator extends TranslatorBase {
         batch = batch.slice(-this.currentBatchSize)
         for (let x = 0; x < batch.length; x++) {
             const input = batch[x]
+            this.adjustGuardForInputRepetition([input])
             this.buildContext()
             const output = await this.translatePrompt(/** @type {any} */ ([input]))
+            this._effectiveGuardRepetition = undefined
             const writeOut = output.content[0]
             yield* this.yieldOutput([batch[x]], [writeOut], output.completionTokens)
         }
@@ -254,8 +284,10 @@ export class Translator extends TranslatorBase {
                     continue
                 }
             }
+            this.adjustGuardForInputRepetition(batch)
             this.buildContext()
             const output = await this.translatePrompt(/** @type {any} */ (batch))
+            this._effectiveGuardRepetition = undefined
 
             if (this.aborted) {
                 log.debug("[Translator]", "Aborted")

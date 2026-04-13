@@ -175,8 +175,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     async * translateSingleSrt(entries) {
         log.debug("[TranslatorStructuredTimestamp]", "Single entry mode")
         for (const entry of entries) {
+            this.adjustGuardForInputRepetition([entry])
             this.buildTimestampContext()
             const output = await this.translatePrompt([entry])
+            this._effectiveGuardRepetition = undefined
             /** @type {TimestampEntry[]} */
             const outputEntries = /** @type {any} */ (output.content)?.outputs ?? []
             const resultEntry = outputEntries?.[0] ?? entry
@@ -302,8 +304,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
             const batch = entries.slice(index, index + this.currentBatchSize)
 
+            this.adjustGuardForInputRepetition(batch)
             this.buildTimestampContext()
             const output = await this.translatePrompt(batch)
+            this._effectiveGuardRepetition = undefined
 
             if (this.aborted) {
                 log.debug("[TranslatorStructuredTimestamp]", "Aborted")
