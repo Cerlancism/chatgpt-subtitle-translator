@@ -64,34 +64,24 @@ export class Translator extends TranslatorBase {
 
     /**
      * Checks input lines for existing repetition patterns.
-     * If the input itself has a pattern repeated more than half the guard threshold,
-     * the effective guard threshold is raised to 3× the detected repeat count and a warning is logged.
-     * @param {any[]} lines
+     * If the input already meets the guard threshold, raises the effective threshold to 3x to avoid false aborts.
+     * @param {(string | { text?: string })[]} lines
      */
     adjustGuardForInputRepetition(lines) {
         this._effectiveGuardRepetition = undefined
         const threshold = this.options.guardRepetition
         if (!threshold) return
         const text = lines.map(l => typeof l === 'string' ? l : (l.text ?? String(l))).join("\n")
-        // Detect any pattern repeated at least 2 times in the input
-        const pattern = detectRepetition(text, 2, 500, 2)
+        const pattern = detectRepetition(text, 2, 500, threshold)
         if (!pattern) return
-        // Count how many consecutive times the pattern appears at the tail
-        let count = 0
-        let pos = text.length
-        while (pos >= pattern.length && text.slice(pos - pattern.length, pos) === pattern) {
-            count++
-            pos -= pattern.length
-        }
-        if (count > threshold / 2) {
-            const boosted = count * 3
-            this._effectiveGuardRepetition = boosted
-            log.warn(`[Translator]`, `Input contains repeated pattern "${pattern.slice(0, 50)}" ×${count} - raising repetition guard threshold from ${threshold} to ${boosted}`)
-        }
+        const boosted = threshold * 3
+        this._effectiveGuardRepetition = boosted
+        log.warn(`[Translator]`, `Input contains repeated pattern "${pattern.slice(0, 50)}" - raising repetition guard threshold from ${threshold} to ${boosted}`)
     }
 
     /**
-     * @param {any[]} inputLines
+     * @template T
+     * @param {T[]} inputLines
      * @param {string} rawContent
      */
     getOutput(inputLines, rawContent) {
@@ -184,8 +174,8 @@ export class Translator extends TranslatorBase {
     }
 
     /**
-     * @param {any[]} batch
-     * @param {any[]} outputs
+     * @param {T[]} batch
+     * @param {T[]} outputs
      * @returns {boolean}
      */
     evaluateBatchOutput(batch, outputs) {
@@ -218,7 +208,7 @@ export class Translator extends TranslatorBase {
     /**
      * Computes how many lines starting at startIndex fit within the dynamic batch budget fraction of the context token budget.
      * Returns at least 3.
-     * @param {any[]} lines
+     * @param {string[]} lines
      * @param {number} startIndex
      * @returns {number}
      */
@@ -296,7 +286,7 @@ export class Translator extends TranslatorBase {
 
             let outputs = output.content
 
-            if (this.evaluateBatchOutput(batch, outputs) || (batch.length > 1 && output.refusal)) {
+            if (this.evaluateBatchOutput(/** @type {T[]} */ (batch), /** @type {T[]} */ (outputs)) || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
                 this.completionTokensWasted += output.completionTokens
 
