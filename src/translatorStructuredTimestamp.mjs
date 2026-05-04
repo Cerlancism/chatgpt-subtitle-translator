@@ -353,7 +353,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 yield* outputEntries
 
                 if (this.isDynamicBatch) {
-                    this.dynamicReductionFactor = 1
+                    if (this.dynamicReductionFactor > 1 && reducedBatchSessions++ >= this.dynamicReductionFactor) {
+                        reducedBatchSessions = 0
+                        this.dynamicReductionFactor = Math.max(1, this.dynamicReductionFactor / AUTO_BATCH_REDUCTION)
+                    }
                 } else {
                     if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
                         reducedBatchSessions = 0
