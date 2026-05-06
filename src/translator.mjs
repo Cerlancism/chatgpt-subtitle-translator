@@ -230,6 +230,30 @@ export class Translator extends TranslatorBase {
     }
 
     /**
+     * Adjusts batch sizing after a successful batch. In dynamic mode, gradually
+     * eases the reduction factor back toward 1; in fixed mode, ramps the batch
+     * size back up once the success threshold is reached.
+     * @param {number} reducedBatchSessions
+     * @returns {{ reducedBatchSessions: number, indexDelta: number }}
+     *   Updated session counter and an index adjustment for the caller's loop.
+     */
+    adjustBatchOnSuccess(reducedBatchSessions) {
+        let indexDelta = 0
+        if (this.isDynamicBatch) {
+            if (this.dynamicReductionFactor > 1 && reducedBatchSessions++ >= AUTO_BATCH_REDUCTION) {
+                reducedBatchSessions = 0
+                this.dynamicReductionFactor = Math.max(1, this.dynamicReductionFactor / AUTO_BATCH_REDUCTION)
+            }
+        } else if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
+            reducedBatchSessions = 0
+            const old = this.currentBatchSize
+            this.changeBatchSize("increase")
+            indexDelta = this.currentBatchSize - old
+        }
+        return { reducedBatchSessions, indexDelta }
+    }
+
+    /**
      * @param {string[]} lines
      */
     async * translateLines(lines) {
@@ -317,19 +341,9 @@ export class Translator extends TranslatorBase {
                 // summing any subset of entries approximates the proportional token cost.
                 yield* this.yieldOutput(batch, outputs, output.completionTokens / outputs.length)
 
-                if (this.isDynamicBatch) {
-                    if (this.dynamicReductionFactor > 1 && reducedBatchSessions++ >= this.dynamicReductionFactor) {
-                        reducedBatchSessions = 0
-                        this.dynamicReductionFactor = Math.max(1, this.dynamicReductionFactor / AUTO_BATCH_REDUCTION)
-                    }
-                } else {
-                    if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
-                        reducedBatchSessions = 0
-                        const old = this.currentBatchSize
-                        this.changeBatchSize("increase")
-                        index -= (this.currentBatchSize - old)
-                    }
-                }
+                const adjusted = this.adjustBatchOnSuccess(reducedBatchSessions)
+                reducedBatchSessions = adjusted.reducedBatchSessions
+                index -= adjusted.indexDelta
             }
 
             this.printUsage()

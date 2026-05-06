@@ -352,19 +352,9 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
                 yield* outputEntries
 
-                if (this.isDynamicBatch) {
-                    if (this.dynamicReductionFactor > 1 && reducedBatchSessions++ >= this.dynamicReductionFactor) {
-                        reducedBatchSessions = 0
-                        this.dynamicReductionFactor = Math.max(1, this.dynamicReductionFactor / AUTO_BATCH_REDUCTION)
-                    }
-                } else {
-                    if (this.batchSizeThreshold && reducedBatchSessions++ >= this.batchSizeThreshold) {
-                        reducedBatchSessions = 0
-                        const old = this.currentBatchSize
-                        this.changeBatchSize("increase")
-                        index -= (this.currentBatchSize - old)
-                    }
-                }
+                const adjusted = this.adjustBatchOnSuccess(reducedBatchSessions)
+                reducedBatchSessions = adjusted.reducedBatchSessions
+                index -= adjusted.indexDelta
             }
 
             this.printUsage()
