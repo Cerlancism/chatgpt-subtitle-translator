@@ -107,7 +107,7 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             }
             const pattern = this.checkRepetition(contentBuffer)
             if (pattern) {
-                this.abortOnRepetition(pattern, runner)
+                this.abortOnRepetition(pattern, runner, contentBuffer)
             }
         })
         runner.on("content.done", () => {

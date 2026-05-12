@@ -442,7 +442,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     }
                     const pattern = this.checkRepetition(textBuffer)
                     if (pattern) {
-                        this.abortOnRepetition(pattern, runner)
+                        this.abortOnRepetition(pattern, runner, textBuffer)
                     }
                 } else if (key === "remarksIfContainedMergers") {
                     const strValue = /** @type {string} */(value)

@@ -28,9 +28,19 @@ export class TranslatorStructuredBase extends Translator {
      * Mark repetition detected and abort the runner (for jsonStream subclasses).
      * @param {string} pattern
      * @param {import('openai/lib/ChatCompletionStream').ChatCompletionStream<any>} runner
+     * @param {string} [buffer] Buffer in which the pattern was detected, used to count occurrences.
      */
-    abortOnRepetition(pattern, runner) {
-        log.warn(`[${this.constructor.name}]`, `Repetition detected: "${pattern.slice(0, 50)}" - retrying (use --guard-repetition 0 to disable)`)
+    abortOnRepetition(pattern, runner, buffer) {
+        const threshold = this._effectiveGuardRepetition ?? this.options.guardRepetition
+        let count = 0
+        if (buffer) {
+            let idx = buffer.indexOf(pattern)
+            while (idx !== -1) {
+                count++
+                idx = buffer.indexOf(pattern, idx + pattern.length)
+            }
+        }
+        log.warn(`[${this.constructor.name}]`, `Repetition detected: "${pattern.slice(0, 50)}" (count=${count}, chars=${pattern.length}, threshold=${threshold}) - retrying (use --guard-repetition 0 to disable)`)
         this._repetitionDetected = true
         runner.controller.abort()
     }
@@ -43,7 +53,7 @@ export class TranslatorStructuredBase extends Translator {
     handleTranslateError(error, lineCount) {
         if (error instanceof ChatStreamRepetitionError || this._repetitionDetected) {
             const pattern = error instanceof ChatStreamRepetitionError ? error.pattern : ''
-            log.warn(`[${this.constructor.name}]`, `Retrying after repetition abort${pattern ? `: "${pattern.slice(0, 50)}"` : ''} (use --guard-repetition 0 to disable)`)
+            log.warn(`[${this.constructor.name}]`, `Retrying after repetition abort${pattern ? `: "${pattern.slice(0, 50)}"` : ''}`)
             this._repetitionDetected = false
             return new TranslationOutput([], 0, 0, 0, 0)
         }
