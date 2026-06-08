@@ -254,17 +254,20 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
     /**
      * Computes how many timestamp entries starting at startIndex fit within the dynamic batch budget fraction of the context token budget.
+     * The reduction factor shrinks the budget *before* evening so the remaining
+     * entries stay balanced even in a reduced state.
      * Returns at least AUTO_BATCH_MIN.
      * @param {TimestampEntry[]} entries
      * @param {number} startIndex
+     * @param {number} [reductionFactor]
      * @returns {number}
      */
-    computeDynamicBatchSizeTimestamp(entries, startIndex) {
+    computeDynamicBatchSizeTimestamp(entries, startIndex, reductionFactor = 1) {
         const useFullContext = this.options.useFullContext
         if (!useFullContext) {
             return entries.length - startIndex
         }
-        const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)
+        const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION / reductionFactor)
         const weights = entries.map(e => countTokens(e.text))
         return computeEvenBatchSize(weights, startIndex, budget)
     }
@@ -278,8 +281,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
 
         for (let index = 0, reducedBatchSessions = 0; index < entries.length; index += this.currentBatchSize) {
             if (this.isDynamicBatch) {
-                const computed = this.computeDynamicBatchSizeTimestamp(entries, index)
-                this.currentBatchSize = Math.max(AUTO_BATCH_MIN, Math.floor(computed / this.dynamicReductionFactor))
+                this.currentBatchSize = this.computeDynamicBatchSizeTimestamp(entries, index, this.dynamicReductionFactor)
                 log.debug("[TranslatorStructuredTimestamp]", "Dynamic batch size:", this.currentBatchSize,
                     this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`)
             }

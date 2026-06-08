@@ -265,17 +265,20 @@ export class Translator extends TranslatorBase {
 
     /**
      * Computes how many lines starting at startIndex fit within the dynamic batch budget fraction of the context token budget.
+     * The reduction factor shrinks the budget *before* evening so the remaining
+     * lines stay balanced even in a reduced state.
      * Returns at least 3.
      * @param {string[]} lines
      * @param {number} startIndex
+     * @param {number} [reductionFactor]
      * @returns {number}
      */
-    computeDynamicBatchSize(lines, startIndex) {
+    computeDynamicBatchSize(lines, startIndex, reductionFactor = 1) {
         const useFullContext = this.options.useFullContext
         if (!useFullContext) {
             return lines.length - startIndex
         }
-        const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)
+        const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION / reductionFactor)
         const weights = lines.map(l => countTokens(String(l)))
         return computeEvenBatchSize(weights, startIndex, budget)
     }
@@ -315,8 +318,7 @@ export class Translator extends TranslatorBase {
 
         for (let index = this.offset, reducedBatchSessions = 0; index < theEnd; index += this.currentBatchSize) {
             if (this.isDynamicBatch) {
-                const computed = this.computeDynamicBatchSize(lines, index)
-                this.currentBatchSize = Math.max(AUTO_BATCH_MIN, Math.floor(computed / this.dynamicReductionFactor))
+                this.currentBatchSize = this.computeDynamicBatchSize(lines, index, this.dynamicReductionFactor)
                 log.debug("[Translator]", "Dynamic batch size:", this.currentBatchSize,
                     this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`)
             }
