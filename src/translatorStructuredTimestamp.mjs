@@ -6,7 +6,7 @@ import { countTokens } from "gpt-tokenizer"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
-import { AUTO_BATCH_MIN, AUTO_BATCH_REDUCTION, DYNAMIC_BATCH_BUDGET_FRACTION } from "./translator.mjs";
+import { AUTO_BATCH_MIN, AUTO_BATCH_REDUCTION, DYNAMIC_BATCH_BUDGET_FRACTION, computeEvenBatchSize } from "./translator.mjs";
 import { streamParse } from "./openai.mjs";
 import { timestampToMilliseconds, millisecondsToTimestamp } from "./subtitle.mjs";
 import { encode as encodeToon } from "@toon-format/toon";
@@ -265,15 +265,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             return entries.length - startIndex
         }
         const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)
-        let tokensSoFar = 0
-        let count = 0
-        for (let i = startIndex; i < entries.length; i++) {
-            const lineTokens = countTokens(entries[i].text)
-            if (count > 0 && tokensSoFar + lineTokens > budget) break
-            tokensSoFar += lineTokens
-            count++
-        }
-        return Math.max(AUTO_BATCH_MIN, count)
+        const weights = entries.map(e => countTokens(e.text))
+        return computeEvenBatchSize(weights, startIndex, budget)
     }
 
     /**

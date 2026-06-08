@@ -15,6 +15,64 @@ export const AUTO_BATCH_REDUCTION = 3
 export const DYNAMIC_BATCH_BUDGET_FRACTION = 0.15
 
 /**
+ * Computes an evened-out batch size for the next dynamic batch.
+ *
+ * A naive greedy fill (take as many entries as fit in `budget`, repeat) leaves a
+ * small remainder at the tail end, e.g. entries weighted to fit 30/batch over 100
+ * entries yield [30, 30, 30, 10]. Instead we:
+ *   1. Greedily count how many batches `B` the remaining entries need at full budget.
+ *   2. Spread the remaining token load evenly across `B` batches, so the per-batch
+ *      target becomes `remainingTokens / B` rather than the full `budget`,
+ *      producing [25, 25, 25, 25].
+ *
+ * Recomputed each iteration, so per-entry token variance and mid-stream budget
+ * reductions self-correct. The hard `budget` is never exceeded, and the result is
+ * at least `AUTO_BATCH_MIN` (unless fewer entries remain).
+ *
+ * @param {number[]} weights - per-entry token counts, indexed globally
+ * @param {number} startIndex - index of the first unprocessed entry
+ * @param {number} budget - hard per-batch token budget
+ * @returns {number} number of entries to include in the next batch
+ */
+export function computeEvenBatchSize(weights, startIndex, budget) {
+    const remaining = weights.length - startIndex
+    if (remaining <= 0) return 0
+    if (budget <= 0) return remaining
+
+    // Step 1: greedily count batches and total tokens over the remaining range.
+    let batchCount = 0
+    let remainingTokens = 0
+    let batchTokens = 0
+    let batchEntries = 0
+    for (let i = startIndex; i < weights.length; i++) {
+        const w = weights[i]
+        remainingTokens += w
+        if (batchEntries > 0 && batchTokens + w > budget) {
+            batchCount++
+            batchTokens = 0
+            batchEntries = 0
+        }
+        batchTokens += w
+        batchEntries++
+    }
+    if (batchEntries > 0) batchCount++
+    if (batchCount <= 1) return remaining
+
+    // Step 2: even per-batch token target across the counted batches.
+    const targetTokens = remainingTokens / batchCount
+
+    let tokensSoFar = 0
+    let count = 0
+    for (let i = startIndex; i < weights.length; i++) {
+        const w = weights[i]
+        if (count > 0 && (tokensSoFar + w > budget || tokensSoFar + w > targetTokens)) break
+        tokensSoFar += w
+        count++
+    }
+    return Math.max(AUTO_BATCH_MIN, count)
+}
+
+/**
  * @typedef {import('./translatorBase.mjs').TranslationServiceContext} TranslationServiceContext
  * @typedef {import('./translatorBase.mjs').TranslatorOptions} TranslatorOptions
  */
@@ -218,15 +276,8 @@ export class Translator extends TranslatorBase {
             return lines.length - startIndex
         }
         const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)
-        let tokensSoFar = 0
-        let count = 0
-        for (let i = startIndex; i < lines.length; i++) {
-            const lineTokens = countTokens(String(lines[i]))
-            if (count > 0 && tokensSoFar + lineTokens > budget) break
-            tokensSoFar += lineTokens
-            count++
-        }
-        return Math.max(AUTO_BATCH_MIN, count)
+        const weights = lines.map(l => countTokens(String(l)))
+        return computeEvenBatchSize(weights, startIndex, budget)
     }
 
     /**

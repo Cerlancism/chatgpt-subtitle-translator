@@ -8,7 +8,7 @@ import { streamParse } from "./openai.mjs"
 import { timestampToMilliseconds } from "./subtitle.mjs"
 import { DefaultOptions } from "./translatorBase.mjs"
 import { roundWithPrecision } from "./helpers.mjs"
-import { Translator } from "./translator.mjs"
+import { Translator, computeEvenBatchSize } from "./translator.mjs"
 import { TranslatorStructuredTimestamp, toMsEntry } from "./translatorStructuredTimestamp.mjs"
 
 const scanBatchSchema = z.object({
@@ -66,9 +66,12 @@ export const CONSOLIDATION_MAX_TOKENS_MULTIPLIER = 1.5
 const agentInstructionTokenBudget = (useFullContext) => Math.floor(useFullContext * INSTRUCTION_BUDGET_FRACTION)
 
 /**
- * Returns the inclusive end index of a scan window starting at startIdx,
- * consuming entries until adding the next would exceed tokenBudget.
- * Always includes at least one entry.
+ * Returns the inclusive end index of a scan window starting at startIdx.
+ *
+ * Windows are evened out (see {@link computeEvenBatchSize}) so the remaining
+ * entries are spread across balanced windows rather than greedily filled, which
+ * would leave a small remainder window at the tail. Always includes at least one
+ * entry. With an unbounded budget (Infinity) the whole remaining range is one window.
  *
  * @param {TimestampEntry[]} entries
  * @param {number} startIdx
@@ -76,15 +79,10 @@ const agentInstructionTokenBudget = (useFullContext) => Math.floor(useFullContex
  * @returns {number} inclusive end index
  */
 function computeScanWindowEnd(entries, startIdx, tokenBudget) {
-    let totalTokens = 0
-    for (let i = startIdx; i < entries.length; i++) {
-        const entryTokens = countTokens(encodeToon({ inputs: [entries[i]].map(toMsEntry) }))
-        if (i > startIdx && totalTokens + entryTokens > tokenBudget) {
-            return i - 1
-        }
-        totalTokens += entryTokens
-    }
-    return entries.length - 1
+    if (!Number.isFinite(tokenBudget)) return entries.length - 1
+    const weights = entries.map(e => countTokens(encodeToon({ inputs: [toMsEntry(e)] })))
+    const count = computeEvenBatchSize(weights, startIdx, tokenBudget)
+    return Math.min(entries.length - 1, startIdx + Math.max(1, count) - 1)
 }
 
 
