@@ -41,8 +41,7 @@ const singleTimestampSchema = z.object({
 })
 
 const batchTimestampSchema = z.object({
-    outputs: timestampEntriesSchema,
-    remarksIfContainedMergers: z.string()
+    outputs: timestampEntriesSchema
 })
 
 const schemaDescriptions = {
@@ -51,12 +50,12 @@ const schemaDescriptions = {
     ].join("\n"),
     batch: [
         "outputs: Subtitle entries with start and end as milliseconds",
-        "remarksIfContainedMergers: MUST be empty if no merges! Otherwise: briefly explain why entries were merged in 1 short sentence. Only merge if the combined text remains readable as a subtitle (prefer keeping entries separate if the merged text would exceed ~42 characters).",
+        "Only merge entries if the combined text remains readable as a subtitle (prefer keeping entries separate if the merged text would exceed ~42 characters).",
     ].join("\n"),
 }
 
 /**
- * @typedef {{ outputs: TimestampEntry[], remarksIfContainedMergers: string }} BatchTimestampOutput
+ * @typedef {{ outputs: TimestampEntry[] }} BatchTimestampOutput
  */
 
 /**
@@ -196,10 +195,9 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @param {TimestampEntry[]} batch
      * @param {TimestampEntry[]} outputEntries
-     * @param {string} [remarksIfContainedMergers]
      * @returns {boolean}
      */
-    evaluateBatchOutput(batch, outputEntries, remarksIfContainedMergers = "") {
+    evaluateBatchOutput(batch, outputEntries) {
         const firstInputStart = batch[0].start
         const firstOutputStart = outputEntries[0]?.start
         const lastInputEnd = batch.at(-1).end
@@ -207,15 +205,14 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         const isMismatch = outputEntries.length === 0 || firstOutputStart !== firstInputStart || lastOutputEnd !== lastInputEnd
         const actuallyMerged = outputEntries.length !== batch.length
 
-        this.logMergeStatus(batch, outputEntries, remarksIfContainedMergers, isMismatch, actuallyMerged, lastInputEnd)
+        this.logMergeStatus(batch, outputEntries, isMismatch, actuallyMerged, lastInputEnd)
 
         if (isMismatch) {
             log.debug("[TranslatorStructuredTimestamp]",
                 "Timestamp boundary mismatch",
                 "expected start:", firstInputStart, "got:", firstOutputStart,
                 "expected end:", lastInputEnd, "got:", lastOutputEnd,
-                `(input: ${batch.length}, output: ${outputEntries.length})`,
-                ...(remarksIfContainedMergers ? [`remarks: "${remarksIfContainedMergers}"`] : [])
+                `(input: ${batch.length}, output: ${outputEntries.length})`
             )
         }
 
@@ -225,18 +222,11 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     /**
      * @param {TimestampEntry[]} batch
      * @param {TimestampEntry[]} outputEntries
-     * @param {string} remarksIfContainedMergers
      * @param {boolean} isMismatch
      * @param {boolean} actuallyMerged
      * @param {string} lastInputEnd
      */
-    logMergeStatus(batch, outputEntries, remarksIfContainedMergers, isMismatch, actuallyMerged, lastInputEnd) {
-        const declaredMerged = remarksIfContainedMergers !== ""
-        if (!isMismatch && declaredMerged !== actuallyMerged) {
-            log.warn("[TranslatorStructuredTimestamp]",
-                `Merge remarksIfContainedMergers mismatch: model ${declaredMerged ? `declared merging ("${remarksIfContainedMergers}")` : "provided no remarks"} but output count ${outputEntries.length} vs input ${batch.length}`)
-        }
-
+    logMergeStatus(batch, outputEntries, isMismatch, actuallyMerged, lastInputEnd) {
         if (!isMismatch && actuallyMerged) {
             const mergeIdx = outputEntries.findIndex((o, i) => batch[i] && o.start !== batch[i].start)
             const mergeStart = mergeIdx === -1 ? outputEntries.length : mergeIdx
@@ -257,8 +247,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 "Merging detected",
                 `(input: ${batch.length}, output: ${outputEntries.length})`,
                 `\n input:${inputToLog.map(fmtEntry).join("")}`,
-                `\n output:${outputToLog.map(fmtEntry).join("")}`,
-                remarksIfContainedMergers ? `\n remarks: ${remarksIfContainedMergers}` : ""
+                `\n output:${outputToLog.map(fmtEntry).join("")}`
             )
         }
     }
@@ -317,7 +306,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             const parsed = /** @type {BatchTimestampOutput} */ (/** @type {unknown} */ (output.content ?? {}))
             const outputEntries = parsed.outputs ?? []
 
-            const isMismatch = this.evaluateBatchOutput(batch, outputEntries, parsed.remarksIfContainedMergers ?? "")
+            const isMismatch = this.evaluateBatchOutput(batch, outputEntries)
 
             if (isMismatch || (batch.length > 1 && output.refusal)) {
                 this.promptTokensWasted += output.promptTokens
@@ -407,10 +396,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             }
         }
 
-        let remarksPrevLen = 0
-
         const pipeline = passThroughStream
-            .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text', '$.remarksIfContainedMergers'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
+            .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
 
         pipeline.on("data", (/** @type {{ value: string | number, key: string, partial: boolean }} */ { value, key, partial }) => {
             try {
@@ -443,19 +430,6 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     const pattern = this.checkRepetition(textBuffer)
                     if (pattern) {
                         this.abortOnRepetition(pattern, runner, textBuffer)
-                    }
-                } else if (key === "remarksIfContainedMergers") {
-                    const strValue = /** @type {string} */(value)
-                    if (strValue) {
-                        const delta = strValue.slice(remarksPrevLen)
-                        if (delta) {
-                            if (remarksPrevLen === 0) this.services.onStreamChunk?.("[remarks] ")
-                            this.services.onStreamChunk?.(delta)
-                        }
-                        remarksPrevLen = strValue.length
-                        if (!partial) {
-                            this.services.onStreamChunk?.("\n")
-                        }
                     }
                 }
             } catch (err) {
