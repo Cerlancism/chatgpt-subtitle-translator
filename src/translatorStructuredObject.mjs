@@ -3,7 +3,6 @@ import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
-import { streamParse, ChatStreamRepetitionError } from "./openai.mjs";
 
 const NestedPlaceholder = "nested_"
 
@@ -23,17 +22,12 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
 
     /**
      * @override
-     * @param {[string]} lines
-     * @returns {Promise<TranslationOutput>}
+     * @param {string[]} lines
+     * @returns {Promise<TranslationOutput<string[]>>}
      */
     async doTranslatePrompt(lines) {
-        // const text = lines.join("\n\n")
-        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
-        // const userMessage = { role: "user", content: `Translate from given schema` }
-        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
-        const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
-        const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext]
-        const max_tokens = this.getMaxToken(lines)
+        // No user message - the response schema itself conveys the input lines
+        const messages = this.buildPromptMessages()
 
         const structuredObject = {}
         for (const [key, value] of lines.entries()) {
@@ -51,18 +45,10 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
         const translationBatch = z.object({ ...structuredObject })
 
         try {
-            await this.services.cooler?.cool()
-
-            const output = await streamParse(this.services, {
-                messages,
-                ...this.options.createChatCompletionRequest,
-                stream: this.options.createChatCompletionRequest.stream,
-                max_tokens
-            }, {
+            const output = await this.requestStructured(lines, messages, {
                 structure: translationBatch,
                 name: "translation_object"
             }, {
-                onController: (c) => { this.streamController = c },
                 shouldAbort: (buffer) => this.checkRepetition(buffer),
             })
 
@@ -105,10 +91,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
 
             return TranslationOutput.fromCompletion(linesOut, output)
         } catch (error) {
-            if (!(error instanceof ChatStreamRepetitionError)) {
-                log.error("[TranslatorStructuredObject]", `Error ${error?.constructor?.name}`, error?.message)
-            }
-            return this.handleTranslateError(error, lines.length)
+            return this.logAndHandleTranslateError(error, lines.length)
         }
     }
 

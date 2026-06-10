@@ -81,11 +81,12 @@ export async function openaiRetryWrapper(func, maxRetries, description) {
 /**
  * Calls the OpenAI structured completion API (streaming or non-streaming) and returns the final completion.
  *
+ * @template {import('zod').ZodType} S
  * @param {import('./translator.mjs').TranslationServiceContext} services
  * @param {import('openai').OpenAI.ChatCompletionCreateParams} params
- * @param {{structure: import('zod').ZodType, name: string}} zFormat
+ * @param {{structure: S, name: string}} zFormat
  * @param {{jsonStream?: boolean, onJsonStream?: (runner: any) => void, onController?: (controller: AbortController) => void, shouldAbort?: (buffer: string) => string | null}} [opts]
- * @returns {Promise<import('openai/resources/chat/completions/completions.js').ParsedChatCompletion<any>>}
+ * @returns {Promise<import('openai/resources/chat/completions/completions.js').ParsedChatCompletion<import('zod').infer<S>>>}
  */
 export async function streamParse(services, params, zFormat, { jsonStream = false, onJsonStream, onController, shouldAbort } = {}) {
     const zodResponseFormatOutput = zodResponseFormat(zFormat.structure, zFormat.name)

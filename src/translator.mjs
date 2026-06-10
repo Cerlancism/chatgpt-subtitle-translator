@@ -78,10 +78,10 @@ export function computeEvenBatchSize(weights, startIndex, budget) {
  */
 
 /**
- * @template [T=string]
- * @template {T[]} [TLines=T[]]
- * @extends {TranslatorBase<T, TLines>}
- * Translator using ChatGPT - string-array implementation.
+ * @template [T=string] Input entry type
+ * @template [TOut=import('./translatorBase.mjs').LineOutput] Output type yielded by translateLines
+ * @extends {TranslatorBase<T, TOut>}
+ * Translator using ChatGPT - string-based implementation.
  */
 export class Translator extends TranslatorBase {
     /**
@@ -121,15 +121,25 @@ export class Translator extends TranslatorBase {
     }
 
     /**
+     * Plain-text content of one input entry, used for repetition guarding,
+     * moderation input and token weighting. Entry-based subclasses override.
+     * @param {T} line
+     * @returns {string}
+     */
+    getLineText(line) {
+        return String(line)
+    }
+
+    /**
      * Checks input lines for existing repetition patterns.
      * If the input already meets the guard threshold, raises the effective threshold to 3x to avoid false aborts.
-     * @param {(string | { text?: string })[]} lines
+     * @param {T[]} lines
      */
     adjustGuardForInputRepetition(lines) {
         this._effectiveGuardRepetition = undefined
         const threshold = this.options.guardRepetition
         if (!threshold) return
-        const text = lines.map(l => typeof l === 'string' ? l : (l.text ?? String(l))).join("\n")
+        const text = lines.map(l => this.getLineText(l)).join("\n")
         const pattern = detectRepetition(text, 2, 500, threshold)
         if (!pattern) return
         const boosted = threshold * 3
@@ -138,9 +148,11 @@ export class Translator extends TranslatorBase {
     }
 
     /**
-     * @template T
+     * Splits the raw model response into output lines, stripping any think block.
+     * String mode assumes T = string.
      * @param {T[]} inputLines
      * @param {string} rawContent
+     * @returns {T[]}
      */
     getOutput(inputLines, rawContent) {
         rawContent = rawContent.trim()
@@ -155,26 +167,20 @@ export class Translator extends TranslatorBase {
                 rawContent = rawContent.slice(endIndex)
             }
         }
-        if (inputLines.length === 1) {
-            return [rawContent.split("\n").join(" ")]
-        }
-        else {
-            return rawContent.split("\n").filter(x => x.trim().length > 0)
-        }
+        const lines = inputLines.length === 1
+            ? [rawContent.split("\n").join(" ")]
+            : rawContent.split("\n").filter(x => x.trim().length > 0)
+        return /** @type {T[]} */ (/** @type {unknown} */ (lines))
     }
 
     /**
      * @override
-     * @param {TLines} lines
-     * @returns {Promise<TranslationOutput>}
+     * @param {T[]} lines
+     * @returns {Promise<TranslationOutput<T[]>>}
      */
     async doTranslatePrompt(lines) {
         const text = lines.join("\n\n")
-        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
-        const userMessage = { role: "user", content: `${text}` }
-        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
-        const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
-        const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
+        const messages = this.buildPromptMessages(`${text}`)
         const max_tokens = this.getMaxToken(lines)
 
         const streamMode = this.options.createChatCompletionRequest.stream
@@ -247,28 +253,37 @@ export class Translator extends TranslatorBase {
     }
 
     /**
-     * @param {string[]} batch
+     * Translates a failed batch one entry at a time.
+     * @param {T[]} batch
+     * @returns {AsyncGenerator<TOut>}
      */
     async * translateSingle(batch) {
-        log.debug(`[Translator]`, "Single line mode")
+        log.debug(`[${this.constructor.name}]`, "Single line mode")
         batch = batch.slice(-this.currentBatchSize)
-        for (let x = 0; x < batch.length; x++) {
-            const input = batch[x]
+        for (const input of batch) {
             this.adjustGuardForInputRepetition([input])
             this.buildContext()
-            const output = await this.translatePrompt(/** @type {any} */ ([input]))
+            const output = await this.translatePrompt([input])
             this._effectiveGuardRepetition = undefined
-            const writeOut = output.content[0]
-            yield* this.yieldOutput([batch[x]], [writeOut], output.completionTokens)
+            yield* this.yieldSingleSuccess(input, output)
         }
+    }
+
+    /**
+     * Token weight of one input entry for dynamic batch sizing.
+     * @param {T} line
+     * @returns {number}
+     */
+    getLineTokenWeight(line) {
+        return countTokens(this.getLineText(line))
     }
 
     /**
      * Computes how many lines starting at startIndex fit within the dynamic batch budget fraction of the context token budget.
      * The reduction factor shrinks the budget *before* evening so the remaining
      * lines stay balanced even in a reduced state.
-     * Returns at least 3.
-     * @param {string[]} lines
+     * Returns at least AUTO_BATCH_MIN.
+     * @param {T[]} lines
      * @param {number} startIndex
      * @param {number} [reductionFactor]
      * @returns {number}
@@ -279,8 +294,50 @@ export class Translator extends TranslatorBase {
             return lines.length - startIndex
         }
         const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION / reductionFactor)
-        const weights = lines.map(l => countTokens(String(l)))
+        const weights = lines.map(l => this.getLineTokenWeight(l))
         return computeEvenBatchSize(weights, startIndex, budget)
+    }
+
+    /**
+     * Recomputes and logs the dynamic batch size for the batch starting at index.
+     * @param {T[]} lines
+     * @param {number} index
+     */
+    applyDynamicBatchSize(lines, index) {
+        this.currentBatchSize = this.computeDynamicBatchSize(lines, index, this.dynamicReductionFactor)
+        log.debug(`[${this.constructor.name}]`, "Dynamic batch size:", this.currentBatchSize,
+            this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`)
+    }
+
+    /**
+     * Decides how to recover after a failed batch (line mismatch, refusal or moderation flag).
+     * Shrinks the batch size for a retry when possible; otherwise signals the caller
+     * to fall back to single-entry mode. On "retry" the caller rewinds its loop index
+     * by `currentBatchSize` to resubmit the same range with the reduced size.
+     * @returns {"single" | "retry"}
+     */
+    resolveBatchFailure() {
+        if (this.isDynamicBatch) {
+            if (this.currentBatchSize <= AUTO_BATCH_MIN) {
+                this.dynamicReductionFactor = 1
+                return "single"
+            }
+            this.dynamicReductionFactor *= AUTO_BATCH_REDUCTION
+            return "retry"
+        }
+        return this.changeBatchSize("decrease") ? "retry" : "single"
+    }
+
+    /**
+     * Records the tokens of a failed batch as wasted and logs any refusal.
+     * @param {TranslationOutput<T[]>} output
+     */
+    recordWaste(output) {
+        this.promptTokensWasted += output.promptTokens
+        this.completionTokensWasted += output.completionTokens
+        if (output.refusal) {
+            log.debug(`[${this.constructor.name}]`, "Refusal:", output.refusal)
+        }
     }
 
     /**
@@ -308,91 +365,100 @@ export class Translator extends TranslatorBase {
     }
 
     /**
-     * @param {string[]} lines
+     * Text submitted to the moderation endpoint for a batch.
+     * @param {T[]} batch
+     * @returns {string}
+     */
+    getModerationInput(batch) {
+        return batch.map(l => this.getLineText(l)).join("\n\n")
+    }
+
+    /**
+     * Emits the outputs of a successful batch and records them into the history.
+     * String mode assumes T = string; entry-based subclasses override.
+     * @param {T[]} batch
+     * @param {T[]} outputs
+     * @param {TranslationOutput<T[]>} output
+     * @returns {Generator<TOut>}
+     */
+    * yieldBatchSuccess(batch, outputs, output) {
+        // Lines are translated in batches but the model returns a single token count
+        // for the whole batch request. Since workingProgress is stored per entry and
+        // buildContext() slices and sums costs per entry, we divide evenly so that
+        // summing any subset of entries approximates the proportional token cost.
+        const sources = /** @type {string[]} */ (/** @type {unknown} */ (batch))
+        const transforms = /** @type {string[]} */ (/** @type {unknown} */ (outputs))
+        yield* this.yieldOutput(sources, transforms, output.completionTokens / outputs.length)
+    }
+
+    /**
+     * Emits the output of one successfully translated entry in single mode.
+     * String mode assumes T = string; entry-based subclasses override.
+     * @param {T} input
+     * @param {TranslationOutput<T[]>} output
+     * @returns {Generator<TOut>}
+     */
+    * yieldSingleSuccess(input, output) {
+        const source = /** @type {string} */ (/** @type {unknown} */ (input))
+        const transform = /** @type {string} */ (/** @type {unknown} */ (output.content[0]))
+        yield* this.yieldOutput([source], [transform], output.completionTokens)
+    }
+
+    /**
+     * @param {T[]} lines
+     * @returns {AsyncGenerator<TOut>}
      */
     async * translateLines(lines) {
-        log.debug("[Translator]", "System Instruction:", this.systemInstruction)
+        log.debug(`[${this.constructor.name}]`, "System Instruction:", this.systemInstruction)
         this.aborted = false
         this.workingLines = lines
         const theEnd = this.end ?? lines.length
 
         for (let index = this.offset, reducedBatchSessions = 0; index < theEnd; index += this.currentBatchSize) {
             if (this.isDynamicBatch) {
-                this.currentBatchSize = this.computeDynamicBatchSize(lines, index, this.dynamicReductionFactor)
-                log.debug("[Translator]", "Dynamic batch size:", this.currentBatchSize,
-                    this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`)
+                this.applyDynamicBatchSize(lines, index)
             }
 
             let batch = lines.slice(index, index + this.currentBatchSize).map((x, i) => this.preprocessLine(x, i, index))
 
             if (this.options.useModerator && !this.services.moderationService) {
-                log.warn("[Translator]", "Moderation service requested but not configured, no moderation applied")
+                log.warn(`[${this.constructor.name}]`, "Moderation service requested but not configured, no moderation applied")
             }
 
             if (this.options.useModerator && this.services.moderationService) {
-                const inputForModeration = batch.join("\n\n")
-                const moderationData = await checkModeration(inputForModeration, this.services.moderationService, this.options.moderationModel)
+                const moderationData = await checkModeration(this.getModerationInput(batch), this.services.moderationService, this.options.moderationModel)
                 if (moderationData.flagged) {
-                    if (this.isDynamicBatch) {
-                        if (this.currentBatchSize <= AUTO_BATCH_MIN) {
-                            yield* this.translateSingle(batch)
-                            this.dynamicReductionFactor = 1
-                        } else {
-                            this.dynamicReductionFactor *= AUTO_BATCH_REDUCTION
-                            index -= this.currentBatchSize
-                        }
+                    if (this.resolveBatchFailure() === "single") {
+                        yield* this.translateSingle(batch)
                     } else {
-                        if (!this.changeBatchSize('decrease')) {
-                            yield* this.translateSingle(batch)
-                        } else {
-                            index -= this.currentBatchSize
-                        }
+                        index -= this.currentBatchSize
                     }
                     continue
                 }
             }
             this.adjustGuardForInputRepetition(batch)
             this.buildContext()
-            const output = await this.translatePrompt(/** @type {any} */ (batch))
+            const output = await this.translatePrompt(batch)
             this._effectiveGuardRepetition = undefined
 
             if (this.aborted) {
-                log.debug("[Translator]", "Aborted")
+                log.debug(`[${this.constructor.name}]`, "Aborted")
                 return
             }
 
-            let outputs = output.content
+            const outputs = /** @type {T[]} */ (output.content)
 
-            if (this.evaluateBatchOutput(/** @type {T[]} */ (batch), /** @type {T[]} */ (outputs)) || (batch.length > 1 && output.refusal)) {
-                this.promptTokensWasted += output.promptTokens
-                this.completionTokensWasted += output.completionTokens
+            if (this.evaluateBatchOutput(batch, outputs) || (batch.length > 1 && output.refusal)) {
+                this.recordWaste(output)
 
-                if (output.refusal) {
-                    log.debug(`[Translator]`, "Refusal: ", output.refusal)
-                }
-
-                if (this.isDynamicBatch) {
-                    if (this.currentBatchSize <= AUTO_BATCH_MIN) {
-                        yield* this.translateSingle(batch)
-                        this.dynamicReductionFactor = 1
-                    } else {
-                        this.dynamicReductionFactor *= AUTO_BATCH_REDUCTION
-                        index -= this.currentBatchSize
-                    }
+                if (this.resolveBatchFailure() === "single") {
+                    yield* this.translateSingle(batch)
                 } else {
-                    if (this.changeBatchSize("decrease")) {
-                        index -= this.currentBatchSize
-                    } else {
-                        yield* this.translateSingle(batch)
-                    }
+                    index -= this.currentBatchSize
                 }
             }
             else {
-                // Lines are translated in batches but the model returns a single token count
-                // for the whole batch request. Since workingProgress is stored per entry and
-                // buildContext() slices and sums costs per entry, we divide evenly so that
-                // summing any subset of entries approximates the proportional token cost.
-                yield* this.yieldOutput(batch, outputs, output.completionTokens / outputs.length)
+                yield* this.yieldBatchSuccess(batch, outputs, output)
 
                 const adjusted = this.adjustBatchOnSuccess(reducedBatchSessions)
                 reducedBatchSessions = adjusted.reducedBatchSessions
@@ -404,9 +470,12 @@ export class Translator extends TranslatorBase {
     }
 
     /**
+     * Builds and yields per-line output records, recording them into workingProgress.
+     * String mode only - assumes TOut is {@link import('./translatorBase.mjs').LineOutput}.
      * @param {string[]} promptSources
      * @param {string[]} promptTransforms
      * @param {number} [completionTokensPerEntry] Completion token cost per entry from the model response, for context budget tracking
+     * @returns {Generator<TOut>}
      */
     * yieldOutput(promptSources, promptTransforms, completionTokensPerEntry) {
         for (let index = 0; index < promptSources.length; index++) {
@@ -436,21 +505,25 @@ export class Translator extends TranslatorBase {
             }
             this.workingProgress.push({ source: promptSource, transform: promptTransform, completionTokens: completionTokensPerEntry })
             const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform, finalTransform }
-            yield output
+            yield /** @type {TOut} */ (/** @type {unknown} */ (output))
         }
     }
 
     /**
-     * @param {string} line
+     * Prepares one input entry for the prompt. String mode flattens newlines and
+     * optionally applies a numeric prefix; entry-based subclasses override.
+     * @param {T} line
      * @param {number} index
      * @param {number} offset
+     * @returns {T}
      */
     preprocessLine(line, index, offset) {
-        line = line.replaceAll("\n", " \\N ")
+        let text = /** @type {string} */ (/** @type {unknown} */ (line))
+        text = text.replaceAll("\n", " \\N ")
         if (this.options.prefixNumber) {
-            line = `${offset + index + 1}. ${line}`
+            text = `${offset + index + 1}. ${text}`
         }
-        return line
+        return /** @type {T} */ (/** @type {unknown} */ (text))
     }
 
     /**
@@ -476,7 +549,7 @@ export class Translator extends TranslatorBase {
             return;
         }
 
-        const chunkSize = this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? this.currentBatchSize
+        const chunkSize = this.contextChunkSize
 
         // Group all history into fixed-size chunks of batchSizes[last]
         const allChunks = []
@@ -491,24 +564,21 @@ export class Translator extends TranslatorBase {
 
         const sliced = includedChunks.flat()
 
-        if (this.options.useFullContext > 0) {
-            const logSliceContext = sliced.length < this.workingProgress.length
-                ? `sliced ${this.workingProgress.length - sliced.length} entries (${sliced.length}/${this.workingProgress.length} kept, ${tokenCount} tokens)`
-                : `all (${sliced.length} entries, ${tokenCount} tokens)`
-            log.debug("[Translator]", "Context:", logSliceContext)
-        }
+        this.logContextSelection(sliced.length, this.workingProgress.length, tokenCount)
 
         const offset = this.workingProgress.length - sliced.length;
 
         /**
          * @param {string} text
          * @param {number} index
+         * @returns {string}
          */
         const checkFlaggedMapper = (text, index) => {
             const id = index + (offset < 0 ? 0 : offset);
             if (this.moderatorFlags.has(id)) {
                 // log.warn("[Translator]", "Prompt Flagged", id, text)
-                return this.preprocessLine("-", id, 0);
+                const placeholder = /** @type {T} */ (/** @type {unknown} */ ("-"));
+                return this.getLineText(this.preprocessLine(placeholder, id, 0));
             }
             return text;
         };
@@ -524,7 +594,7 @@ export class Translator extends TranslatorBase {
      */
     getContext(sourceLines, transformLines) {
         const chunks = [];
-        const chunkSize = this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? this.currentBatchSize;
+        const chunkSize = this.contextChunkSize;
         for (let i = 0; i < sourceLines.length; i += chunkSize) {
             const sourceChunk = sourceLines.slice(i, i + chunkSize);
             const transformChunk = transformLines.slice(i, i + chunkSize);

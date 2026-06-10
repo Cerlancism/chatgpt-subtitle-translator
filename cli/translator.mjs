@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs'
 import path from 'node:path';
-import url from 'url'
 import readline from 'node:readline'
 import * as undici from 'undici';
 
@@ -173,55 +172,50 @@ function buildOptions(opts) {
  * @param {boolean} [agentMode]
  */
 async function run(opts, options, agentMode = false) {
+    /** Wraps a progress output callback to a no-op when the log level is silent. @template {Function} F @param {F} fn */
+    const unlessSilent = (fn) => log.getLevel() === log.levels.SILENT ? () => { } : fn
+
     /**
      * @type {import('../src/translator.mjs').TranslationServiceContext}
      */
     const services = {
         openai,
         cooler: coolerChatGPTAPI,
-        onStreamChunk: log.getLevel() === log.levels.SILENT ? () => { } : (data) => {
-            return process.stdout.write(data);
-        },
-        onStreamEnd: log.getLevel() === log.levels.SILENT ? () => { } : () => {
-            return process.stdout.write("\n");
-        },
-        onClearLine: log.getLevel() === log.levels.SILENT ? () => { } : () => {
+        onStreamChunk: unlessSilent((data) => {
+            process.stdout.write(data)
+        }),
+        onStreamEnd: unlessSilent(() => {
+            process.stdout.write("\n")
+        }),
+        onClearLine: unlessSilent(() => {
             readline.clearLine(process.stdout, 0)
             readline.cursorTo(process.stdout, 0)
-        },
+        }),
         moderationService: {
             openai,
             cooler: coolerOpenAIModerator
         }
     }
 
+    const structuredTranslators = {
+        array: TranslatorStructuredArray,
+        timestamp: TranslatorStructuredTimestamp,
+        object: TranslatorStructuredObject,
+    }
+
     function getTranslator() {
-        if (agentMode) {
-            if (options.structuredMode === "array" || !options.structuredMode) {
-                const inner = new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
-                return new TranslatorAgent({ from: opts.from, to: opts.to }, services, options, inner);
-            }
-            else if (options.structuredMode === "timestamp") {
-                const inner = new TranslatorStructuredTimestamp({ from: opts.from, to: opts.to }, services, options);
-                return new TranslatorAgent({ from: opts.from, to: opts.to }, services, options, inner);
-            }
-            else {
-                log.error("[CLI]", `Unsupported agent delegate mode: ${options.structuredMode}`)
-                process.exit(1)
-            }
+        const language = { from: opts.from, to: opts.to }
+        if (!agentMode) {
+            const TranslatorClass = structuredTranslators[options.structuredMode] ?? Translator
+            return new TranslatorClass(language, services, options)
         }
-        else if (options.structuredMode === "array") {
-            return new TranslatorStructuredArray({ from: opts.from, to: opts.to }, services, options);
+        // Agent mode composes an inner delegate; only array (default) and timestamp are supported
+        const DelegateClass = structuredTranslators[options.structuredMode ?? "array"]
+        if (DelegateClass !== TranslatorStructuredArray && DelegateClass !== TranslatorStructuredTimestamp) {
+            log.error("[CLI]", `Unsupported agent delegate mode: ${options.structuredMode}`)
+            process.exit(1)
         }
-        else if (options.structuredMode === "timestamp") {
-            return new TranslatorStructuredTimestamp({ from: opts.from, to: opts.to }, services, options);
-        }
-        else if (options.structuredMode === "object") {
-            return new TranslatorStructuredObject({ from: opts.from, to: opts.to }, services, options);
-        }
-        else {
-            return new Translator({ from: opts.from, to: opts.to }, services, options);
-        }
+        return new TranslatorAgent(language, services, options, new DelegateClass(language, services, options))
     }
 
     const translator = getTranslator()
@@ -231,12 +225,12 @@ async function run(opts, options, agentMode = false) {
     }
 
     if (opts.plainText) {
-        if (opts.structured === "timestamp" || (agentMode && options.structuredMode === "timestamp")) {
+        if (options.structuredMode === "timestamp") {
             log.error("[CLI]", "--plain-text is not supported in timestamp mode.")
             process.exit(1)
         }
-        if (!(translator instanceof Translator)) throw new Error("Expected Translator")
-        await translatePlainText(translator, opts.plainText)
+        if (!(translator instanceof Translator || translator instanceof TranslatorAgent)) throw new Error("Expected Translator or TranslatorAgent")
+        await runWithErrorExit(() => translatePlainText(translator, opts.plainText))
     }
     else if (opts.input) {
         const fileTag = opts.systemInstruction ? "Custom" : opts.to
@@ -266,27 +260,29 @@ async function translateSrtFile(translator, opts, options, agentMode, fileTag) {
     if (isNoResumeMode) {
         log.warn("[CLI]", `${agentMode ? "Agent" : "Timestamp"} mode: progress resumption is not supported, starting from beginning.`)
         fs.writeFileSync(outputFile, '')
-        if (options.structuredMode === "timestamp") {
-            if (!(translator instanceof TranslatorStructuredTimestamp || translator instanceof TranslatorAgent)) {
-                throw new Error("Expected TranslatorStructuredTimestamp or TranslatorAgent")
-            }
-            await runWithErrorExit(() => translateTimestampSrt(translator, srtArraySource, outputFile))
-        } else if (translator instanceof TranslatorAgent) {
-            const srtArrayWorking = subtitleParser.fromSrt(text)
-            await runWithErrorExit(() => writeSrtTranslation(translator, srtArraySource.map(x => x.text), srtArrayWorking, outputFile))
+    }
+
+    if (options.structuredMode === "timestamp") {
+        if (!(translator instanceof TranslatorStructuredTimestamp || translator instanceof TranslatorAgent)) {
+            throw new Error("Expected TranslatorStructuredTimestamp or TranslatorAgent")
         }
+        await runWithErrorExit(() => translateTimestampSrt(translator, srtArraySource, outputFile))
+        return
     }
-    else {
-        const srtArrayWorking = subtitleParser.fromSrt(text)
-        const sourceLines = srtArraySource.map(x => x.text)
-        const progressFile = `${opts.input}.progress_${fileTag}.csv`
 
-        if (translator instanceof TranslatorStructuredTimestamp) throw new Error("Unexpected TranslatorStructuredTimestamp")
+    const srtArrayWorking = subtitleParser.fromSrt(text)
+    const sourceLines = srtArraySource.map(x => x.text)
 
-        const baseTranslator = /** @type {import('../src/translator.mjs').Translator} */ (translator)
-        await resumeProgress(baseTranslator, sourceLines, progressFile, outputFile)
-        await runWithErrorExit(() => writeSrtTranslation(baseTranslator, sourceLines, srtArrayWorking, outputFile, progressFile))
+    if (translator instanceof TranslatorAgent) {
+        await runWithErrorExit(() => writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile))
+        return
     }
+
+    if (translator instanceof TranslatorStructuredTimestamp) throw new Error("Unexpected TranslatorStructuredTimestamp")
+
+    const progressFile = `${opts.input}.progress_${fileTag}.csv`
+    await resumeProgress(translator, sourceLines, progressFile, outputFile)
+    await runWithErrorExit(() => writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile, progressFile))
 }
 
 /**
@@ -300,7 +296,7 @@ async function translateTextFile(translator, opts, fileTag) {
     const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}${ext}`
     const text = fs.readFileSync(opts.input, 'utf-8')
     fs.writeFileSync(outputFile, '')
-    await translatePlainText(translator, text, outputFile)
+    await runWithErrorExit(() => translatePlainText(translator, text, outputFile))
 }
 
 /**
@@ -323,7 +319,9 @@ async function runWithErrorExit(fn) {
 async function translateTimestampSrt(translator, srtArraySource, outputFile) {
     const timestampSource = srtArraySource.map(e => ({ start: e.startTime, end: e.endTime, text: e.text }))
     let outputId = 1
-    for await (const srtOut of translator.translateSrtLines(timestampSource)) {
+    for await (const output of translator.translateLines(timestampSource)) {
+        // Timestamp delegates always yield TimestampEntry
+        const srtOut = /** @type {import('../src/translatorStructuredTimestamp.mjs').TimestampEntry} */ (output)
         const entry = {
             id: String(outputId),
             startTime: srtOut.start,
@@ -385,7 +383,9 @@ async function resumeProgress(translator, sourceLines, progressFile, outputFile)
  * @param {string} [progressFile]
  */
 async function writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile, progressFile) {
-    for await (const output of translator.translateLines(sourceLines)) {
+    for await (const out of translator.translateLines(sourceLines)) {
+        // String-based translators always yield LineOutput records
+        const output = /** @type {import('../src/translatorBase.mjs').LineOutput} */ (out)
         const srtEntry = srtArrayWorking[output.index - 1]
         srtEntry.text = output.finalTransform
         const outSrt = subtitleParser.toSrt([srtEntry])
@@ -399,25 +399,26 @@ async function writeSrtTranslation(translator, sourceLines, srtArrayWorking, out
     }
 }
 
+/**
+ * @param {import('../src/translator.mjs').Translator | import('../src/translatorAgent.mjs').TranslatorAgent} translator
+ * @param {string} text
+ * @param {string} [outfile]
+ */
 async function translatePlainText(translator, text, outfile) {
     const lines = text.split(/\r?\n/)
     if (lines[lines.length - 1].length === 0) {
         lines.pop()
     }
-    try {
-        for await (const output of translator.translateLines(lines)) {
-            if (!translator.options.createChatCompletionRequest.stream) {
-                log.info(output.transform)
-            }
-            if (outfile) {
-                fs.appendFileSync(outfile, output.transform + "\n")
-            }
+    for await (const out of translator.translateLines(lines)) {
+        // String-based translators always yield LineOutput records
+        const output = /** @type {import('../src/translatorBase.mjs').LineOutput} */ (out)
+        if (!translator.options.createChatCompletionRequest.stream) {
+            log.info(output.transform)
         }
-    } catch (error) {
-        log.error("[CLI]", "Error", error)
-        process.exit(1)
+        if (outfile) {
+            fs.appendFileSync(outfile, output.transform + "\n")
+        }
     }
-
 }
 
 /**

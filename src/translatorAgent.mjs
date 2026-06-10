@@ -237,8 +237,9 @@ export class TranslatorAgent {
 
     /**
      * Convenience wrapper: calls the shared streamParse with this agent's services and controller binding.
+     * @template {import('zod').ZodType} S
      * @param {import('openai').OpenAI.ChatCompletionCreateParams} params
-     * @param {{structure: import('zod').ZodType, name: string}} zFormat
+     * @param {{structure: S, name: string}} zFormat
      */
     _streamParse(params, zFormat) {
         return streamParse(this.services, params, zFormat, { onController: (c) => { this.streamController = c } })
@@ -890,15 +891,13 @@ export class TranslatorAgent {
     }
 
     /**
-     * Runs planning then translates SRT entries via the delegate.
-     * Entry point for timestamp-based delegates.
+     * Shared pre-translation phase: runs the planning passes, applies the accumulated
+     * instruction to the delegate, then verifies the output language on a small sample.
      *
-     * @param {TimestampEntry[]} entries
+     * @param {TimestampEntry[]} entries - entries to plan over (real or synthesized)
+     * @param {string[]} sampleTexts - raw texts used for output language verification
      */
-    async * translateSrtLines(entries) {
-        log.debug("[TranslatorAgent]", "Starting agentic multi-pass translation,",
-            entries.length, "total entries")
-
+    async _planAndVerify(entries, sampleTexts) {
         const { instruction } = await this._runPlanning(entries)
 
         // Apply accumulated instruction to delegate
@@ -909,55 +908,55 @@ export class TranslatorAgent {
         }
 
         // Verify output language with a small sample before starting full translation
-        const srtSample = entries.slice(0, Math.min(VERIFY_SAMPLE_SIZE, entries.length))
-        await this._verifyLanguageWithSample(srtSample.map(e => e.text))
-
-        // Pass 2: delegate handles batching
-        log.debug("[TranslatorAgent]", "Pass 2 (Translation): delegating to translateSrtLines")
-        const delegate = /** @type {TranslatorStructuredTimestamp} */ (this.delegate)
-        yield* delegate.translateSrtLines(entries)
+        await this._verifyLanguageWithSample(sampleTexts.slice(0, VERIFY_SAMPLE_SIZE))
     }
 
     /**
-     * Runs planning then translates lines via the delegate.
-     * Entry point for array-based delegates.
+     * Runs planning then translates via the delegate. Accepts the delegate's input type:
+     * TimestampEntry objects for timestamp delegates, plain strings otherwise
+     * (synthesized into timestamp entries for the planning passes).
      *
-     * @param {string[]} lines
+     * @param {string[] | TimestampEntry[]} items
+     * @returns {AsyncGenerator<import('./translatorBase.mjs').LineOutput | TimestampEntry>}
      */
-    async * translateLines(lines) {
-        log.debug("[TranslatorAgent]", "Starting agentic multi-pass translation (array mode),",
-            lines.length, "total lines")
+    async * translateLines(items) {
+        log.debug("[TranslatorAgent]", "Starting agentic multi-pass translation,",
+            items.length, "total entries")
 
-        // Convert lines to TimestampEntry for planning (synthesize dummy timestamps)
-        const toTimestamp = (s) => {
+        const isTimestampMode = this.delegate instanceof TranslatorStructuredTimestamp
+
+        // Synthesize dummy timestamps for planning when input is plain lines
+        const toTimestamp = (/** @type {number} */ s) => {
             const h = Math.floor(s / 3600)
             const m = Math.floor((s % 3600) / 60)
             const sec = s % 60
             return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')},000`
         }
-        const entries = lines.map((text, i) => ({
-            start: toTimestamp(i),
-            end: toTimestamp(i + 1),
-            text
-        }))
+        const entries = isTimestampMode
+            ? /** @type {TimestampEntry[]} */ (items)
+            : /** @type {string[]} */ (items).map((text, i) => ({
+                start: toTimestamp(i),
+                end: toTimestamp(i + 1),
+                text
+            }))
 
-        const { instruction } = await this._runPlanning(entries)
-
-        // Apply accumulated instruction to delegate
-        this.delegate.systemInstruction = instruction
-
-        if (instruction !== this.systemInstruction) {
-            log.debug("[TranslatorAgent]", `System instruction updated:\n${instruction}`)
-        }
-
-        // Verify output language with a small sample before starting full translation
-        const lineSample = lines.slice(0, Math.min(VERIFY_SAMPLE_SIZE, lines.length))
-        await this._verifyLanguageWithSample(lineSample)
+        await this._planAndVerify(entries, entries.map(e => e.text))
 
         // Pass 2: delegate handles batching
-        log.debug("[TranslatorAgent]", "Pass 2 (Translation): delegating to translateLines")
-        const delegate = /** @type {Translator} */ (this.delegate)
-        yield* delegate.translateLines(lines)
+        log.debug("[TranslatorAgent]", "Pass 2 (Translation): delegating to", this.delegate.constructor.name)
+        if (isTimestampMode) {
+            yield* /** @type {TranslatorStructuredTimestamp} */ (this.delegate).translateLines(entries)
+        } else {
+            yield* /** @type {Translator} */ (this.delegate).translateLines(/** @type {string[]} */ (items))
+        }
+    }
+
+    /**
+     * @deprecated Use {@link translateLines} instead.
+     * @param {TimestampEntry[]} entries
+     */
+    async * translateSrtLines(entries) {
+        yield* this.translateLines(entries)
     }
 
     /**

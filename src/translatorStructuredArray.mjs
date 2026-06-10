@@ -5,7 +5,6 @@ import log from "loglevel"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
-import { streamParse } from "./openai.mjs";
 
 export class TranslatorStructuredArray extends TranslatorStructuredBase {
     /**
@@ -19,59 +18,32 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
 
     /**
      * @override
-     * @param {[string]} lines
-     * @returns {Promise<TranslationOutput>}
+     * @param {string[]} lines
+     * @returns {Promise<TranslationOutput<string[]>>}
      */
     async doTranslatePrompt(lines) {
-        // const text = lines.join("\n\n")
-        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */
-        const userMessage = { role: "user", content: JSON.stringify({ inputs: lines }) }
-        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
-        const systemMessage = this.systemInstruction ? [{ role: "system", content: `${this.systemInstruction}` }] : []
-        const messages = [...systemMessage, ...this.options.initialPrompts, ...this.promptContext, userMessage]
-        const max_tokens = this.getMaxToken(lines)
+        const messages = this.buildPromptMessages(JSON.stringify({ inputs: lines }))
 
         const structuredArray = z.object({
             outputs: z.array(z.string())
         })
 
         try {
-            await this.services.cooler?.cool()
-
-            const output = await streamParse(this.services, {
-                messages,
-                ...this.options.createChatCompletionRequest,
-                stream: this.options.createChatCompletionRequest.stream,
-                max_tokens
-            }, {
+            const output = await this.requestStructured(lines, messages, {
                 structure: structuredArray,
                 name: "translation_array"
             }, {
                 jsonStream: true,
                 onJsonStream: (runner) => this.jsonStreamParse(runner),
-                onController: (c) => { this.streamController = c },
             })
 
-            // log.debug("[TranslatorStructuredArray]", output.choices[0].message.content)
-
-            const translationCandidate = output.choices[0].message
-
-            const getLinesOutput = async (/** @type {import("openai/resources/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */ translation) => {
-                if (translation.refusal) {
-                    return [translation.refusal]
-                }
-
-                return translation.parsed.outputs
-            }
-
-            const linesOut = await getLinesOutput(translationCandidate)
+            /** @type {import("openai/resources/chat/completions.mjs").ParsedChatCompletionMessage<{ outputs?: string[]; }>} */
+            const translation = output.choices[0].message
+            const linesOut = translation.refusal ? [translation.refusal] : translation.parsed.outputs
 
             return TranslationOutput.fromCompletion(linesOut, output)
         } catch (error) {
-            if (!this._repetitionDetected) {
-                log.error("[TranslatorStructuredArray]", `Error ${error?.constructor?.name}`, error?.message)
-            }
-            return this.handleTranslateError(error, lines.length)
+            return this.logAndHandleTranslateError(error, lines.length)
         }
     }
 

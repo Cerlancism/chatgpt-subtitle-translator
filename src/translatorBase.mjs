@@ -75,9 +75,18 @@ export const DefaultOptions = {
 }
 
 /**
+ * Output record yielded per line by string-based translators.
+ * @typedef LineOutput
+ * @property {number} index
+ * @property {string} source
+ * @property {string} transform
+ * @property {string} finalTransform
+ */
+
+/**
  * @abstract
- * @template [T=string]
- * @template {T[]} [TLines=T[]]
+ * @template [T=string] Input entry type
+ * @template [TOut=LineOutput] Output type yielded by translateLines
  * Abstract base class for all translator implementations.
  * Holds shared state (token counters, options, batch sizes) and utility methods
  * (abort, usage tracking, batch size management, token budget slicing).
@@ -125,8 +134,11 @@ export class TranslatorBase {
 
     /**
      * @abstract
-     * @param {string[]} _lines
-     * @returns {AsyncGenerator<{index: number, source: string, transform: string, finalTransform: string}>}
+     * Translates input entries, yielding outputs as they complete.
+     * String-based translators yield {@link LineOutput} records;
+     * entry-based translators (timestamp) yield their entry type.
+     * @param {T[]} _lines
+     * @returns {AsyncGenerator<TOut>}
      */
     async * translateLines(_lines) {
         throw new Error(`${this.constructor.name}.translateLines() is not implemented`)
@@ -134,8 +146,8 @@ export class TranslatorBase {
 
     /**
      * Timing and accumulation wrapper - subclasses override doTranslatePrompt, not this.
-     * @param {TLines} lines
-     * @returns {Promise<import('./translatorOutput.mjs').TranslationOutput>}
+     * @param {T[]} lines
+     * @returns {Promise<import('./translatorOutput.mjs').TranslationOutput<T[]>>}
      */
     async translatePrompt(lines) {
         const startTime = Date.now()
@@ -147,15 +159,32 @@ export class TranslatorBase {
 
     /**
      * @abstract
-     * @param {TLines} _lines
-     * @returns {Promise<import('./translatorOutput.mjs').TranslationOutput>}
+     * @param {T[]} _lines
+     * @returns {Promise<import('./translatorOutput.mjs').TranslationOutput<T[]>>}
      */
     async doTranslatePrompt(_lines) {
         throw new Error(`${this.constructor.name}.doTranslatePrompt() is not implemented`)
     }
 
     /**
-     * @param {TLines} lines
+     * Assembles the chat messages for a translation prompt:
+     * system instruction, initial prompts, accumulated context, then the user content.
+     * @param {string} [userContent] - omit to send no user message (schema-only modes)
+     * @param {string} [systemContent] - defaults to the system instruction
+     * @returns {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]}
+     */
+    buildPromptMessages(userContent, systemContent = this.systemInstruction) {
+        /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */
+        const messages = systemContent ? [{ role: "system", content: `${systemContent}` }] : []
+        messages.push(...this.options.initialPrompts, ...this.promptContext)
+        if (userContent !== undefined) {
+            messages.push({ role: "user", content: userContent })
+        }
+        return messages
+    }
+
+    /**
+     * @param {T[]} lines
      */
     getMaxToken(lines) {
         if (this.options.max_token && !this.options.inputMultiplier) {
@@ -199,9 +228,10 @@ export class TranslatorBase {
 
     /**
      * Accumulates token usage from a translatePrompt response into running totals, then returns the output.
-     * @param {import('./translatorOutput.mjs').TranslationOutput} output
+     * @template C
+     * @param {import('./translatorOutput.mjs').TranslationOutput<C>} output
      * @param {number} elapsedMs - time elapsed for this request in milliseconds
-     * @returns {import('./translatorOutput.mjs').TranslationOutput}
+     * @returns {import('./translatorOutput.mjs').TranslationOutput<C>}
      */
     accumulateUsage(output, elapsedMs) {
         this.promptTokensUsed += output.promptTokens
@@ -211,6 +241,30 @@ export class TranslatorBase {
         this.contextCompletionTokens = output.completionTokens
         this.tokensProcessTimeMs += elapsedMs
         return output
+    }
+
+    /**
+     * History chunk size for context building: the last (largest) fixed batch size,
+     * or the current batch size in dynamic mode.
+     */
+    get contextChunkSize() {
+        return this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? this.currentBatchSize
+    }
+
+    /**
+     * Logs which portion of the translation history was kept for the prompt context.
+     * @param {number} includedEntries
+     * @param {number} totalEntries
+     * @param {number} tokenCount
+     */
+    logContextSelection(includedEntries, totalEntries, tokenCount) {
+        if (this.options.useFullContext <= 0) {
+            return
+        }
+        const message = includedEntries < totalEntries
+            ? `sliced ${totalEntries - includedEntries} entries (${includedEntries}/${totalEntries} kept, ${tokenCount} tokens)`
+            : `all (${includedEntries} entries, ${tokenCount} tokens)`
+        log.debug(`[${this.constructor.name}]`, "Context:", message)
     }
 
     /**
