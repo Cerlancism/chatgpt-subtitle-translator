@@ -1,5 +1,61 @@
 # Changelog
 
+## 3.4.0 (draft)
+
+### Deprecations
+
+#### `translateSrtLines` deprecated (library API)
+
+`TranslatorStructuredTimestamp.translateSrtLines()` (introduced with timestamp mode in 3.0.0) and `TranslatorAgent.translateSrtLines()` (introduced with agent mode in 3.1.0) are deprecated and now simply delegate to `translateLines()`, which accepts the translator's input entry type directly - plain strings for the string-based modes, timestamp entries for `timestamp` mode - and yields the matching output type.
+
+```js
+// deprecated
+for await (const output of translator.translateSrtLines(entries)) { /* ... */ }
+
+// preferred
+for await (const output of translator.translateLines(entries)) { /* ... */ }
+```
+
+CLI usage is unaffected.
+
+### New Features
+
+#### Evened-out auto batch sizes
+
+When `--batch-sizes` is omitted, batch sizes are now spread evenly across the remaining lines instead of greedily filled to the token budget. Greedy filling left a small remainder batch at the tail (e.g. 100 lines packing 30 per batch produced batches of 30/30/30/10); the same lines now translate as 25/25/25/25, improving context consistency and prompt cache utilization across batches.
+
+The same evening applies to agent-mode planning scan windows, and is preserved while the batch size is temporarily reduced after a failure.
+
+#### Moderation support in `timestamp` mode
+
+`--use-moderator` now works in `-r timestamp` mode (previously it was silently ignored). The moderation check inspects only the text content of each batch - timestamps are excluded.
+
+As in the other modes, moderation serves to prevent token wastage when the model is highly likely to refuse a batch, not as a content gate: flagged batches are retried at smaller sizes, ultimately falling back to single-entry translation.
+
+#### Timestamp mode: merge remarks field removed
+
+The `timestamp` mode output schema no longer includes the `remarksIfContainedMergers` field, reducing output tokens per batch. The merge readability guidance (keep merged text within ~42 characters) is retained in the schema description.
+
+### Fixes
+
+#### Auto batch size recovers gradually after failures
+
+In auto batch mode, a failure reduces the batch size for retries, previously a single successful batch immediately restored the full size, which could thrash between failing large batches and recovering. The reduction now eases back stepwise after every few consecutive successful batches.
+
+#### Repetition guard input pre-check threshold
+
+The input pre-check introduced in 3.3.2 now raises the effective guard threshold only when the input itself contains a pattern repeated at least the full `--guard-repetition` threshold (previously more than half), and the raised threshold is fixed at 3x the configured value (previously 3x the detected repeat count). This makes the guard less likely to be loosened by mildly repetitive input.
+
+#### `--plain-text` with the `agent` subcommand
+
+`cli/translator.mjs agent --plain-text "..."` previously failed with an `Expected Translator` error. It now runs the agent planning passes and translates the text using the default `array` delegate, as documented. Combining `--plain-text` with `-r timestamp` remains unsupported.
+
+### Other Changes
+
+- Repetition abort warnings now report the detected pattern's occurrence count and the active threshold.
+
+---
+
 ## 3.3.2 (2026-04-14)
 
 - Repetition guard now checks input for existing repetition before translating. When the source text itself contains a pattern repeated more than half the guard threshold, the threshold is automatically raised to 3x the detected count to avoid false-positive aborts.
@@ -36,7 +92,7 @@ The agent mode has been expanded into a multi-pass pipeline:
 
 **Planning pass:** Scans the file in token-bounded windows derived from the context budget, rather than fixed max-batch-size chunks. Each window produces a batch summary. Summaries are consolidated and used to generate a refined translation instruction. The final refinement step can be skipped with `--skip-refine`.
 
-**Translation pass:** Uses the enriched instruction. The delegate translation mode defaults to `array`; pass `-r timestamp` alongside the `agent` subcommand to use timestamp mode instead.
+**Translation pass:** Uses the enriched instruction. The delegate translation mode defaults to `array`, pass `-r timestamp` alongside the `agent` subcommand to use timestamp mode instead.
 
 ```bash
 # Default (array delegate)
@@ -260,7 +316,7 @@ Moderation is now **off by default**. If you were previously not passing `--no-u
 # v2 - moderation was on unless you passed --no-use-moderator
 cli/translator.mjs -i subtitles.srt
 
-# v3 - moderation is off by default; opt in explicitly
+# v3 - moderation is off by default, opt in explicitly
 cli/translator.mjs --use-moderator -i subtitles.srt
 ```
 
@@ -282,7 +338,7 @@ If your v2 scripts relied on the old defaults, you may need to add flags to pres
 
 ### `--stream` Flag
 
-If you were explicitly passing `--stream` to enable streaming, that flag no longer exists. Streaming is on by default; remove the flag.
+If you were explicitly passing `--stream` to enable streaming, that flag no longer exists. Streaming is on by default, remove the flag.
 
 ```bash
 # v2

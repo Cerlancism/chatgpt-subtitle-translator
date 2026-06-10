@@ -69,7 +69,7 @@ Options:
     [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode. (default: `array`, choices: `array`, `object`, `timestamp`, `agent`, `none`)
       - `array` Structures the input and output into an array format.
       - `object` Structures the input and output as a keyed object.
-      - `timestamp` Provides the model with start/end timestamps alongside each entry's text, allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and a merge remarks field in output. Output entry count may differ from input, so progress file resumption is not supported.
+      - `timestamp` Provides the model with start/end timestamps alongside each entry's text, allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and output. Output entry count may differ from input, so progress file resumption is not supported.
       - `agent` Alias for the `agent` subcommand with default options. Use the dedicated subcommand for full configuration. See [Agent Mode](#agent-mode).
       - `none` Legacy compatibility mode, disables structured output.
 
@@ -502,7 +502,7 @@ Yes, it's very nice weather.
 
 #### `timestamp`
 
-Timestamps are preserved alongside the text. Lines are sent using the compact [Toon format](https://www.npmjs.com/package/@toon-format/toon) (milliseconds). The model may merge subtitle entries when contextually appropriate, which it reports via `mergedRemarks`.
+Timestamps are preserved alongside the text. Lines are sent using the compact [Toon format](https://www.npmjs.com/package/@toon-format/toon) (milliseconds). The model may merge subtitle entries when contextually appropriate.
 
 <table>
 <tr>
