@@ -59,7 +59,7 @@ export const CONSOLIDATION_MAX_TOKENS_MULTIPLIER = 1.5
 
 /**
  * @typedef {import('./translatorStructuredTimestamp.mjs').TimestampEntry} TimestampEntry
- * @typedef {{ finalInstruction: string }} PlanningResult
+ * @typedef {{ finalInstruction: string, contextSummary?: string }} PlanningResult
  */
 
 /** @param {number} useFullContext @returns {number} */
@@ -520,8 +520,8 @@ export class TranslatorAgent {
 
         // Final synthesis: consolidate all batch summaries, then produce refined directive
         let finalInstruction = accumulatedBatchSummary
+        let consolidatedContextSummary
         if (accumulatedBatchSummary) {
-            let consolidatedContextSummary
             if (this.options.agentContextSummary) {
                 // Provided summary is already consolidated - skip the consolidation API call
                 consolidatedContextSummary = accumulatedBatchSummary
@@ -546,7 +546,7 @@ export class TranslatorAgent {
             "Final instruction length:", finalInstruction.length,
             `(${countTokens(finalInstruction)} tokens)`)
 
-        return { finalInstruction }
+        return { finalInstruction, contextSummary: consolidatedContextSummary }
     }
 
     /**
@@ -982,7 +982,10 @@ export class TranslatorAgent {
         const overviewResult = await this._runOverviewPass(entries, subtitleMeta)
 
         // Pass 1: Planning
-        const { finalInstruction } = await this.runPlanningPass(entries, overviewResult, subtitleMeta)
+        const { finalInstruction, contextSummary } = await this.runPlanningPass(entries, overviewResult, subtitleMeta)
+        if (contextSummary) {
+            await this.services.onAgentPlanningResult?.({ contextSummary, finalInstruction })
+        }
 
         const instruction = finalInstruction || baseInstruction
 
