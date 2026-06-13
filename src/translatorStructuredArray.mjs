@@ -67,9 +67,16 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
     jsonStreamParse(runner) {
         this.services.onStreamChunk?.("\n")
         const passThroughStream = new PassThrough()
+        let passThroughEnded = false
         let writeBuffer = ''
         let contentBuffer = ''
+        passThroughStream.on("error", (/** @type {Error} */ err) => {
+            log.debug("[TranslatorStructuredArray]", "stream buffer error:", err.message)
+        })
         runner.on("content.delta", (e) => {
+            if (passThroughEnded || passThroughStream.destroyed || passThroughStream.writableEnded) {
+                return
+            }
             writeBuffer += e.delta
             contentBuffer += e.delta
             passThroughStream.write(e.delta)
@@ -83,6 +90,8 @@ export class TranslatorStructuredArray extends TranslatorStructuredBase {
             }
         })
         runner.on("content.done", () => {
+            if (passThroughEnded) return
+            passThroughEnded = true
             passThroughStream.end()
             this.services.onClearLine?.()
         })
