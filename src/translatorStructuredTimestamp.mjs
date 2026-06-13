@@ -275,13 +275,23 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
      */
     jsonStreamParse(runner) {
         const passThroughStream = new PassThrough()
+        let passThroughEnded = false
+        passThroughStream.on("error", (/** @type {Error} */ err) => {
+            log.debug("[TranslatorStructuredTimestamp]", "stream buffer error:", err.message)
+        })
 
         runner.on("content.delta", (e) => {
+            if (passThroughEnded || passThroughStream.destroyed || passThroughStream.writableEnded) {
+                return
+            }
             passThroughStream.write(e.delta)
         })
 
         runner.on("content.done", () => {
-            passThroughStream.end()
+            if (!passThroughEnded) {
+                passThroughEnded = true
+                passThroughStream.end()
+            }
         })
 
         const prevLen = { start: 0, end: 0, text: 0 }
