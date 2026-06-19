@@ -7,7 +7,7 @@ import { countTokens } from "gpt-tokenizer"
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
 import { timestampToMilliseconds, millisecondsToTimestamp } from "./subtitle.mjs";
-import { encode as encodeToon } from "@toon-format/toon";
+import { encodeGeneric as encodeToon } from "@blackwell-systems/gcf";
 
 const timestampEntriesSchema = z.array(z.object({
     start: z.int(),

@@ -1,7 +1,7 @@
 import log from "loglevel"
 import { z } from "zod"
 import { countTokens } from "gpt-tokenizer"
-import { encode as encodeToon } from "@toon-format/toon"
+import { encodeGeneric as encodeToon } from "@blackwell-systems/gcf"
 
 import { summarise } from "llm-summary"
 import { streamParse } from "./openai.mjs"
