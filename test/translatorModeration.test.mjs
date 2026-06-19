@@ -30,7 +30,7 @@ function makeFakeOpenai(flaggedFn, calls) {
             completions: {
                 parse: async (params) => {
                     const userContent = params.messages.at(-1).content
-                    const rows = [...userContent.matchAll(/^\s*(\d+),(\d+),(.+)$/gm)]
+                    const rows = [...userContent.matchAll(/^(\d+)\|(\d+)\|(.+)$/gm)]
                     calls.parseBatchSizes.push(rows.length)
                     const outputs = rows.map(m => ({ start: Number(m[1]), end: Number(m[2]), text: `EN:${m[3]}` }))
                     return {
