@@ -4,7 +4,7 @@ import { countTokens } from "gpt-tokenizer"
 import { encode as encodeToon } from "@toon-format/toon"
 
 import { summarise } from "llm-summary"
-import { streamParse } from "./openai.mjs"
+import { streamParse, withRequestOverrides } from "./openai.mjs"
 import { timestampToMilliseconds } from "./subtitle.mjs"
 import { DefaultOptions } from "./translatorBase.mjs"
 import { roundWithPrecision } from "./helpers.mjs"
@@ -115,6 +115,10 @@ export class TranslatorAgent {
         /** @type {TranslatorStructuredTimestamp | Translator} */
         this.delegate = delegate
         this.systemInstruction = delegate.systemInstruction
+        /** Client for summarise() calls: forwards request params (e.g. reasoning_effort) the summariser doesn't expose as options. */
+        this._summariseClient = withRequestOverrides(services.openai, {
+            reasoning_effort: this.options.createChatCompletionRequest.reasoning_effort
+        })
 
         /** @type {AbortController | undefined} */
         this.streamController = undefined
@@ -617,7 +621,7 @@ export class TranslatorAgent {
                 try {
                     await this.services.cooler?.cool()
                     const result = await summarise(
-                        this.services.openai,
+                        this._summariseClient,
                         `Subtitle entries:\n${encodedBatch}\n\nDraft summary:\n${batchSummary}`,
                         targetLower,
                         budget,
@@ -670,7 +674,7 @@ export class TranslatorAgent {
         if (!this.options.skipFitting) {
             try {
                 const result = await summarise(
-                    this.services.openai,
+                    this._summariseClient,
                     combined,
                     targetLower,
                     targetTokens,

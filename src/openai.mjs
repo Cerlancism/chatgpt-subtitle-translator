@@ -20,6 +20,32 @@ export function createOpenAIClient(apiKey, dangerouslyAllowBrowser = undefined, 
     });
 }
 
+/**
+ * Wraps an OpenAI client so every chat completion request (`create`, `parse`,
+ * `stream`) merges `overrides` into the request body. Lets request params the
+ * caller controls (e.g. `reasoning_effort`) reach libraries that build their
+ * own request bodies from just a client, like `llm-summary`.
+ *
+ * Entries with `undefined` values are dropped; with no effective overrides the
+ * original client is returned as-is.
+ *
+ * @param {OpenAI} openai
+ * @param {Partial<import('openai').OpenAI.Chat.ChatCompletionCreateParams>} [overrides]
+ * @returns {OpenAI}
+ */
+export function withRequestOverrides(openai, overrides) {
+    const effective = Object.fromEntries(Object.entries(overrides ?? {}).filter(([, value]) => value !== undefined))
+    if (Object.keys(effective).length === 0) return openai
+    const completions = openai.chat.completions
+    const client = Object.create(openai)
+    client.chat = Object.create(openai.chat)
+    client.chat.completions = Object.create(completions)
+    client.chat.completions.create = (params, opts) => completions.create({ ...params, ...effective }, opts)
+    client.chat.completions.parse = (params, opts) => completions.parse({ ...params, ...effective }, opts)
+    client.chat.completions.stream = (params, opts) => completions.stream({ ...params, ...effective }, opts)
+    return client
+}
+
 export class ChatStreamSyntaxError extends SyntaxError {
     /**
      * @param {string} message
