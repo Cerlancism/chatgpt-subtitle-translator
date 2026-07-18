@@ -20,17 +20,17 @@ const timestampEntriesSchema = z.array(z.object({
  * @typedef {z.infer<typeof timestampEntriesSchema>[number]} MsEntry
  */
 
-/** @param {TimestampEntry} e @returns {MsEntry} */
-export const toMsEntry = (e) => ({
-    offset: timestampToMilliseconds(e.start),
+/** @param {TimestampEntry} e @param {number} [baseMs] batch start subtracted from the entry offset @returns {MsEntry} */
+export const toMsEntry = (e, baseMs = 0) => ({
+    offset: timestampToMilliseconds(e.start) - baseMs,
     length: timestampToMilliseconds(e.end) - timestampToMilliseconds(e.start),
     text: e.text
 })
 
-/** @param {MsEntry} e @returns {TimestampEntry} */
-const fromMsEntry = (e) => ({
-    start: millisecondsToTimestamp(e.offset),
-    end: millisecondsToTimestamp(e.offset + e.length),
+/** @param {MsEntry} e @param {number} [baseMs] batch start added back to the entry offset @returns {TimestampEntry} */
+const fromMsEntry = (e, baseMs = 0) => ({
+    start: millisecondsToTimestamp(baseMs + e.offset),
+    end: millisecondsToTimestamp(baseMs + e.offset + e.length),
     text: e.text
 })
 
@@ -44,10 +44,12 @@ const batchTimestampSchema = z.object({
 
 const schemaDescriptions = {
     single: [
-        "outputs: Subtitle entries with offset (start time) and length (duration) as milliseconds",
+        "The input offset is the batch start time in milliseconds; entry offsets are relative to it.",
+        "outputs: Subtitle entries with offset (relative to the batch offset) and length (duration) in milliseconds",
     ].join("\n"),
     batch: [
-        "outputs: Subtitle entries with offset (start time) and length (duration) as milliseconds",
+        "The input offset is the batch start time in milliseconds; entry offsets are relative to it.",
+        "outputs: Subtitle entries with offset (relative to the batch offset) and length (duration) in milliseconds",
         "Only merge entries if the combined text remains readable as a subtitle (prefer keeping entries separate if the merged text would exceed ~42 characters).",
     ].join("\n"),
 }
@@ -80,7 +82,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         const schema = isSingle ? singleTimestampSchema : batchTimestampSchema
         const schemaAppendix = isSingle ? schemaDescriptions.single : schemaDescriptions.batch
         const systemContent = this.systemInstruction ? `${this.systemInstruction}\n\n# Output Schema\n${schemaAppendix}` : undefined
-        const messages = this.buildPromptMessages(encodeToon({ inputs: entries.map(toMsEntry) }), systemContent)
+        const baseMs = timestampToMilliseconds(entries[0].start)
+        const messages = this.buildPromptMessages(encodeToon({ offset: baseMs, inputs: entries.map(e => toMsEntry(e, baseMs)) }), systemContent)
 
         try {
             this.currentBatchEntries = entries
@@ -96,7 +99,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             const translationCandidate = output.choices[0].message
 
             const parsedRaw = translationCandidate.refusal ? null : translationCandidate.parsed
-            const outputs = parsedRaw?.outputs?.map(fromMsEntry) ?? []
+            const outputs = parsedRaw?.outputs?.map(e => fromMsEntry(e, baseMs)) ?? []
 
             return TranslationOutput.fromCompletion(outputs, output)
         } catch (error) {
@@ -135,7 +138,8 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         const allChunks = []
         for (let i = 0; i < this.entryHistory.length; i += chunkSize) {
             const chunk = this.entryHistory.slice(i, i + chunkSize)
-            const userContent = encodeToon({ inputs: chunk.map(e => toMsEntry(e.input)) })
+            const chunkBaseMs = timestampToMilliseconds(chunk[0].input.start)
+            const userContent = encodeToon({ offset: chunkBaseMs, inputs: chunk.map(e => toMsEntry(e.input, chunkBaseMs)) })
             const seenStarts = new Set()
             const outputs = chunk.reduce((acc, e) => {
                 if (!seenStarts.has(e.output.start)) {
@@ -144,7 +148,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                 }
                 return acc
             }, [])
-            const assistantContent = JSON.stringify({ outputs: outputs.map(toMsEntry) })
+            const assistantContent = JSON.stringify({ outputs: outputs.map(e => toMsEntry(e, chunkBaseMs)) })
             allChunks.push({ userContent, assistantContent, size: chunk.length })
         }
 
@@ -289,6 +293,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         let expectedIdx = -1
         let currentOffset = 0
         const currentBatchEntries = /** @type {TimestampEntry[]} */ (this.currentBatchEntries ?? [])
+        const baseMs = currentBatchEntries[0] ? timestampToMilliseconds(currentBatchEntries[0].start) : 0
 
         /** Text-only buffer for repetition detection (timestamps excluded) */
         let textBuffer = ''
@@ -330,10 +335,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                     }
                     if (!partial) {
                         const expectedStart = currentBatchEntries[expectedIdx]?.start
-                        if (expectedStart && /** @type {number} */(value) !== timestampToMilliseconds(expectedStart)) {
+                        currentOffset = baseMs + /** @type {number} */(value)
+                        if (expectedStart && currentOffset !== timestampToMilliseconds(expectedStart)) {
                             this.services.onStreamChunk?.(">>> ")
                         }
-                        currentOffset = /** @type {number} */(value)
                         emitField("offset", " -> ", millisecondsToTimestamp(currentOffset), partial)
                     }
                 } else if (key === "length") {
