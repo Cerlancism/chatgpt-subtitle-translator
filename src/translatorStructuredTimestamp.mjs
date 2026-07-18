@@ -56,6 +56,8 @@ const schemaDescriptions = {
 
 /**
  * Timestamp-entry translator: input and yielded output are both {@link TimestampEntry}.
+ * On the wire, batches are toon-encoded with a top-level batch `offset` (absolute ms)
+ * and per-entry `offset`/`length` relative to it (see {@link toMsEntry} / `fromMsEntry`).
  * @extends {TranslatorStructuredBase<TimestampEntry, TimestampEntry>}
  */
 export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {

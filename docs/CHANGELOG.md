@@ -36,6 +36,19 @@ As in the other modes, moderation serves to prevent token wastage when the model
 
 The `timestamp` mode output schema no longer includes the `remarksIfContainedMergers` field, reducing output tokens per batch. The merge readability guidance (keep merged text within ~42 characters) is retained in the schema description.
 
+#### Timestamp mode: offset/length wire encoding
+
+The `timestamp` mode wire format now sends each entry as `offset`/`length` (start time and duration) instead of `start`/`end`, and each batch carries its absolute start time as a single top-level `offset` field with entry offsets relative to it:
+
+```yaml
+offset: 5400000
+inputs[2]{offset,length,text}:
+  0,1500,今日はとてもいい天気ですね。
+  1500,2200,桜が満開で、本当に綺麗です。
+```
+
+Absolute millisecond timestamps grow to 7 digits over a feature-length runtime, so batches later in the file previously cost more tokens and required the model to reproduce long near-identical digit strings without drift. With the relative encoding the numbers stay small (mostly 1-4 digits) regardless of position: mid-file batches of short dialogue measure ~5% fewer prompt tokens and ~9% fewer combined prompt+response tokens, with the same saving applying to every context-history replay. Timestamps are reconstructed exactly on parse; SRT output and the library API are unchanged.
+
 ### Fixes
 
 #### Auto batch size recovers gradually after failures
