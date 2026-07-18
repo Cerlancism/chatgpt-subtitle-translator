@@ -29,7 +29,10 @@ test('should output subtitles', async () => {
         createChatCompletionRequest: {
             model: process.env.OPENAI_DEFAULT_MODEL,
             temperature: 0,
+            frequency_penalty: 0,
+            presence_penalty: 0,
             stream: true,
+            reasoning_effort: "none"
         },
         batchSizes: [2, 3],
     });

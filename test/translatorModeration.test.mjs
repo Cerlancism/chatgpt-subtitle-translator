@@ -32,7 +32,7 @@ function makeFakeOpenai(flaggedFn, calls) {
                     const userContent = params.messages.at(-1).content
                     const rows = [...userContent.matchAll(/^\s*(\d+),(\d+),(.+)$/gm)]
                     calls.parseBatchSizes.push(rows.length)
-                    const outputs = rows.map(m => ({ start: Number(m[1]), end: Number(m[2]), text: `EN:${m[3]}` }))
+                    const outputs = rows.map(m => ({ offset: Number(m[1]), length: Number(m[2]), text: `EN:${m[3]}` }))
                     return {
                         choices: [{ message: { parsed: { outputs }, refusal: null } }],
                         usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 }

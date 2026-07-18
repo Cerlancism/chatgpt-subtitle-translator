@@ -10,8 +10,8 @@ import { timestampToMilliseconds, millisecondsToTimestamp } from "./subtitle.mjs
 import { encode as encodeToon } from "@toon-format/toon";
 
 const timestampEntriesSchema = z.array(z.object({
-    start: z.int(),
-    end: z.int(),
+    offset: z.int(),
+    length: z.int(),
     text: z.string()
 }))
 
@@ -22,15 +22,15 @@ const timestampEntriesSchema = z.array(z.object({
 
 /** @param {TimestampEntry} e @returns {MsEntry} */
 export const toMsEntry = (e) => ({
-    start: timestampToMilliseconds(e.start),
-    end: timestampToMilliseconds(e.end),
+    offset: timestampToMilliseconds(e.start),
+    length: timestampToMilliseconds(e.end) - timestampToMilliseconds(e.start),
     text: e.text
 })
 
 /** @param {MsEntry} e @returns {TimestampEntry} */
 const fromMsEntry = (e) => ({
-    start: millisecondsToTimestamp(e.start),
-    end: millisecondsToTimestamp(e.end),
+    start: millisecondsToTimestamp(e.offset),
+    end: millisecondsToTimestamp(e.offset + e.length),
     text: e.text
 })
 
@@ -44,10 +44,10 @@ const batchTimestampSchema = z.object({
 
 const schemaDescriptions = {
     single: [
-        "outputs: Subtitle entries with start and end as milliseconds",
+        "outputs: Subtitle entries with offset (start time) and length (duration) as milliseconds",
     ].join("\n"),
     batch: [
-        "outputs: Subtitle entries with start and end as milliseconds",
+        "outputs: Subtitle entries with offset (start time) and length (duration) as milliseconds",
         "Only merge entries if the combined text remains readable as a subtitle (prefer keeping entries separate if the merged text would exceed ~42 characters).",
     ].join("\n"),
 }
@@ -284,9 +284,10 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             passThroughStream.end()
         })
 
-        const prevLen = { start: 0, end: 0, text: 0 }
+        const prevLen = { offset: 0, length: 0, text: 0 }
         let textDone = true
         let expectedIdx = -1
+        let currentOffset = 0
         const currentBatchEntries = /** @type {TimestampEntry[]} */ (this.currentBatchEntries ?? [])
 
         /** Text-only buffer for repetition detection (timestamps excluded) */
@@ -294,7 +295,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         let textBufEntryLen = 0
 
         /**
-         * @param {"start"|"end"|"text"} fieldKey
+         * @param {"offset"|"length"|"text"} fieldKey
          * @param {string} separator
          * @param {string} value
          * @param {boolean} partial
@@ -316,13 +317,13 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         }
 
         const pipeline = passThroughStream
-            .pipe(new JSONParser({ paths: ['$.outputs.*.start', '$.outputs.*.end', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
+            .pipe(new JSONParser({ paths: ['$.outputs.*.offset', '$.outputs.*.length', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
 
         pipeline.on("data", (/** @type {{ value: string | number, key: string, partial: boolean }} */ { value, key, partial }) => {
             try {
-                if (key === "start") {
+                if (key === "offset") {
                     if (textDone) {
-                        prevLen.start = prevLen.end = prevLen.text = 0
+                        prevLen.offset = prevLen.length = prevLen.text = 0
                         textBufEntryLen = 0
                         textDone = false
                         expectedIdx++
@@ -332,10 +333,11 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
                         if (expectedStart && /** @type {number} */(value) !== timestampToMilliseconds(expectedStart)) {
                             this.services.onStreamChunk?.(">>> ")
                         }
-                        emitField("start", " -> ", millisecondsToTimestamp(/** @type {number} */(value)), partial)
+                        currentOffset = /** @type {number} */(value)
+                        emitField("offset", " -> ", millisecondsToTimestamp(currentOffset), partial)
                     }
-                } else if (key === "end") {
-                    if (!partial) emitField("end", "  ", millisecondsToTimestamp(/** @type {number} */(value)), partial)
+                } else if (key === "length") {
+                    if (!partial) emitField("length", "  ", millisecondsToTimestamp(currentOffset + /** @type {number} */(value)), partial)
                 } else if (key === "text") {
                     emitField("text", "\n", /** @type {string} */(value), partial, () => { textDone = true })
                     const strValue = /** @type {string} */(value ?? '')
