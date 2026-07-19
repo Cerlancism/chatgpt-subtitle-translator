@@ -392,6 +392,17 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             }
         })
 
+        // Close out an entry the stream ended on without finalizing (omitted
+        // field, truncation or abort), so buffered text is not swallowed and a
+        // partially printed header still gets its newline.
+        pipeline.on("close", () => {
+            if (entry.stage !== "none" || entry.pendingText) {
+                if (entry.pendingText) this.services.onStreamChunk?.(entry.pendingText)
+                this.services.onStreamChunk?.("\n")
+                entry = newEntryState()
+            }
+        })
+
         pipeline.on("error", (/** @type {Error} */ err) => {
             log.error("[TranslatorStructuredTimestamp]", "stream-json parsing error:", err)
         })
