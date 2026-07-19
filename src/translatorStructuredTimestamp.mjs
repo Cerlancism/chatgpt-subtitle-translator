@@ -290,75 +290,102 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             passThroughStream.end()
         })
 
-        const prevLen = { offset: 0, length: 0, text: 0 }
-        let textDone = true
-        let expectedIdx = -1
-        let currentOffset = 0
         const currentBatchEntries = /** @type {TimestampEntry[]} */ (this.currentBatchEntries ?? [])
         const baseMs = currentBatchEntries[0] ? timestampToMilliseconds(currentBatchEntries[0].start) : 0
 
         /** Text-only buffer for repetition detection (timestamps excluded) */
         let textBuffer = ''
-        let textBufEntryLen = 0
+        let expectedIdx = 0
 
-        /**
-         * @param {"offset"|"length"|"text"} fieldKey
-         * @param {string} separator
-         * @param {string} value
-         * @param {boolean} partial
-         * @param {() => void} [onComplete]
-         */
-        const emitField = (fieldKey, separator, value, partial, onComplete) => {
-            if (!value) {
-                return
+        // Some backends emit object keys in a different order than the schema
+        // (e.g. alphabetical: length, offset, text), so the display state is not
+        // keyed on any particular field arriving first: each part of the
+        // "start -> end  " header is emitted as soon as it is printable (in schema
+        // order that is field-by-field as they arrive), text seen before the header
+        // completes is buffered, and the entry finalizes when all three fields
+        // have completed.
+        const newEntryState = () => ({
+            /** @type {number | undefined} */ offsetMs: undefined,
+            /** @type {number | undefined} */ lengthMs: undefined,
+            seenTextLen: 0,
+            pendingText: '',
+            /** @type {"none" | "start" | "header"} */ stage: "none",
+            done: { offset: false, length: false, text: false }
+        })
+        let entry = newEntryState()
+
+        const emitAvailableHeader = () => {
+            if (entry.stage === "none" && entry.offsetMs !== undefined) {
+                const expectedStart = currentBatchEntries[expectedIdx]?.start
+                const startMs = baseMs + entry.offsetMs
+                if (expectedStart && startMs !== timestampToMilliseconds(expectedStart)) {
+                    this.services.onStreamChunk?.(">>> ")
+                }
+                this.services.onStreamChunk?.(`${millisecondsToTimestamp(startMs)} -> `)
+                entry.stage = "start"
             }
-            const delta = value.slice(prevLen[fieldKey])
-            if (delta) {
-                this.services.onStreamChunk?.(delta)
+            if (entry.stage === "start" && entry.lengthMs !== undefined) {
+                this.services.onStreamChunk?.(`${millisecondsToTimestamp(baseMs + entry.offsetMs + entry.lengthMs)}  `)
+                entry.stage = "header"
+                if (entry.pendingText) {
+                    this.services.onStreamChunk?.(entry.pendingText)
+                    entry.pendingText = ''
+                }
             }
-            prevLen[fieldKey] = value.length
-            if (!partial) {
-                this.services.onStreamChunk?.(separator)
-                onComplete?.()
-            }
+        }
+
+        const startNextEntry = () => {
+            expectedIdx++
+            entry = newEntryState()
         }
 
         const pipeline = passThroughStream
             .pipe(new JSONParser({ paths: ['$.outputs.*.offset', '$.outputs.*.length', '$.outputs.*.text'], keepStack: false, emitPartialTokens: true, emitPartialValues: true }))
 
-        pipeline.on("data", (/** @type {{ value: string | number, key: string, partial: boolean }} */ { value, key, partial }) => {
+        pipeline.on("data", (/** @type {{ value: string | number, key: "offset" | "length" | "text", partial: boolean }} */ { value, key, partial }) => {
             try {
+                if (!partial && entry.done[key]) {
+                    // A repeated completed key means the previous entry never finalized
+                    // (a field was omitted); close it out and move on.
+                    if (entry.stage !== "none") this.services.onStreamChunk?.("\n")
+                    startNextEntry()
+                }
                 if (key === "offset") {
-                    if (textDone) {
-                        prevLen.offset = prevLen.length = prevLen.text = 0
-                        textBufEntryLen = 0
-                        textDone = false
-                        expectedIdx++
-                    }
                     if (!partial) {
-                        const expectedStart = currentBatchEntries[expectedIdx]?.start
-                        currentOffset = baseMs + /** @type {number} */(value)
-                        if (expectedStart && currentOffset !== timestampToMilliseconds(expectedStart)) {
-                            this.services.onStreamChunk?.(">>> ")
-                        }
-                        emitField("offset", " -> ", millisecondsToTimestamp(currentOffset), partial)
+                        entry.offsetMs = /** @type {number} */(value)
+                        entry.done.offset = true
+                        emitAvailableHeader()
                     }
                 } else if (key === "length") {
-                    if (!partial) emitField("length", "  ", millisecondsToTimestamp(currentOffset + /** @type {number} */(value)), partial)
+                    if (!partial) {
+                        entry.lengthMs = /** @type {number} */(value)
+                        entry.done.length = true
+                        emitAvailableHeader()
+                    }
                 } else if (key === "text") {
-                    emitField("text", "\n", /** @type {string} */(value), partial, () => { textDone = true })
                     const strValue = /** @type {string} */(value ?? '')
-                    const delta = strValue.slice(textBufEntryLen)
+                    const delta = strValue.slice(entry.seenTextLen)
+                    entry.seenTextLen = strValue.length
+                    if (delta) {
+                        if (entry.stage === "header") {
+                            this.services.onStreamChunk?.(delta)
+                        } else {
+                            entry.pendingText += delta
+                        }
+                    }
                     textBuffer += delta
-                    textBufEntryLen = strValue.length
                     if (!partial) {
                         textBuffer += '\n'
-                        textBufEntryLen = 0
+                        entry.done.text = true
                     }
                     const pattern = this.checkRepetition(textBuffer)
                     if (pattern) {
                         this.abortOnRepetition(pattern, runner, textBuffer)
                     }
+                }
+                if (entry.done.offset && entry.done.length && entry.done.text) {
+                    this.services.onStreamChunk?.("\n")
+                    startNextEntry()
                 }
             } catch (err) {
                 log.error("[TranslatorStructuredTimestamp]", "Parsing error:", err)
