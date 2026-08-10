@@ -270,6 +270,10 @@ export class TranslatorAgent {
      * Step 2: Feeds the overview to the model to generate an enhanced agent instruction.
      *         The model decides whether to incorporate subtitle metadata into the instruction.
      *
+     * When a context summary is already available the planning scan is skipped, and with it
+     * the only consumers of the overview and the agent instruction. Steps 1 and 2 are then
+     * skipped too, leaving just the language detection that Pass 2 verification depends on.
+     *
      * @param {TimestampEntry[]} entries
      * @param {string} subtitleMeta - subtitle metadata string (file, entry count, duration)
      * @returns {Promise<{ overview: string, agentInstruction: string } | null>}
@@ -284,6 +288,13 @@ export class TranslatorAgent {
         const sampleLabel = tail.length > 0
             ? `First ${head.length} entries (0-${head.length - 1}) and last ${tail.length} entries (${entries.length - tail.length}-${entries.length - 1})`
             : `All ${head.length} entries`
+
+        if (this.options.agentContextSummary) {
+            log.debug("[TranslatorAgent]", "Pass 0 (Overview): overview and agent instruction skipped,",
+                "context summary already available - detecting languages only")
+            await this._detectLanguages(head, tail)
+            return null
+        }
 
         log.debug("[TranslatorAgent]", "Pass 0 (Overview): sampling", sampleLabel)
 

@@ -94,6 +94,36 @@ test('agent summary cache save failures do not throw', () => {
     });
 });
 
+test('overview pass skips overview and agent instruction when a context summary is available', async () => {
+    const calls = []
+    const makeAgent = (/** @type {string} [agentContextSummary] */ agentContextSummary = '') => {
+        const agent = new TranslatorAgent({ from: 'English', to: 'Finnish' }, { openai: null }, {
+            createChatCompletionRequest: { model: 'fake-model', stream: false },
+            useFullContext: 2000,
+            ...(agentContextSummary && { agentContextSummary }),
+        }, /** @type {any} */({ translateLines: async function* () { } }));
+        const testAgent = /** @type {any} */ (agent);
+        testAgent._generateOverview = async () => { calls.push('overview'); return 'overview' };
+        testAgent._detectLanguages = async () => { calls.push('detect') };
+        testAgent._generateAgentInstruction = async () => { calls.push('agentInstruction'); return 'scan carefully' };
+        return testAgent;
+    };
+
+    const entries = [{ start: '00:00:00,000', end: '00:00:01,000', text: 'Hello' }];
+
+    // Without a summary the planning scan runs, so all three steps are needed.
+    const full = await makeAgent()._runOverviewPass(entries, 'meta');
+    assert.deepEqual(calls, ['overview', 'detect', 'agentInstruction']);
+    assert.deepEqual(full, { overview: 'overview', agentInstruction: 'scan carefully' });
+
+    // With a summary the scan is skipped, leaving only the language detection
+    // that Pass 2 verification depends on.
+    calls.length = 0;
+    const skipped = await makeAgent('cached movie summary')._runOverviewPass(entries, 'meta');
+    assert.deepEqual(calls, ['detect']);
+    assert.equal(skipped, null);
+});
+
 test('agent planning emits reusable context summary callback', async () => {
     let saved = null;
     const delegate = /** @type {any} */ ({

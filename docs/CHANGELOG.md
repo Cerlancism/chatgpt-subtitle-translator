@@ -59,6 +59,8 @@ Agent mode now writes its consolidated planning context to a sidecar `<input>.ag
 
 The sidecar is retained after a run and can be deleted at any time to force a fresh scan. `--context-summary` still takes precedence when provided.
 
+Whenever a context summary is already available - from the sidecar or from `--context-summary` - the overview pass now skips generating the content overview and the agent instruction, since both are only consumed by the planning scan that is being skipped. Source and target language detection still runs, as the pre-translation language verification depends on it. This saves two further API calls per run on top of the skipped scan.
+
 ### Fixes
 
 #### Auto batch size recovers gradually after failures
