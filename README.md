@@ -7,16 +7,25 @@ This utility uses the OpenAI ChatGPT API to translate text, with a specific focu
 
 ## Web Interface: <https://cerlancism.github.io/chatgpt-subtitle-translator>  
 
+- Base URL presets: pick a known OpenAI compatible endpoint next to the base URL field, or type any custom URL. Selecting a preset turns off structured mode, as most non-OpenAI endpoints do not implement it
+- Model listing: once the base URL and API key are filled in, the endpoint's models are fetched and offered as suggestions in the Model field. Typing a model name by hand still works, for endpoints without a model listing route
+- Import and export `.srt`, `.vtt` and `.ass`/`.ssa`. The import format is detected automatically, the export format is chosen from the menu next to the export button. See [Subtitle Formats](#subtitle-formats)
+- Light and dark theme, toggled from the action bar and remembered across visits, light as before by default
+
+Settings, including the theme, are stored in the browser only.
+
 ## Features
 - Web User Interface (Web UI) and Command Line Interface (CLI)  
+- Subtitle formats: `.srt`, `.vtt` (WebVTT) and `.ass`/`.ssa` input and output, detected automatically. See [Subtitle Formats](#subtitle-formats)
 - Supports [Structured Output](https://openai.com/index/introducing-structured-outputs-in-the-api/): for more concise results, enabled by default in the Web UI and CLI
 - Supports [Prompt Caching](https://openai.com/index/api-prompt-caching/): by including the full context of translated data, the system instruction and translation context are packaged to work well with prompt caching, controlled with `-c, --context` (CLI only)
-- Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally
+- Supports any OpenAI API compatible providers such as running [Ollama](https://ollama.com/) locally, with base URL presets and model listing in the Web UI
 - Line-based batching: avoids token limit per request, reduces overhead token wastage, and maintains translation context to a certain extent
 - Optional OpenAI Moderation tool check: prevents token wastage if the model is highly likely to refuse to translate, enabled with `--use-moderator` (CLI only)
 - Streaming process output  
 - Request per minute (RPM) [rate limits](https://platform.openai.com/docs/guides/rate-limits/overview)  
 - Progress resumption (CLI only)
+- Light and dark theme (Web UI only)
 
 
 ## Setup
@@ -62,9 +71,9 @@ Options:
   - `-s, --system-instruction <instruction>`  
     Override the prompt system instruction template `Translate ${from} to ${to}` with this text, **ignoring `--from` and `--to` options**
   - `-i, --input <file>`  
-    Input source text with the content of this file, in `.srt` format or plain text
+    Input source text with the content of this file, a subtitle file (`.srt`, `.vtt`, `.ass`/`.ssa`) or plain text
   - `-o, --output <file>`  
-    Output file name, defaults to be based on input file name
+    Output file name, defaults to be based on input file name. For subtitle input, a subtitle extension on this name selects the output format, otherwise the input format is kept
   - `-r, --structured <mode>`
     [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode. (default: `array`, choices: `array`, `object`, `timestamp`, `agent`, `none`)
       - `array` Structures the input and output into an array format.
@@ -255,6 +264,39 @@ The weather is nice today, isn't it?
 5
 00:00:12,000 --> 00:00:16,000
 Yes, it's very nice weather.
+```
+
+## Subtitle Formats
+`.srt`, `.vtt` (WebVTT) and `.ass`/`.ssa` files can be read and written. Translation always runs on the entry text, so the format only decides how entries are parsed on the way in and serialised on the way out.
+
+The input format is detected from the file extension, falling back to the content when the extension is inconclusive, so no format option is needed. In the CLI the output keeps the input format unless `-o, --output` carries a different subtitle extension:
+
+```bash
+# WebVTT in, WebVTT out: movie.vtt.out_English.vtt
+cli/translator.mjs --input movie.vtt
+
+# ASS in, WebVTT out
+cli/translator.mjs --input movie.ass --output movie.en.vtt
+```
+
+Output is written entry by entry as batches complete, in every format, so streaming progress and `--output` progress resumption work the same regardless of format.
+
+Only timing and text survive a conversion, which matters when the input is not SRT:
+
+- WebVTT: cue identifiers, cue settings (`align`, `position`, ...), `NOTE` and `STYLE` blocks are dropped. `<i>`, `<b>` and `<u>` are kept since SRT shares them, other cue markup such as `<v Speaker>` and inline timestamps is removed, and HTML entities are decoded.
+- ASS/SSA: script, style and font sections are dropped, `Comment:` events are not translated, override blocks (`{\i1}`) are removed, `\N` becomes a line break and `\h` a space. Events that only carry a vector drawing (`{\p1}`) are skipped. Written files use a single default style.
+
+The same formats are understood by the subtitle utilities, which may be mixed freely:
+
+```bash
+# Shift every timestamp, keeping the file's own format, the original is kept as movie.old.vtt
+cli/subtitle.mjs offset movie.vtt 00:00:02.500
+
+# Concatenate files of any format, output format follows the first file
+cli/subtitle.mjs merge part1.srt part2.vtt part3.ass
+
+# ... or is chosen explicitly
+cli/subtitle.mjs merge --format vtt part1.srt part2.ass
 ```
 
 ## How it works

@@ -20,6 +20,47 @@ CLI usage is unaffected.
 
 ### New Features
 
+#### WebVTT and ASS/SSA subtitle formats
+
+`.vtt` (WebVTT) and `.ass`/`.ssa` files can now be translated directly, alongside `.srt`. Translation still runs on entry text only, the format decides how entries are parsed on the way in and serialised on the way out.
+
+```bash
+# WebVTT in, WebVTT out: movie.vtt.out_English.vtt
+cli/translator.mjs --input movie.vtt
+
+# ASS in, WebVTT out
+cli/translator.mjs --input movie.ass --output movie.en.vtt
+```
+
+The input format is detected from the file extension, falling back to sniffing the content, so there is no format option to set. The output keeps the input format unless `-o, --output` carries a different subtitle extension. Entries are still written one at a time as batches complete, in every format, so streaming output and progress file resumption behave as before.
+
+Only timing and text survive a conversion: WebVTT cue identifiers, cue settings, `NOTE`/`STYLE` blocks and non-SRT cue markup are dropped (`<i>`, `<b>` and `<u>` are kept, HTML entities are decoded), and ASS/SSA style sections, `Comment:` events, override blocks and vector drawing events are dropped, with `\N` becoming a line break and `\h` a space.
+
+`cli/subtitle.mjs` understands the same formats. `offset` keeps the file's own format, and `merge` accepts mixed formats, following the first file unless `--format <srt|vtt|ass>` is given:
+
+```bash
+cli/subtitle.mjs offset movie.vtt 00:00:02.500
+cli/subtitle.mjs merge --format vtt part1.srt part2.ass
+```
+
+New library exports for this: `subtitleFormats`, `getSubtitleFormat`, `isSubtitleFile`, `subtitleFormatFromFileName`, `detectSubtitleFormat`, `convertToSrt`, `convertFromSrt`, `offsetSubtitle`, `mergeSubtitles`, `subtitleHeader`, `formatSubtitleCue` and `cueFromSrtEntry`. `subtitleHeader` and `formatSubtitleCue` exist so output can be appended entry by entry rather than buffered and converted at the end.
+
+#### Web interface: base URL presets and endpoint model listing
+
+The base URL field gained a preset picker for known OpenAI compatible endpoints, currently OpenAI itself (which clears the field back to the default) and Anthropic. A fully custom URL can still be typed as before, and a preset goes through the same path as manual entry, so structured mode is still switched off automatically when a base URL is set.
+
+Once the base URL and API key are both filled in, the endpoint's models are listed and offered as suggestions in the Model field. The request is debounced, superseded requests are aborted, and a typed model name is still accepted for endpoints that have no model listing route. Failures are reported under the field and leave the entered value alone.
+
+Requests from the browser carry `anthropic-dangerous-direct-browser-access: true`. Anthropic's endpoint rejects browser origin preflight without it, and other providers ignore the unknown header. As before, the API key is sent from the browser directly to the endpoint.
+
+#### Web interface: subtitle import and export formats
+
+Import accepts `.srt`, `.vtt` and `.ass`/`.ssa`, detecting the format from the file, and selecting the same file twice re-imports it. The export button keeps exporting SRT on click, with a menu next to it for the other formats.
+
+#### Web interface: dark theme
+
+A light/dark toggle was added to the action bar. The choice is stored in the browser under `THEME`, alongside the existing settings, and the interface stays light by default.
+
 #### Evened-out auto batch sizes
 
 When `--batch-sizes` is omitted, batch sizes are now spread evenly across the remaining lines instead of greedily filled to the token budget. Greedy filling left a small remainder batch at the tail (e.g. 100 lines packing 30 per batch produced batches of 30/30/30/10); the same lines now translate as 25/25/25/25, improving context consistency and prompt cache utilization across batches.
