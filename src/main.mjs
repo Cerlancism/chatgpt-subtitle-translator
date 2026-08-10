@@ -2,6 +2,20 @@ export { createOpenAIClient } from './openai.mjs'
 export { wrapQuotes } from './helpers.mjs'
 export { CooldownContext } from './cooldown.mjs'
 export { parser as subtitleParser, secondsToTimestamp } from './subtitle.mjs'
+export {
+    subtitleFormats,
+    getSubtitleFormat,
+    isSubtitleFile,
+    subtitleFormatFromFileName,
+    detectSubtitleFormat,
+    convertToSrt,
+    convertFromSrt,
+    offsetSubtitle,
+    mergeSubtitles,
+    subtitleHeader,
+    formatSubtitleCue,
+    cueFromSrtEntry
+} from './subtitleFormats.mjs'
 export { TranslatorBase, DefaultOptions } from './translatorBase.mjs'
 export { Translator } from './translator.mjs'
 export { TranslatorStructuredBase } from './translatorStructuredBase.mjs'
