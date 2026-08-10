@@ -49,6 +49,12 @@ inputs[2]{offset,length,text}:
 
 Absolute millisecond timestamps grow to 7 digits over a feature-length runtime, so batches later in the file previously cost more tokens and required the model to reproduce long near-identical digit strings without drift. With the relative encoding the numbers stay small (mostly 1-4 digits) regardless of position: mid-file batches of short dialogue measure ~5% fewer prompt tokens and ~9% fewer combined prompt+response tokens, with the same saving applying to every context-history replay. Timestamps are reconstructed exactly on parse; SRT output and the library API are unchanged.
 
+#### Agent mode: cached planning summaries
+
+Agent mode now writes its consolidated planning context to a sidecar `<input>.agent-summary.json` next to the input file. On a later run the sidecar is reused when the input file, model, structured mode, context size and system instruction all still match, skipping the planning scan and its API calls. Only a completed scan is cached: interrupting the planning pass leaves no sidecar, and translation progress itself is unaffected as agent mode always restarts from the beginning.
+
+The sidecar is retained after a run and can be deleted at any time to force a fresh scan. `--context-summary` still takes precedence when provided.
+
 ### Fixes
 
 #### Auto batch size recovers gradually after failures
@@ -62,6 +68,14 @@ The input pre-check introduced in 3.3.2 now raises the effective guard threshold
 #### `--plain-text` with the `agent` subcommand
 
 `cli/translator.mjs agent --plain-text "..."` previously failed with an `Expected Translator` error. It now runs the agent planning passes and translates the text using the default `array` delegate, as documented. Combining `--plain-text` with `-r timestamp` remains unsupported.
+
+#### Late stream deltas no longer crash structured modes
+
+Some providers emit a `content.delta` event after `content.done` has already ended the streaming preview buffer, which previously crashed the process with `ERR_STREAM_WRITE_AFTER_END`. Late deltas are now ignored in both `array` and `timestamp` modes.
+
+#### Dynamic batch retries no longer expand back to the full file
+
+When repeated structured-output failures reduced the dynamic batch budget until it rounded to zero, the next retry expanded to all remaining lines instead of shrinking, preventing the fallback to single-entry translation. Such retries now use the minimum batch size so the fallback proceeds as intended.
 
 ### Other Changes
 
