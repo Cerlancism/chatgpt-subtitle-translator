@@ -28,6 +28,14 @@ module.exports = {
             },
           },
         },
+        dark: {
+          colors: {
+            primary: {
+              DEFAULT: "#eee",
+              foreground: "#111",
+            },
+          },
+        },
       }
     })
   ],

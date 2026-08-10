@@ -8,6 +8,7 @@ import { ChevronDownIcon } from './ChevronDownIcon';
 
 import { FileUploadButton } from '@/components/FileUploadButton';
 import { SubtitleCard } from '@/components/SubtitleCard';
+import { ThemeSwitch } from '@/components/ThemeSwitch';
 import { downloadString } from '@/utils/download';
 import { createBrowserOpenAIClient } from '@/utils/openaiClient';
 import { AcceptedSubtitleExtensions, SubtitleFormats, convertFromSrt, convertToSrt, detectSubtitleFormat, getSubtitleFormat } from '@/utils/subtitleFormats';
@@ -476,6 +477,8 @@ export function TranslatorApplication() {
               </DropdownMenu>
             </Dropdown>
           </ButtonGroup>
+
+          <ThemeSwitch />
           <Divider className='mt-3 sm:mt-0' />
         </div>
 
