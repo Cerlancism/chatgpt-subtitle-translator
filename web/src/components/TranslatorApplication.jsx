@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react'
-import { Button, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@nextui-org/react";
+import { Autocomplete, AutocompleteItem, Button, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@nextui-org/react";
 
 import { EyeSlashFilledIcon } from './EyeSlashFilledIcon';
 import { EyeFilledIcon } from './EyeFilledIcon';
@@ -10,6 +10,7 @@ import { FileUploadButton } from '@/components/FileUploadButton';
 import { SubtitleCard } from '@/components/SubtitleCard';
 import { downloadString } from '@/utils/download';
 import { createBrowserOpenAIClient } from '@/utils/openaiClient';
+import { useModelList } from '@/hooks/useModelList';
 import { sampleSrt } from '@/data/sample';
 
 import { Translator, TranslatorStructuredArray, subtitleParser, CooldownContext } from "chatgpt-subtitle-translator"
@@ -61,6 +62,9 @@ export function TranslatorApplication() {
   // Translator Stats
   const [usageInformation, setUsageInformation] = useState(/** @type {typeof Translator.prototype.usage}*/(null))
   const [RPMInfomation, setRPMInformation] = useState(0)
+
+  // Model discovery against the configured endpoint
+  const { models: availableModels, isLoading: modelsLoading, error: modelsError } = useModelList(APIvalue, baseUrlValue)
 
   // Persistent Data Restoration
   useEffect(() => {
@@ -316,15 +320,26 @@ export function TranslatorApplication() {
 
                   <div className='flex flex-wrap md:flex-nowrap w-full gap-4'>
                     <div className='w-full md:w-1/5'>
-                      <Input
+                      <Autocomplete
                         size='sm'
                         type="text"
                         label="Model"
                         placeholder={DefaultModel}
-                        autoComplete='on'
-                        value={model}
-                        onValueChange={setModelValue}
-                      />
+                        autoComplete='off'
+                        allowsCustomValue
+                        isLoading={modelsLoading}
+                        inputValue={model ?? ""}
+                        selectedKey={availableModels.includes(model) ? model : null}
+                        onInputChange={setModelValue}
+                        onSelectionChange={(key) => key && setModelValue(String(key))}
+                        description={modelsError}
+                      >
+                        {availableModels.map((modelId) => (
+                          <AutocompleteItem key={modelId}>
+                            {modelId}
+                          </AutocompleteItem>
+                        ))}
+                      </Autocomplete>
                     </div>
 
                     <div className='w-full md:w-1/5 flex'>
