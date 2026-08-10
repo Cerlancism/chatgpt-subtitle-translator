@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react'
-import { Autocomplete, AutocompleteItem, Button, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@nextui-org/react";
+import { Autocomplete, AutocompleteItem, Button, ButtonGroup, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@nextui-org/react";
 
 import { EyeSlashFilledIcon } from './EyeSlashFilledIcon';
 import { EyeFilledIcon } from './EyeFilledIcon';
@@ -10,6 +10,7 @@ import { FileUploadButton } from '@/components/FileUploadButton';
 import { SubtitleCard } from '@/components/SubtitleCard';
 import { downloadString } from '@/utils/download';
 import { createBrowserOpenAIClient } from '@/utils/openaiClient';
+import { AcceptedSubtitleExtensions, SubtitleFormats, convertFromSrt, convertToSrt, detectSubtitleFormat, getSubtitleFormat } from '@/utils/subtitleFormats';
 import { useModelList } from '@/hooks/useModelList';
 import { sampleSrt } from '@/data/sample';
 
@@ -118,6 +119,38 @@ export function TranslatorApplication() {
       localStorage.setItem(MODEL, value)
     }
     setModel(value)
+  }
+
+  /**
+   * @param {File} file
+   */
+  async function importSubtitles(file) {
+    try {
+      const text = await file.text()
+      const format = detectSubtitleFormat(text, file.name)
+      const srtText = convertToSrt(text, format)
+      const parsed = subtitleParser.fromSrt(srtText)
+      if (parsed.length === 0) {
+        throw new Error("No subtitle entries found in the file.")
+      }
+      setSrtInputText(srtText)
+      setInputs(parsed.map(x => x.text))
+    } catch (error) {
+      alert(error.message ?? error)
+    }
+  }
+
+  /**
+   * @param {import('@/utils/subtitleFormats').SubtitleFormatId} formatId
+   */
+  function exportSubtitles(formatId) {
+    const format = getSubtitleFormat(formatId)
+    try {
+      downloadString(convertFromSrt(srtOutputText, format.id), format.mimeType, `export${format.extension}`)
+    } catch (error) {
+      console.error(error)
+      alert(error?.message ?? error)
+    }
   }
 
   async function generate(e) {
@@ -408,17 +441,7 @@ export function TranslatorApplication() {
         </form>
 
         <div className='w-full justify-between md:justify-center flex flex-wrap gap-1 sm:gap-4 mt-auto sticky top-0 backdrop-blur px-4 pt-4'>
-          <FileUploadButton label={"Import SRT"} onFileSelect={async (file) => {
-            // console.log("File", file);
-            try {
-              const text = await file.text()
-              const parsed = subtitleParser.fromSrt(text)
-              setSrtInputText(text)
-              setInputs(parsed.map(x => x.text))
-            } catch (error) {
-              alert(error.message ?? error)
-            }
-          }} />
+          <FileUploadButton label={"Import"} accept={AcceptedSubtitleExtensions} onFileSelect={(file) => importSubtitles(file)} />
           {!translatorRunningState && (
             <Button type='submit' form="translator-config-form" color="primary" isDisabled={!APIvalue || translatorRunningState}>
               Start
@@ -431,12 +454,28 @@ export function TranslatorApplication() {
             </Button>
           )}
 
-          <Button color="primary" onClick={() => {
-            // console.log(srtOutputText)
-            downloadString(srtOutputText, "text/plain", "export.srt")
-          }}>
-            Export SRT
-          </Button>
+          <ButtonGroup color="primary">
+            <Button onClick={() => exportSubtitles("srt")}>
+              Export SRT
+            </Button>
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger>
+                <Button isIconOnly aria-label="More export formats">
+                  <ChevronDownIcon />
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu
+                aria-label="Export formats"
+                onAction={(key) => exportSubtitles(/** @type {import('@/utils/subtitleFormats').SubtitleFormatId} */(key))}
+              >
+                {SubtitleFormats.map((format) => (
+                  <DropdownItem key={format.id} description={`Export as ${format.extension}`}>
+                    {format.label}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
+          </ButtonGroup>
           <Divider className='mt-3 sm:mt-0' />
         </div>
 
