@@ -294,6 +294,9 @@ export class Translator extends TranslatorBase {
             return lines.length - startIndex
         }
         const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION / reductionFactor)
+        if (budget <= 0) {
+            return Math.min(AUTO_BATCH_MIN, lines.length - startIndex)
+        }
         const weights = lines.map(l => this.getLineTokenWeight(l))
         return computeEvenBatchSize(weights, startIndex, budget)
     }
