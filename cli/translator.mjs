@@ -182,8 +182,10 @@ async function run(opts, options, agentMode = false) {
     /** Wraps a progress output callback to a no-op when the log level is silent. @template {Function} F @param {F} fn */
     const unlessSilent = (fn) => log.getLevel() === log.levels.SILENT ? () => { } : fn
 
+    /** Summary loaded from the sidecar, if any - used to skip re-saving unchanged cache content. */
+    let cachedSummary
     if (agentMode && opts.input && !options.agentContextSummary) {
-        const cachedSummary = loadAgentSummary(opts, options)
+        cachedSummary = loadAgentSummary(opts, options)
         if (cachedSummary) {
             options.agentContextSummary = cachedSummary
         }
@@ -206,7 +208,14 @@ async function run(opts, options, agentMode = false) {
             readline.cursorTo(process.stdout, 0)
         }),
         onAgentPlanningResult: agentMode && opts.input
-            ? (result) => saveAgentSummary(opts, options, result)
+            ? (result) => {
+                // A cache hit replays the sidecar's own summary - saving it back would only
+                // rewrite identical content with a fresh createdAt.
+                if (result.contextSummary === cachedSummary) {
+                    return
+                }
+                saveAgentSummary(opts, options, result)
+            }
             : undefined,
         moderationService: {
             openai,
