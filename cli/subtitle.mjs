@@ -3,23 +3,25 @@ import url from 'node:url'
 import fs from 'node:fs'
 import { Command } from "commander"
 import path from 'node:path'
-import { offsetSrt, parseTimeOffset, parser } from '../src/subtitle.mjs'
+import { parseTimeOffset } from '../src/subtitle.mjs'
+import { detectSubtitleFormat, getSubtitleFormat, mergeSubtitles, offsetSubtitle } from '../src/subtitleFormats.mjs'
 
 /**
  * @param {readonly string[]} args
  */
 function createInstance(args) {
     const commandOffsetFile = new Command("offset")
-        .description("Offsets all timestamps in .srt file, currently implemented using floating points, sub-second operations will have precision issues\n"
+        .description("Offsets all timestamps in a .srt, .vtt or .ass/.ssa file, currently implemented using floating points, sub-second operations will have precision issues\n"
             + "For negative offsets, pass -- first, eg: \n./subtitle.mjs -- offset file.srt -01:02:03.456")
         .argument("<file>", "Target file")
         .argument("<offset>", "Time offset in HH-MM-SS.sss or HH:MM:SS,sss or HH:MM:SS.sss or seconds")
         .action((file, offset) => offsetFile(file, offset))
 
     const commandMergeFiles = new Command("merge")
-        .description("Merge subtitle files")
+        .description("Merge subtitle files, formats may be mixed. The output format follows the first file unless --format is given")
         .arguments("<files...>")
-        .action((files) => mergeFiles(files))
+        .option("--format <format>", "Output format: srt, vtt or ass")
+        .action((files, opts) => mergeFiles(files, opts.format))
 
     const program = new Command()
         .description("Subtitle utilities")
@@ -50,32 +52,27 @@ function offsetFile(file, offset) {
     console.error("offsetting", filePath.ext, filePath.name, offsetSeconds)
 
     const content = fs.readFileSync(file, 'utf-8')
-    const srt = offsetSrt(content, offsetSeconds)
+    const format = detectSubtitleFormat(content, file)
+    const offsetted = offsetSubtitle(content, offsetSeconds, format)
 
     fs.renameSync(file, path.join(filePath.dir, filePath.name + ".old" + filePath.ext))
-    fs.writeFileSync(file, srt)
+    fs.writeFileSync(file, offsetted)
 }
 
 /**
  * TODO: Move this to another module
- * @param {string[]} files 
+ * @param {string[]} files
+ * @param {string} [outputFormat] Output format, defaults to the format of the first file
  */
-function mergeFiles(files) {
-    let output = []
+function mergeFiles(files, outputFormat) {
+    const contents = files.map(file => fs.readFileSync(file, 'utf-8'))
+    const formats = contents.map((content, i) => detectSubtitleFormat(content, files[i]))
+    const format = getSubtitleFormat(outputFormat ?? formats[0])
 
-    for (const file of files) {
-        const content = fs.readFileSync(file, 'utf-8')
-        const srt = parser.fromSrt(content)
-        for (let index = 0, id = output.length; index < srt.length; index++, id++) {
-            const item = srt[index]
-            item.id = (id + 1).toString()
-            output.push(item)
-        }
-    }
-    const outSrt = parser.toSrt(output)
+    const outSubtitle = mergeSubtitles(contents, formats, format.id)
     const outFilePaths = files.map(x => path.parse(x))
-    const outFileName = outFilePaths.map(x => x.name).join("+") + outFilePaths[0].ext
-    fs.writeFileSync(path.join(outFilePaths[0].dir, outFileName), outSrt)
+    const outFileName = outFilePaths.map(x => x.name).join("+") + format.extension
+    fs.writeFileSync(path.join(outFilePaths[0].dir, outFileName), outSubtitle)
 }
 
 

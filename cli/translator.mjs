@@ -17,6 +17,14 @@ import {
     createOpenAIClient,
     CooldownContext,
     subtitleParser,
+    detectSubtitleFormat,
+    isSubtitleFile,
+    subtitleFormatFromFileName,
+    getSubtitleFormat,
+    convertToSrt,
+    subtitleHeader,
+    formatSubtitleCue,
+    cueFromSrtEntry,
     wrapQuotes
 } from "../src/main.mjs"
 
@@ -52,8 +60,8 @@ function addTranslatorOptions(cmd) {
         .option("-m, --model <model>", "OpenAI model to use for translation", process.env.OPENAI_DEFAULT_MODEL ?? DefaultOptions.createChatCompletionRequest.model)
         .option("--moderation-model <model>", "OpenAI moderation model", DefaultOptions.moderationModel)
 
-        .option("-i, --input <file>", "Text file name to use as input, .srt or plain text")
-        .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
+        .option("-i, --input <file>", "Text file name to use as input, a subtitle file (.srt, .vtt, .ass/.ssa) or plain text")
+        .option("-o, --output <file>", "Output file name, defaults to be based on input file name. For subtitle input, a subtitle extension on this name selects the output format, otherwise the input format is kept")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}`")
         .option("-p, --plain-text <text>", "Only translate this input plain text. Not supported in timestamp mode, or with the agent subcommand using -r timestamp")
         .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "object", "timestamp", "agent", "none"]).default("array"))
@@ -234,8 +242,8 @@ async function run(opts, options, agentMode = false) {
     }
     else if (opts.input) {
         const fileTag = opts.systemInstruction ? "Custom" : opts.to
-        if (opts.input.endsWith(".srt")) {
-            await translateSrtFile(translator, opts, options, agentMode, fileTag)
+        if (isSubtitleFile(opts.input)) {
+            await translateSubtitleFile(translator, opts, options, agentMode, fileTag)
         }
         else {
             await translateTextFile(/** @type {import('../src/translator.mjs').Translator} */(translator), opts, fileTag)
@@ -250,39 +258,51 @@ async function run(opts, options, agentMode = false) {
  * @param {boolean} agentMode
  * @param {string} fileTag
  */
-async function translateSrtFile(translator, opts, options, agentMode, fileTag) {
-    log.debug("[CLI]", "Assume SRT file", opts.input)
+async function translateSubtitleFile(translator, opts, options, agentMode, fileTag) {
     const text = fs.readFileSync(opts.input, 'utf-8')
-    const srtArraySource = subtitleParser.fromSrt(text)
-    const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}.srt`
+    const inputFormat = detectSubtitleFormat(text, opts.input)
+    log.debug("[CLI]", "Assume subtitle file", getSubtitleFormat(inputFormat).label, opts.input)
+
+    // An output file name carrying a subtitle extension selects the output
+    // format, otherwise the input format is kept
+    const outputFormat = (opts.output ? subtitleFormatFromFileName(opts.output)?.id : undefined) ?? inputFormat
+    const outputFile = opts.output ? opts.output : `${opts.input}.out_${fileTag}${getSubtitleFormat(inputFormat).extension}`
+    if (outputFormat !== inputFormat) {
+        log.debug("[CLI]", "Converting output to", getSubtitleFormat(outputFormat).label, outputFile)
+    }
+
+    // The pipeline works on SRT, other formats are converted on the way in and
+    // written back out in the output format
+    const srtText = convertToSrt(text, inputFormat)
+    const srtArraySource = subtitleParser.fromSrt(srtText)
 
     const isNoResumeMode = options.structuredMode === "timestamp" || agentMode
     if (isNoResumeMode) {
         log.warn("[CLI]", `${agentMode ? "Agent" : "Timestamp"} mode: progress resumption is not supported, starting from beginning.`)
-        fs.writeFileSync(outputFile, '')
+        fs.writeFileSync(outputFile, subtitleHeader(outputFormat))
     }
 
     if (options.structuredMode === "timestamp") {
         if (!(translator instanceof TranslatorStructuredTimestamp || translator instanceof TranslatorAgent)) {
             throw new Error("Expected TranslatorStructuredTimestamp or TranslatorAgent")
         }
-        await runWithErrorExit(() => translateTimestampSrt(translator, srtArraySource, outputFile))
+        await runWithErrorExit(() => translateTimestampSrt(translator, srtArraySource, outputFile, outputFormat))
         return
     }
 
-    const srtArrayWorking = subtitleParser.fromSrt(text)
+    const srtArrayWorking = subtitleParser.fromSrt(srtText)
     const sourceLines = srtArraySource.map(x => x.text)
 
     if (translator instanceof TranslatorAgent) {
-        await runWithErrorExit(() => writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile))
+        await runWithErrorExit(() => writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile, outputFormat))
         return
     }
 
     if (translator instanceof TranslatorStructuredTimestamp) throw new Error("Unexpected TranslatorStructuredTimestamp")
 
     const progressFile = `${opts.input}.progress_${fileTag}.csv`
-    await resumeProgress(translator, sourceLines, progressFile, outputFile)
-    await runWithErrorExit(() => writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile, progressFile))
+    await resumeProgress(translator, sourceLines, progressFile, outputFile, outputFormat)
+    await runWithErrorExit(() => writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile, outputFormat, progressFile))
 }
 
 /**
@@ -315,8 +335,9 @@ async function runWithErrorExit(fn) {
  * @param {TranslatorStructuredTimestamp | TranslatorAgent} translator
  * @param {ReturnType<typeof subtitleParser.fromSrt>} srtArraySource
  * @param {string} outputFile
+ * @param {import('../src/subtitleFormats.mjs').SubtitleFormatId} format
  */
-async function translateTimestampSrt(translator, srtArraySource, outputFile) {
+async function translateTimestampSrt(translator, srtArraySource, outputFile, format) {
     const timestampSource = srtArraySource.map(e => ({ start: e.startTime, end: e.endTime, text: e.text }))
     let outputId = 1
     for await (const output of translator.translateLines(timestampSource)) {
@@ -330,9 +351,9 @@ async function translateTimestampSrt(translator, srtArraySource, outputFile) {
             endSeconds: subtitleParser.timestampToSeconds(srtOut.end),
             text: srtOut.text
         }
-        const outSrt = subtitleParser.toSrt([entry])
+        const outSubtitle = formatSubtitleCue(format, cueFromSrtEntry(entry), outputId)
         log.info(outputId, entry.startTime, "->", entry.endTime, wrapQuotes(entry.text))
-        await fs.promises.appendFile(outputFile, outSrt)
+        await fs.promises.appendFile(outputFile, outSubtitle)
         outputId++
     }
 }
@@ -342,8 +363,9 @@ async function translateTimestampSrt(translator, srtArraySource, outputFile) {
  * @param {string[]} sourceLines
  * @param {string} progressFile
  * @param {string} outputFile
+ * @param {import('../src/subtitleFormats.mjs').SubtitleFormatId} format
  */
-async function resumeProgress(translator, sourceLines, progressFile, outputFile) {
+async function resumeProgress(translator, sourceLines, progressFile, outputFile, format) {
     if (await checkFileExists(progressFile)) {
         const progress = await getProgress(progressFile)
 
@@ -352,7 +374,7 @@ async function resumeProgress(translator, sourceLines, progressFile, outputFile)
             log.debug("[CLI]", `Overwriting ${progressFile}`)
             fs.writeFileSync(progressFile, '')
             log.debug("[CLI]", `Overwriting ${outputFile}`)
-            fs.writeFileSync(outputFile, '')
+            fs.writeFileSync(outputFile, subtitleHeader(format))
         }
         else {
             log.debug("[CLI]", `Resuming from ${progressFile}`, progress.length)
@@ -371,7 +393,7 @@ async function resumeProgress(translator, sourceLines, progressFile, outputFile)
         }
     }
     else {
-        fs.writeFileSync(outputFile, '')
+        fs.writeFileSync(outputFile, subtitleHeader(format))
     }
 }
 
@@ -380,17 +402,18 @@ async function resumeProgress(translator, sourceLines, progressFile, outputFile)
  * @param {string[]} sourceLines
  * @param {ReturnType<typeof subtitleParser.fromSrt>} srtArrayWorking
  * @param {string} outputFile
+ * @param {import('../src/subtitleFormats.mjs').SubtitleFormatId} format
  * @param {string} [progressFile]
  */
-async function writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile, progressFile) {
+async function writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile, format, progressFile) {
     for await (const out of translator.translateLines(sourceLines)) {
         // String-based translators always yield LineOutput records
         const output = /** @type {import('../src/translatorBase.mjs').LineOutput} */ (out)
         const srtEntry = srtArrayWorking[output.index - 1]
         srtEntry.text = output.finalTransform
-        const outSrt = subtitleParser.toSrt([srtEntry])
+        const outSubtitle = formatSubtitleCue(format, cueFromSrtEntry(srtEntry), srtEntry.id)
         log.info(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
-        const writes = [fs.promises.appendFile(outputFile, outSrt)]
+        const writes = [fs.promises.appendFile(outputFile, outSubtitle)]
         if (progressFile) {
             const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
             writes.push(fs.promises.appendFile(progressFile, csv))
