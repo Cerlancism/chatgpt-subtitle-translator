@@ -5,14 +5,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { TranslatorAgent } from '../src/translatorAgent.mjs';
-
-process.env.OPENAI_API_KEY ??= 'test-key';
-
-const {
+import {
     getAgentSummaryFile,
     loadAgentSummary,
     saveAgentSummary,
-} = await import('../cli/translator.mjs');
+} from '../src/agentSummaryCache.mjs';
 
 function makeInputFile() {
     const dir = mkdtempSync(join(tmpdir(), 'agent-summary-cache-'));

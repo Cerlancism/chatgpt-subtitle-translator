@@ -2,7 +2,6 @@
 import fs from 'node:fs'
 import path from 'node:path';
 import readline from 'node:readline'
-import { pathToFileURL } from 'node:url'
 import * as undici from 'undici';
 
 import { Command, Option } from "commander"
@@ -18,7 +17,9 @@ import {
     createOpenAIClient,
     CooldownContext,
     subtitleParser,
-    wrapQuotes
+    wrapQuotes,
+    loadAgentSummary,
+    saveAgentSummary
 } from "../src/main.mjs"
 
 import 'dotenv/config'
@@ -27,7 +28,6 @@ const proxyAgent = getProxyAgent()
 const openai = createOpenAIClient(process.env.OPENAI_API_KEY, undefined, process.env.OPENAI_BASE_URL, proxyAgent)
 const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 500), 60000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_MODERATOR_RPM ?? process.env.OPENAI_API_RPM ?? 500), 60000, "OpenAIModerator")
-const AGENT_SUMMARY_CACHE_VERSION = 1
 
 function getProxyAgent() {
     const httpProxyConfig = process.env.http_proxy ?? process.env.HTTP_PROXY
@@ -166,108 +166,6 @@ function buildOptions(opts) {
     }
 
     return options
-}
-
-/**
- * @param {Record<string, any>} opts
- */
-function getBaseSystemInstruction(opts) {
-    return opts.systemInstruction ?? `Translate ${opts.from ? opts.from + " " : ""}to ${opts.to}`
-}
-
-/**
- * @param {string} inputFile
- */
-function getAgentSummaryFile(inputFile) {
-    return `${inputFile}.agent-summary.json`
-}
-
-/**
- * @param {Record<string, any>} opts
- * @param {Partial<import("../src/translator.mjs").TranslatorOptions>} options
- */
-function getAgentSummaryMetadata(opts, options) {
-    const inputStat = fs.statSync(opts.input)
-    return {
-        version: AGENT_SUMMARY_CACHE_VERSION,
-        inputFile: opts.input,
-        inputSize: inputStat.size,
-        inputMtimeMs: inputStat.mtimeMs,
-        from: opts.from,
-        to: opts.to,
-        model: options.createChatCompletionRequest?.model,
-        structuredMode: options.structuredMode ?? "array",
-        useFullContext: options.useFullContext,
-        systemInstruction: getBaseSystemInstruction(opts),
-    }
-}
-
-/**
- * @param {Record<string, any>} opts
- * @param {Partial<import("../src/translator.mjs").TranslatorOptions>} options
- */
-function loadAgentSummary(opts, options) {
-    const summaryFile = getAgentSummaryFile(opts.input)
-    if (!fs.existsSync(summaryFile)) {
-        return undefined
-    }
-    try {
-        const cache = JSON.parse(fs.readFileSync(summaryFile, "utf-8"))
-        const expected = getAgentSummaryMetadata(opts, options)
-        const isCompatible =
-            cache.version === expected.version &&
-            cache.inputFile === expected.inputFile &&
-            cache.inputSize === expected.inputSize &&
-            cache.inputMtimeMs === expected.inputMtimeMs &&
-            cache.from === expected.from &&
-            cache.to === expected.to &&
-            cache.model === expected.model &&
-            cache.structuredMode === expected.structuredMode &&
-            cache.useFullContext === expected.useFullContext &&
-            cache.systemInstruction === expected.systemInstruction &&
-            typeof cache.contextSummary === "string" &&
-            cache.contextSummary.length > 0
-
-        if (!isCompatible) {
-            log.warn("[CLI]", `Ignoring stale agent summary cache ${summaryFile}`)
-            return undefined
-        }
-
-        log.debug("[CLI]", `Using agent summary cache ${summaryFile}`)
-        return cache.contextSummary
-    } catch (error) {
-        log.warn("[CLI]", `Could not read agent summary cache ${summaryFile}:`, error?.message ?? error)
-        return undefined
-    }
-}
-
-/**
- * @param {Record<string, any>} opts
- * @param {Partial<import("../src/translator.mjs").TranslatorOptions>} options
- * @param {{ contextSummary?: string, finalInstruction?: string }} result
- */
-function saveAgentSummary(opts, options, result) {
-    if (!result.contextSummary) return
-    try {
-        const summaryFile = getAgentSummaryFile(opts.input)
-        const payload = {
-            ...getAgentSummaryMetadata(opts, options),
-            createdAt: new Date().toISOString(),
-            contextSummary: result.contextSummary,
-            finalInstruction: result.finalInstruction,
-        }
-        fs.writeFileSync(summaryFile, `${JSON.stringify(payload, null, 2)}\n`)
-        log.debug("[CLI]", `Saved agent summary cache ${summaryFile}`)
-    } catch (error) {
-        log.warn("[CLI]", `Could not save agent summary cache for ${opts.input}:`, error?.message ?? error)
-    }
-}
-
-export {
-    getAgentSummaryFile,
-    getAgentSummaryMetadata,
-    loadAgentSummary,
-    saveAgentSummary,
 }
 
 /**
@@ -574,6 +472,4 @@ async function checkFileExists(filePath) {
     }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    createInstance(process.argv)
-}
+createInstance(process.argv)
