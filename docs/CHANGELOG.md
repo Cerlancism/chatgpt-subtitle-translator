@@ -18,6 +18,10 @@ for await (const output of translator.translateLines(entries)) { /* ... */ }
 
 CLI usage is unaffected.
 
+#### `--skip-refine` deprecated (CLI)
+
+The agent-mode `--skip-refine` flag is renamed to `--no-refine`, aligning it with the other negated boolean options such as `--no-fitting`.
+
 ### New Features
 
 #### Evened-out auto batch sizes

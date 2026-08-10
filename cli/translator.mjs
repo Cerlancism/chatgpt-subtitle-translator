@@ -92,7 +92,8 @@ async function createInstance(args) {
 
     addTranslatorOptions(program.command("agent")
         .description("Agentic multi-pass translation: planning pass observes content before translating"))
-        .option("--skip-refine", "Skip final instruction refinement and use the base instruction directly")
+        .option("--no-refine", "Skip final instruction refinement and use the base instruction directly")
+        .option("--skip-refine", "Deprecated alias for --no-refine")
         .option("--no-fitting", "Skip LLM-based token-range fitting for planning summaries and consolidation")
         .option("--context-summary <summary>", "Provide a context summary directly, skipping the batch summary scanning pass")
         .action(async (_, agentCmd) => {
@@ -143,7 +144,7 @@ function buildOptions(opts) {
         ...(opts.guardRepetition !== undefined && { guardRepetition: opts.guardRepetition }),
         ...(opts.logLevel && { logLevel: opts.logLevel }),
         ...(opts.input && { inputFile: opts.input }),
-        ...(opts.skipRefine && { skipRefineInstruction: true }),
+        ...((opts.refine === false || opts.skipRefine) && { skipRefineInstruction: true }),
         ...(opts.fitting === false && { skipFitting: true }),
         ...(opts.contextSummary && { agentContextSummary: opts.contextSummary })
     }
@@ -159,6 +160,10 @@ function buildOptions(opts) {
     }
 
     log.debug("[CLI]", "Log level", Object.entries(log.levels).find(x => x[1] === log.getLevel())?.[0])
+
+    if (opts.skipRefine) {
+        log.warn("[CLI]", "--skip-refine is deprecated, use --no-refine instead")
+    }
 
     if (options.inputMultiplier && !options.max_token) {
         log.error("[CLI]", "[ERROR]", "--experimental-input-multiplier must be set with --experimental-max_token")
