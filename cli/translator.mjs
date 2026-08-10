@@ -17,7 +17,9 @@ import {
     createOpenAIClient,
     CooldownContext,
     subtitleParser,
-    wrapQuotes
+    wrapQuotes,
+    loadAgentSummary,
+    saveAgentSummary
 } from "../src/main.mjs"
 
 import 'dotenv/config'
@@ -175,6 +177,13 @@ async function run(opts, options, agentMode = false) {
     /** Wraps a progress output callback to a no-op when the log level is silent. @template {Function} F @param {F} fn */
     const unlessSilent = (fn) => log.getLevel() === log.levels.SILENT ? () => { } : fn
 
+    if (agentMode && opts.input && !options.agentContextSummary) {
+        const cachedSummary = loadAgentSummary(opts, options)
+        if (cachedSummary) {
+            options.agentContextSummary = cachedSummary
+        }
+    }
+
     /**
      * @type {import('../src/translator.mjs').TranslationServiceContext}
      */
@@ -191,6 +200,9 @@ async function run(opts, options, agentMode = false) {
             readline.clearLine(process.stdout, 0)
             readline.cursorTo(process.stdout, 0)
         }),
+        onAgentPlanningResult: agentMode && opts.input
+            ? (result) => saveAgentSummary(opts, options, result)
+            : undefined,
         moderationService: {
             openai,
             cooler: coolerOpenAIModerator

@@ -11,6 +11,7 @@ import { roundWithPrecision, sleep } from './helpers.mjs'
  * @property {(data: string) => void} [onStreamChunk] - Called for each streamed token chunk
  * @property {() => void} [onStreamEnd] - Called when a stream response finishes
  * @property {() => void} [onClearLine] - Called to erase the current console line (progress UI)
+ * @property {(result: { contextSummary?: string, finalInstruction?: string }) => void | Promise<void>} [onAgentPlanningResult] - Called when agent planning produces reusable context
  * @property {import('./moderator.mjs').ModerationServiceContext} [moderationService] - Optional moderation service context
  */
 
