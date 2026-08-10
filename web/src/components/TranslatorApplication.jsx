@@ -1,16 +1,18 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react'
-import { Button, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider } from "@nextui-org/react";
+import { Button, Input, Card, Textarea, Slider, Switch, CardHeader, CardBody, Divider, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@nextui-org/react";
 
 import { EyeSlashFilledIcon } from './EyeSlashFilledIcon';
 import { EyeFilledIcon } from './EyeFilledIcon';
+import { ChevronDownIcon } from './ChevronDownIcon';
 
 import { FileUploadButton } from '@/components/FileUploadButton';
 import { SubtitleCard } from '@/components/SubtitleCard';
 import { downloadString } from '@/utils/download';
+import { createBrowserOpenAIClient } from '@/utils/openaiClient';
 import { sampleSrt } from '@/data/sample';
 
-import { Translator, TranslatorStructuredArray, subtitleParser, createOpenAIClient, CooldownContext } from "chatgpt-subtitle-translator"
+import { Translator, TranslatorStructuredArray, subtitleParser, CooldownContext } from "chatgpt-subtitle-translator"
 
 const OPENAI_API_KEY = "OPENAI_API_KEY"
 const OPENAI_BASE_URL = "OPENAI_BASE_URL"
@@ -19,6 +21,15 @@ const MODEL = "MODEL"
 
 const DefaultModel = "gpt-4o-mini"
 const DefaultTemperature = 0
+
+/**
+ * Quick fill targets for the base url field, a custom url can still be typed.
+ * @type {{key: string, label: string, url: string | undefined}[]}
+ */
+const BaseUrlPresets = [
+  { key: "openai", label: "OpenAI", url: undefined },
+  { key: "anthropic", label: "Anthropic", url: "https://api.anthropic.com/v1/" },
+]
 
 export function TranslatorApplication() {
   // Translator Configuration
@@ -116,7 +127,7 @@ export function TranslatorApplication() {
     const outputWorkingProgress = subtitleParser.fromSrt(srtInputText)
     const currentOutputs = []
     console.log("OPENAI_BASE_URL", baseUrlValue)
-    const openai = createOpenAIClient(APIvalue, true, baseUrlValue)
+    const openai = createBrowserOpenAIClient(APIvalue, baseUrlValue)
 
     const coolerChatGPTAPI = new CooldownContext(rateLimit, 60000, "ChatGPTAPI")
 
@@ -234,16 +245,40 @@ export function TranslatorApplication() {
                       }
                       type={isAPIInputVisible ? "text" : "password"}
                     />
-                    <Input
-                      className='w-full md:w-6/12'
-                      size='sm'
-                      type="text"
-                      label="OpenAI Base Url"
-                      placeholder="https://api.openai.com/v1"
-                      autoComplete='on'
-                      value={baseUrlValue ?? ""}
-                      onValueChange={setBaseUrl}
-                    />
+                    <div className='w-full md:w-6/12 flex gap-2 items-start'>
+                      <Input
+                        className='w-full'
+                        size='sm'
+                        type="text"
+                        label="OpenAI Base Url"
+                        placeholder="https://api.openai.com/v1"
+                        autoComplete='on'
+                        value={baseUrlValue ?? ""}
+                        onValueChange={setBaseUrl}
+                      />
+                      <Dropdown>
+                        <DropdownTrigger>
+                          <Button
+                            isIconOnly
+                            size='lg'
+                            variant="flat"
+                            aria-label="Base url presets"
+                          >
+                            <ChevronDownIcon className="text-lg text-default-500" />
+                          </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu
+                          aria-label="Base url presets"
+                          onAction={(key) => setBaseUrl(BaseUrlPresets.find(x => x.key === key)?.url)}
+                        >
+                          {BaseUrlPresets.map((preset) => (
+                            <DropdownItem key={preset.key} description={preset.url ?? "Default endpoint"}>
+                              {preset.label}
+                            </DropdownItem>
+                          ))}
+                        </DropdownMenu>
+                      </Dropdown>
+                    </div>
                   </div>
 
                   <div className='flex w-full gap-4'>
