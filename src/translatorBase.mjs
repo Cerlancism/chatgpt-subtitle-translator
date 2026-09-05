@@ -8,7 +8,7 @@ import { roundWithPrecision, sleep } from './helpers.mjs'
 export const CONTEXT_HEADROOM_FRACTION = 0.5
 /** Prior ratio of a batch's history cost (its prompt context messages) to the token
  * weight of its input text, used until measured from the recorded history. */
-export const HISTORY_COST_RATIO_PRIOR = 2
+export const HISTORY_COST_RATIO_PRIOR = 3
 
 /**
  * Runtime context passed to translation service functions.
