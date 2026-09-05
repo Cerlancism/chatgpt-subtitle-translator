@@ -2,7 +2,6 @@ import { PassThrough } from "stream";
 import { z } from "zod";
 import { JSONParser } from "@streamparser/json-node";
 import log from "loglevel"
-import { countTokens } from "gpt-tokenizer"
 
 import { TranslationOutput } from "./translatorOutput.mjs";
 import { TranslatorStructuredBase } from "./translatorStructuredBase.mjs";
@@ -128,45 +127,40 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     }
 
     /**
-     * @override
-     * Builds the prompt context from entryHistory (instead of workingProgress).
+     * @override Renders a range of entryHistory as prompt context messages: the batch
+     * input as sent (toon, offsets relative to the batch start) and the merged outputs
+     * as the assistant reply.
+     * @param {number} start
+     * @param {number} end
      */
-    buildContext() {
-        if (this.entryHistory.length === 0) return
+    renderHistoryChunk(start, end) {
+        const chunk = this.entryHistory.slice(start, end)
+        const baseMs = timestampToMilliseconds(chunk[0].input.start)
+        const userContent = encodeToon({ offset: baseMs, inputs: chunk.map(e => toMsEntry(e.input, baseMs)) })
+        const seenStarts = new Set()
+        const outputs = chunk.reduce((acc, e) => {
+            if (!seenStarts.has(e.output.start)) {
+                seenStarts.add(e.output.start)
+                acc.push(e.output)
+            }
+            return acc
+        }, [])
+        const assistantContent = JSON.stringify({ outputs: outputs.map(e => toMsEntry(e, baseMs)) })
+        return /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ ([
+            { role: "user", content: userContent },
+            { role: "assistant", content: assistantContent }
+        ])
+    }
 
-        const chunkSize = this.contextChunkSize
-
-        // Precompute all chunks with their serialized message content
-        const allChunks = []
-        for (let i = 0; i < this.entryHistory.length; i += chunkSize) {
-            const chunk = this.entryHistory.slice(i, i + chunkSize)
-            const chunkBaseMs = timestampToMilliseconds(chunk[0].input.start)
-            const userContent = encodeToon({ offset: chunkBaseMs, inputs: chunk.map(e => toMsEntry(e.input, chunkBaseMs)) })
-            const seenStarts = new Set()
-            const outputs = chunk.reduce((acc, e) => {
-                if (!seenStarts.has(e.output.start)) {
-                    seenStarts.add(e.output.start)
-                    acc.push(e.output)
-                }
-                return acc
-            }, [])
-            const assistantContent = JSON.stringify({ outputs: outputs.map(e => toMsEntry(e, chunkBaseMs)) })
-            allChunks.push({ userContent, assistantContent, size: chunk.length })
-        }
-
-        const { includedChunks, tokenCount } = this.selectContextChunks(allChunks,
-            ({ userContent, assistantContent }) => countTokens(userContent) + countTokens(assistantContent)
-        )
-
-        const includedEntries = includedChunks.reduce((sum, c) => sum + c.size, 0)
-        this.logContextSelection(includedEntries, this.entryHistory.length, tokenCount)
-
-        this.promptContext = /** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} */ (
-            includedChunks.flatMap(({ userContent, assistantContent }) => [
-                { role: "user", content: userContent },
-                { role: "assistant", content: assistantContent }
-            ])
-        )
+    /**
+     * Appends translated entries to entryHistory and records them as one context chunk.
+     * @param {{ input: TimestampEntry, output: TimestampEntry, completionTokens: number }[]} entries
+     */
+    recordEntries(entries) {
+        const start = this.entryHistory.length
+        this.entryHistory.push(...entries)
+        const inputTokens = entries.reduce((sum, e) => sum + this.getLineTokenWeight(e.input), 0)
+        this.recordHistoryChunk(this.renderHistoryChunk(start, this.entryHistory.length), entries.length, inputTokens)
     }
 
     /**
@@ -184,7 +178,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
             log.warn("[TranslatorStructuredTimestamp]", "Empty output for single entry, using original:", input.text)
         }
 
-        this.entryHistory.push({ input, output: resultEntry, completionTokens: output.completionTokens })
+        this.recordEntries([{ input, output: resultEntry, completionTokens: output.completionTokens }])
 
         yield resultEntry
     }
@@ -207,11 +201,11 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
      */
     * yieldBatchSuccess(batch, outputEntries, output) {
         const completionTokensPerEntry = output.completionTokens / batch.length
-        for (const input of batch) {
-            const matchedOutput = outputEntries.find(o => o.start <= input.start && o.end >= input.end)
-                ?? outputEntries.at(-1)
-            this.entryHistory.push({ input, output: matchedOutput, completionTokens: completionTokensPerEntry })
-        }
+        this.recordEntries(batch.map(input => ({
+            input,
+            output: outputEntries.find(o => o.start <= input.start && o.end >= input.end) ?? outputEntries.at(-1),
+            completionTokens: completionTokensPerEntry
+        })))
 
         yield* outputEntries
     }

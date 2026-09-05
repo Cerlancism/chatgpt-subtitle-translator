@@ -2,10 +2,13 @@ import log from "loglevel"
 import { countTokens } from "gpt-tokenizer"
 import { roundWithPrecision, sleep } from './helpers.mjs'
 
-/** Context history chunk size (entries) in dynamic batch mode — fixed so chunk
- * boundaries stay stable across batches (required for prefix caching) and small
- * enough for precise window selection. */
-const CONTEXT_CHUNK_ENTRIES = 16
+/** Fraction of the context token budget the history window is trimmed back to when it
+ * overflows (see {@link TranslatorBase.selectContextChunks}). The rest of the budget is
+ * the growth span the window fills up again before the next trim. */
+export const CONTEXT_HEADROOM_FRACTION = 0.5
+/** Prior ratio of a batch's history cost (its prompt context messages) to the token
+ * weight of its input text, used until measured from the recorded history. */
+export const HISTORY_COST_RATIO_PRIOR = 2
 
 /**
  * Runtime context passed to translation service functions.
@@ -35,12 +38,14 @@ const CONTEXT_CHUNK_ENTRIES = 16
  * @property {boolean} lineMatching `true`  
  * Enforce one-to-one line quantity matching between input and output
  * @property {number} useFullContext `2000`  
- * Max context token budget for history. When > 0, includes as much workingProgress history as fits within this token budget (tracked from actual model response token counts), chunked by the last batchSizes value. Set to 0 to include history without a token limit check.
+ * Max context token budget for history. When > 0, includes as much translation history as fits within this token budget,
+ * as the user/assistant message pairs of the batches as they were sent (see {@link TranslatorBase.historyChunks}). Set to 0 to include history without a token limit check.
  * @property {number[] | undefined} batchSizes
  * The number of lines to include in each translation prompt, provided they are estimated to fit within the token limit.
  * In case of mismatched output line quantities, this number will be decreased step-by-step according to the values in the array, ultimately reaching one.
- * When `undefined` (not explicitly provided), batch size is determined dynamically per batch based on the `useFullContext`
- * token budget. On failure, the size is reduced and retried down to a minimum, then resets on the next successful batch.
+ * When `undefined` (not explicitly provided), batch size is determined dynamically per batch from the `useFullContext`
+ * token budget, sized so that several batches fit in the context window between cache-invalidating trims.
+ * On failure, the size is reduced and retried down to a minimum, then eases back up after successful batches.
  *
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
@@ -124,11 +129,15 @@ export class TranslatorBase {
         this.tokensProcessTimeMs = 0
         this.contextPromptTokens = 0
         this.contextCompletionTokens = 0
-        /** First history chunk index included in the prompt context (stepped window anchor) */
+        /** First history chunk included in the prompt context (stepped window anchor) */
         this.contextAnchor = 0
-        /** Measured prompt-context tokens per history entry, from the last context build.
-         * Feeds the cache-aware dynamic batch cap; 0 until the first context build. */
-        this.contextCostPerEntry = 0
+        /**
+         * Translation history rendered as prompt context, one chunk per translated batch in
+         * send order. A chunk is rendered once and never reshaped, so earlier context messages
+         * stay byte-identical across requests for server-side prompt prefix caching.
+         * @type {{ messages: import('openai').OpenAI.Chat.ChatCompletionMessageParam[], size: number, tokens: number, inputTokens: number }[]}
+         */
+        this.historyChunks = []
         
         this.isDynamicBatch = !this.options.batchSizes
         this.dynamicReductionFactor = 1
@@ -260,15 +269,41 @@ export class TranslatorBase {
     }
 
     /**
-     * History chunk size for context building: the last (largest) fixed batch size,
-     * or a fixed constant in dynamic mode. The size must not change between batches —
-     * chunk boundaries define the prompt context prefix, and reshaping them (as the
-     * per-batch dynamic size would) breaks server-side prefix caching. The constant
-     * also keeps chunks fine-grained so the stepped context window can select
-     * precisely within the token budget.
+     * Appends a translated batch to the history as one rendered context chunk.
+     * @param {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} messages - prompt context messages of the batch
+     * @param {number} size - number of history entries in the batch
+     * @param {number} inputTokens - token weight of the batch input text (see getLineTokenWeight)
      */
-    get contextChunkSize() {
-        return this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? CONTEXT_CHUNK_ENTRIES
+    recordHistoryChunk(messages, size, inputTokens) {
+        const tokens = messages.reduce((sum, m) => sum + countTokens(String(m.content ?? "")), 0)
+        this.historyChunks.push({ messages, size, tokens, inputTokens })
+    }
+
+    /** Number of history entries recorded into context chunks. */
+    get historyLength() {
+        return this.historyChunks.reduce((sum, c) => sum + c.size, 0)
+    }
+
+    /**
+     * Ratio of history context cost to input text tokens, measured over the recorded
+     * batches, or {@link HISTORY_COST_RATIO_PRIOR} until anything is recorded.
+     * Converts the context budget into a dynamic batch input budget.
+     */
+    get historyCostRatio() {
+        const inputTokens = this.historyChunks.reduce((sum, c) => sum + c.inputTokens, 0)
+        if (inputTokens <= 0) return HISTORY_COST_RATIO_PRIOR
+        return this.historyChunks.reduce((sum, c) => sum + c.tokens, 0) / inputTokens
+    }
+
+    /**
+     * Sets the prompt context to the history chunks that fit the token budget.
+     */
+    buildContext() {
+        if (this.historyChunks.length === 0) return
+        const { includedChunks, tokenCount } = this.selectContextChunks(this.historyChunks)
+        this.promptContext = includedChunks.flatMap(c => c.messages)
+        const includedEntries = includedChunks.reduce((sum, c) => sum + c.size, 0)
+        this.logContextSelection(includedEntries, this.historyLength, tokenCount)
     }
 
     /**
@@ -281,9 +316,6 @@ export class TranslatorBase {
         if (this.options.useFullContext <= 0) {
             return
         }
-        if (includedEntries > 0 && tokenCount > 0) {
-            this.contextCostPerEntry = tokenCount / includedEntries
-        }
         const message = includedEntries < totalEntries
             ? `sliced ${totalEntries - includedEntries} entries (${includedEntries}/${totalEntries} kept, ${tokenCount} tokens)`
             : `all (${includedEntries} entries, ${tokenCount} tokens)`
@@ -292,65 +324,36 @@ export class TranslatorBase {
 
     /**
      * Selects history chunks for the prompt context using a stepped (anchored) window
-     * that fits within the useFullContext token budget. When budget is disabled (≤ 0),
+     * within the useFullContext token budget. When the budget is disabled (≤ 0),
      * returns only the last chunk.
      *
-     * The window start (`contextAnchor`) stays fixed across batches so the prompt prefix
-     * remains byte-stable for server-side prefix caching. The anchor only jumps forward
-     * when the suffix overflows the budget, shedding enough chunks to leave headroom
-     * (down to ~half the budget) before the next jump - one cache miss per jump instead
-     * of one per batch. If chunk boundaries shift under the anchor (e.g. dynamic batch
-     * size changes), the anchor walks back to refill the window up to the same headroom.
-     * @template T
-     * @param {T[]} chunks
-     * @param {(chunk: T) => number} getChunkCost
-     * @returns {{ includedChunks: T[], tokenCount: number }}
+     * The window start (`contextAnchor`) holds still while the history grows, keeping the
+     * prompt prefix byte-stable for server-side prefix caching. When the window overflows
+     * the budget, the anchor jumps forward far enough to trim the window down to
+     * {@link CONTEXT_HEADROOM_FRACTION} of the budget, so the next jump - one prompt
+     * cache miss - is several batches away rather than one per batch.
+     * @template {{ tokens: number }} C
+     * @param {C[]} chunks
+     * @returns {{ includedChunks: C[], tokenCount: number }}
      */
-    selectContextChunks(chunks, getChunkCost) {
+    selectContextChunks(chunks) {
         const maxTokens = this.options.useFullContext
         if (maxTokens <= 0 || chunks.length === 0) {
-            const includedCount = Math.min(1, chunks.length)
-            return { includedChunks: chunks.slice(chunks.length - includedCount), tokenCount: 0 }
+            return { includedChunks: chunks.slice(-1), tokenCount: 0 }
         }
 
-        const headroomTarget = Math.floor(maxTokens / 2)
-        const anchorWasClamped = this.contextAnchor > chunks.length - 1
         let anchor = Math.min(this.contextAnchor, chunks.length - 1)
-
-        const suffixCosts = []
         let tokenCount = 0
         for (let i = anchor; i < chunks.length; i++) {
-            const cost = getChunkCost(chunks[i])
-            suffixCosts.push(cost)
-            tokenCount += cost
+            tokenCount += chunks[i].tokens
         }
 
         if (tokenCount > maxTokens) {
-            // Overflow: jump the anchor forward, always keeping at least the most recent chunk.
-            // Mandatory drops enforce the budget; optional drops add headroom for future growth
-            // but never shed below the headroom target (coarse chunks would otherwise leave
-            // almost no context).
-            let drop = 0
-            while (anchor < chunks.length - 1 && tokenCount > maxTokens) {
-                tokenCount -= suffixCosts[drop++]
-                anchor++
-            }
-            while (anchor < chunks.length - 1 && tokenCount - suffixCosts[drop] >= headroomTarget) {
-                tokenCount -= suffixCosts[drop++]
-                anchor++
-            }
-        }
-        else {
-            // Refill: only reachable when chunk boundaries shifted under the anchor
-            // (in steady state the chunk dropped last would exceed the headroom target).
-            // After a clamp the cache prefix is already lost this batch, so refill up to
-            // the full budget; otherwise cap at the headroom target to avoid creep-back.
-            const fillLimit = anchorWasClamped ? maxTokens : headroomTarget
-            while (anchor > 0) {
-                const cost = getChunkCost(chunks[anchor - 1])
-                if (tokenCount + cost > fillLimit) break
-                tokenCount += cost
-                anchor--
+            // Trim down to the headroom target, always keeping at least the most recent chunk.
+            // A chunk larger than the target itself is kept rather than trimming further.
+            const headroomTarget = Math.floor(maxTokens * CONTEXT_HEADROOM_FRACTION)
+            while (anchor < chunks.length - 1 && (tokenCount > maxTokens || tokenCount - chunks[anchor].tokens >= headroomTarget)) {
+                tokenCount -= chunks[anchor++].tokens
             }
         }
 

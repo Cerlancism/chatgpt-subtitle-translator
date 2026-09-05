@@ -5,25 +5,18 @@ import { detectRepetition } from 'llm-summary';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
 import { roundWithPrecision } from './helpers.mjs';
-import { TranslatorBase, DefaultOptions } from './translatorBase.mjs';
+import { TranslatorBase, DefaultOptions, CONTEXT_HEADROOM_FRACTION } from './translatorBase.mjs';
 import { TranslationOutput } from './translatorOutput.mjs';
 
 export { DefaultOptions }
 
 export const AUTO_BATCH_MIN = 3
 export const AUTO_BATCH_REDUCTION = 3
-/** Fraction of the context budget used to size each dynamic batch. */
-export const DYNAMIC_BATCH_BUDGET_FRACTION = 0.15
-/** Minimum number of dynamic batches that should fit within the context window's
- * growth span (useFullContext/2) before it must slice. Each slice moves the window
- * anchor and invalidates the server-side prompt prefix cache, so a batch whose
- * history contribution eats the whole span forces a cache miss on every request. */
+/** Number of dynamic batches whose history fits in the context window's growth span
+ * (the part of the budget freed when the window is trimmed, see selectContextChunks).
+ * Each trim moves the window anchor and misses the server-side prompt prefix cache,
+ * so this is roughly the number of batches served per cache miss. */
 export const CACHE_WINDOW_BATCH_CYCLES = 3
-/** Prior for a history entry's prompt-context cost relative to its input token weight,
- * used to size early batches before the first context build measures the real cost.
- * Context entries carry input + translated output + timestamp/serialization overhead;
- * ~5x the bare input text is the observed ratio for subtitle content. */
-export const CONTEXT_COST_PRIOR_MULTIPLIER = 5
 
 /**
  * Computes an evened-out batch size for the next dynamic batch.
@@ -290,7 +283,17 @@ export class Translator extends TranslatorBase {
     }
 
     /**
-     * Computes how many lines starting at startIndex fit within the dynamic batch budget fraction of the context token budget.
+     * Input-token budget of one dynamic batch: the context window's growth span shared
+     * by CACHE_WINDOW_BATCH_CYCLES batches, converted from history cost to input tokens
+     * with the measured (or prior) history cost ratio.
+     */
+    get dynamicBatchBudget() {
+        const growthSpan = this.options.useFullContext * (1 - CONTEXT_HEADROOM_FRACTION)
+        return Math.floor(growthSpan / CACHE_WINDOW_BATCH_CYCLES / this.historyCostRatio)
+    }
+
+    /**
+     * Computes how many lines starting at startIndex fit within the dynamic batch budget.
      * The reduction factor shrinks the budget *before* evening so the remaining
      * lines stay balanced even in a reduced state.
      * Returns at least AUTO_BATCH_MIN.
@@ -300,40 +303,15 @@ export class Translator extends TranslatorBase {
      * @returns {number}
      */
     computeDynamicBatchSize(lines, startIndex, reductionFactor = 1) {
-        const useFullContext = this.options.useFullContext
-        if (!useFullContext) {
+        if (!this.options.useFullContext) {
             return lines.length - startIndex
         }
-        const budget = Math.floor(useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION / reductionFactor)
+        const budget = Math.floor(this.dynamicBatchBudget / reductionFactor)
         if (budget <= 0) {
             return Math.min(AUTO_BATCH_MIN, lines.length - startIndex)
         }
         const weights = lines.map(l => this.getLineTokenWeight(l))
-        let size = computeEvenBatchSize(weights, startIndex, budget)
-        // Cache-aware cap: keep each batch's history contribution small enough that
-        // CACHE_WINDOW_BATCH_CYCLES batches fit in the window growth span, so the
-        // context anchor survives across batches (see selectContextChunks). The
-        // per-entry context cost is measured from the previous context build; until
-        // then (first batch) the cap is inactive — there is no cache to preserve yet.
-        this.cacheCapApplied = false
-        let costPerEntry = this.contextCostPerEntry
-        if (!(costPerEntry > 0)) {
-            // No context build measured yet: estimate from the upcoming input weights so
-            // early batches are sized consistently with later, measured ones.
-            const sample = weights.slice(startIndex, startIndex + 100)
-            const avgWeight = sample.length ? sample.reduce((sum, w) => sum + w, 0) / sample.length : 0
-            costPerEntry = avgWeight * CONTEXT_COST_PRIOR_MULTIPLIER
-        }
-        if (costPerEntry > 0) {
-            const growthBudget = useFullContext / 2 / CACHE_WINDOW_BATCH_CYCLES
-            const cap = Math.max(AUTO_BATCH_MIN, Math.floor(growthBudget / costPerEntry))
-            if (cap < size) {
-                size = cap
-                this.cacheCapApplied = this.contextCostPerEntry > 0 ? "measured" : "estimated"
-                this.cacheCapCostPerEntry = costPerEntry
-            }
-        }
-        return size
+        return computeEvenBatchSize(weights, startIndex, budget)
     }
 
     /**
@@ -343,10 +321,9 @@ export class Translator extends TranslatorBase {
      */
     applyDynamicBatchSize(lines, index) {
         this.currentBatchSize = this.computeDynamicBatchSize(lines, index, this.dynamicReductionFactor)
-        const sizeReason = this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})`
-            : this.cacheCapApplied ? `(cache window cap, ${roundWithPrecision(this.cacheCapCostPerEntry, 1)}${this.cacheCapApplied === "estimated" ? " est." : ""} context tokens/entry)`
-                : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`
-        log.debug(`[${this.constructor.name}]`, "Dynamic batch size:", this.currentBatchSize, sizeReason)
+        const reduction = this.dynamicReductionFactor > 1 ? `, reduction x${this.dynamicReductionFactor}` : ""
+        log.debug(`[${this.constructor.name}]`, "Dynamic batch size:", this.currentBatchSize,
+            `(budget: ${this.dynamicBatchBudget} tokens, history cost ratio: ${roundWithPrecision(this.historyCostRatio, 1)}x${reduction})`)
     }
 
     /**
@@ -510,7 +487,8 @@ export class Translator extends TranslatorBase {
     }
 
     /**
-     * Builds and yields per-line output records, recording them into workingProgress.
+     * Builds and yields per-line output records, recording them into workingProgress
+     * and the batch into the context history.
      * String mode only - assumes TOut is {@link import('./translatorBase.mjs').LineOutput}.
      * @param {string[]} promptSources
      * @param {string[]} promptTransforms
@@ -518,6 +496,8 @@ export class Translator extends TranslatorBase {
      * @returns {Generator<TOut>}
      */
     * yieldOutput(promptSources, promptTransforms, completionTokensPerEntry) {
+        const start = this.workingProgress.length
+        let inputTokens = 0
         for (let index = 0; index < promptSources.length; index++) {
             const promptSource = promptSources[index];
             const promptTransform = promptTransforms[index] ?? ""
@@ -544,9 +524,11 @@ export class Translator extends TranslatorBase {
                 finalTransform = this.postprocessLine(finalTransform)
             }
             this.workingProgress.push({ source: promptSource, transform: promptTransform, completionTokens: completionTokensPerEntry })
+            inputTokens += this.getLineTokenWeight(originalSource)
             const output = { index: this.workingProgress.length, source: originalSource, transform: outTransform, finalTransform }
             yield /** @type {TOut} */ (/** @type {unknown} */ (output))
         }
+        this.recordHistoryChunk(this.renderHistoryChunk(start, this.workingProgress.length), promptSources.length, inputTokens)
     }
 
     /**
@@ -584,70 +566,63 @@ export class Translator extends TranslatorBase {
         return line
     }
 
+    /**
+     * @override Records any history seeded outside of translateLines (progress resumption)
+     * before building the context.
+     */
     buildContext() {
-        if (this.workingProgress.length === 0) {
-            return;
-        }
-
-        const chunkSize = this.contextChunkSize
-
-        // Group all history into fixed-size chunks of batchSizes[last]
-        const allChunks = []
-        for (let i = 0; i < this.workingProgress.length; i += chunkSize) {
-            allChunks.push(this.workingProgress.slice(i, i + chunkSize))
-        }
-
-        const { includedChunks, tokenCount } = this.selectContextChunks(allChunks, chunk => {
-            const messages = this.getContext(chunk.map(e => e.source), chunk.map(e => e.transform))
-            return messages.reduce((sum, m) => sum + countTokens(String(m.content ?? "")), 0)
-        })
-
-        const sliced = includedChunks.flat()
-
-        this.logContextSelection(sliced.length, this.workingProgress.length, tokenCount)
-
-        const offset = this.workingProgress.length - sliced.length;
-
-        /**
-         * @param {string} text
-         * @param {number} index
-         * @returns {string}
-         */
-        const checkFlaggedMapper = (text, index) => {
-            const id = index + (offset < 0 ? 0 : offset);
-            if (this.moderatorFlags.has(id)) {
-                // log.warn("[Translator]", "Prompt Flagged", id, text)
-                const placeholder = /** @type {T} */ (/** @type {unknown} */ ("-"));
-                return this.getLineText(this.preprocessLine(placeholder, id, 0));
-            }
-            return text;
-        };
-
-        const checkedSource = sliced.map((x, i) => checkFlaggedMapper(x.source, i));
-        const checkedTransform = sliced.map((x, i) => checkFlaggedMapper(x.transform, i));
-        this.promptContext = this.getContext(checkedSource, checkedTransform);
+        this.recordSeededHistory()
+        super.buildContext()
     }
 
     /**
+     * Records workingProgress entries not yet in the context history (seeded by progress
+     * resumption) as batches of the size the batching would have sent them in, so they
+     * form stable context chunks like translated batches do.
+     */
+    recordSeededHistory() {
+        const seeded = this.workingProgress.length
+        if (this.historyLength >= seeded) return
+        const lines = /** @type {T[]} */ (this.workingLines ?? this.workingProgress.map(e => e.source)).slice(0, seeded)
+        for (let start = this.historyLength; start < seeded;) {
+            const size = this.isDynamicBatch ? this.computeDynamicBatchSize(lines, start) : this.options.batchSizes.at(-1)
+            const end = Math.min(start + size, seeded)
+            const inputTokens = lines.slice(start, end).reduce((sum, l) => sum + this.getLineTokenWeight(l), 0)
+            this.recordHistoryChunk(this.renderHistoryChunk(start, end), end - start, inputTokens)
+            start = end
+        }
+    }
+
+    /**
+     * Renders a range of workingProgress entries as prompt context messages,
+     * substituting a placeholder for flagged entries.
+     * @param {number} start
+     * @param {number} end
+     * @returns {import("openai").OpenAI.Chat.ChatCompletionMessageParam[]}
+     */
+    renderHistoryChunk(start, end) {
+        const entries = this.workingProgress.slice(start, end)
+        /** @param {string} text @param {number} index */
+        const checkFlagged = (text, index) => {
+            if (!this.moderatorFlags.has(index)) return text
+            const placeholder = /** @type {T} */ (/** @type {unknown} */ ("-"))
+            return this.getLineText(this.preprocessLine(placeholder, index, 0))
+        }
+        const sources = entries.map((e, i) => checkFlagged(e.source, start + i))
+        const transforms = entries.map((e, i) => checkFlagged(e.transform, start + i))
+        return this.getContext(sources, transforms)
+    }
+
+    /**
+     * Prompt context messages of one translated batch: its user/assistant message pair.
      * @param {string[]} sourceLines
      * @param {string[]} transformLines
      */
     getContext(sourceLines, transformLines) {
-        const chunks = [];
-        const chunkSize = this.contextChunkSize;
-        for (let i = 0; i < sourceLines.length; i += chunkSize) {
-            const sourceChunk = sourceLines.slice(i, i + chunkSize);
-            const transformChunk = transformLines.slice(i, i + chunkSize);
-            chunks.push({
-                role: "user",
-                content: this.getContextLines(sourceChunk, "user")
-            });
-            chunks.push({
-                role: "assistant",
-                content: this.getContextLines(transformChunk, "assistant")
-            });
-        }
-        return /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/ (chunks);
+        return /** @type {import('openai').OpenAI.Chat.ChatCompletionMessage[]}*/ ([
+            { role: "user", content: this.getContextLines(sourceLines, "user") },
+            { role: "assistant", content: this.getContextLines(transformLines, "assistant") },
+        ]);
     }
 
 
