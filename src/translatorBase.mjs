@@ -117,6 +117,8 @@ export class TranslatorBase {
         this.tokensProcessTimeMs = 0
         this.contextPromptTokens = 0
         this.contextCompletionTokens = 0
+        /** First history chunk index included in the prompt context (stepped window anchor) */
+        this.contextAnchor = 0
         
         this.isDynamicBatch = !this.options.batchSizes
         this.dynamicReductionFactor = 1
@@ -237,7 +239,9 @@ export class TranslatorBase {
     accumulateUsage(output, elapsedMs) {
         this.promptTokensUsed += output.promptTokens
         this.completionTokensUsed += output.completionTokens
-        this.cachedTokens += output.cachedTokens
+        if (output.cachedTokens != null) {
+            this.cachedTokens = (this.cachedTokens ?? 0) + output.cachedTokens
+        }
         this.contextPromptTokens = output.promptTokens
         this.contextCompletionTokens = output.completionTokens
         this.tokensProcessTimeMs += elapsedMs
@@ -269,8 +273,16 @@ export class TranslatorBase {
     }
 
     /**
-     * Scans pre-grouped chunks from most recent backward, returning those that fit within
-     * the useFullContext token budget. When budget is disabled (≤ 0), returns only the last chunk.
+     * Selects history chunks for the prompt context using a stepped (anchored) window
+     * that fits within the useFullContext token budget. When budget is disabled (≤ 0),
+     * returns only the last chunk.
+     *
+     * The window start (`contextAnchor`) stays fixed across batches so the prompt prefix
+     * remains byte-stable for server-side prefix caching. The anchor only jumps forward
+     * when the suffix overflows the budget, shedding enough chunks to leave headroom
+     * (down to ~half the budget) before the next jump - one cache miss per jump instead
+     * of one per batch. If chunk boundaries shift under the anchor (e.g. dynamic batch
+     * size changes), the anchor walks back to refill the window up to the same headroom.
      * @template T
      * @param {T[]} chunks
      * @param {(chunk: T) => number} getChunkCost
@@ -278,19 +290,47 @@ export class TranslatorBase {
      */
     selectContextChunks(chunks, getChunkCost) {
         const maxTokens = this.options.useFullContext
-        let tokenCount = 0
-        let includedCount = maxTokens <= 0 ? Math.min(1, chunks.length) : 0
-        if (maxTokens > 0) {
-            for (let i = chunks.length - 1; i >= 0; i--) {
-                const cost = getChunkCost(chunks[i])
-                if (tokenCount + cost > maxTokens) break
-                tokenCount += cost
-                includedCount++
-            }
-            // Always include at least the most recent chunk to avoid losing all context
-            if (includedCount === 0 && chunks.length > 0) includedCount = 1
+        if (maxTokens <= 0 || chunks.length === 0) {
+            const includedCount = Math.min(1, chunks.length)
+            return { includedChunks: chunks.slice(chunks.length - includedCount), tokenCount: 0 }
         }
-        return { includedChunks: chunks.slice(chunks.length - includedCount), tokenCount }
+
+        const headroomTarget = Math.floor(maxTokens / 2)
+        const anchorWasClamped = this.contextAnchor > chunks.length - 1
+        let anchor = Math.min(this.contextAnchor, chunks.length - 1)
+
+        const suffixCosts = []
+        let tokenCount = 0
+        for (let i = anchor; i < chunks.length; i++) {
+            const cost = getChunkCost(chunks[i])
+            suffixCosts.push(cost)
+            tokenCount += cost
+        }
+
+        if (tokenCount > maxTokens) {
+            // Overflow: jump the anchor forward, always keeping at least the most recent chunk
+            let drop = 0
+            while (anchor < chunks.length - 1 && tokenCount > headroomTarget) {
+                tokenCount -= suffixCosts[drop++]
+                anchor++
+            }
+        }
+        else {
+            // Refill: only reachable when chunk boundaries shifted under the anchor
+            // (in steady state the chunk dropped last would exceed the headroom target).
+            // After a clamp the cache prefix is already lost this batch, so refill up to
+            // the full budget; otherwise cap at the headroom target to avoid creep-back.
+            const fillLimit = anchorWasClamped ? maxTokens : headroomTarget
+            while (anchor > 0) {
+                const cost = getChunkCost(chunks[anchor - 1])
+                if (tokenCount + cost > fillLimit) break
+                tokenCount += cost
+                anchor--
+            }
+        }
+
+        this.contextAnchor = anchor
+        return { includedChunks: chunks.slice(anchor), tokenCount }
     }
 
     get usage() {
