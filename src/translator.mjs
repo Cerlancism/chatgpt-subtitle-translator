@@ -4,6 +4,7 @@ import { openaiRetryWrapper, completeChatStream } from './openai.mjs';
 import { detectRepetition } from 'llm-summary';
 import { checkModeration } from './moderator.mjs';
 import { splitStringByNumberLabel } from './subtitle.mjs';
+import { roundWithPrecision } from './helpers.mjs';
 import { TranslatorBase, DefaultOptions } from './translatorBase.mjs';
 import { TranslationOutput } from './translatorOutput.mjs';
 
@@ -18,6 +19,11 @@ export const DYNAMIC_BATCH_BUDGET_FRACTION = 0.15
  * anchor and invalidates the server-side prompt prefix cache, so a batch whose
  * history contribution eats the whole span forces a cache miss on every request. */
 export const CACHE_WINDOW_BATCH_CYCLES = 3
+/** Prior for a history entry's prompt-context cost relative to its input token weight,
+ * used to size early batches before the first context build measures the real cost.
+ * Context entries carry input + translated output + timestamp/serialization overhead;
+ * ~5x the bare input text is the observed ratio for subtitle content. */
+export const CONTEXT_COST_PRIOR_MULTIPLIER = 5
 
 /**
  * Computes an evened-out batch size for the next dynamic batch.
@@ -309,10 +315,23 @@ export class Translator extends TranslatorBase {
         // context anchor survives across batches (see selectContextChunks). The
         // per-entry context cost is measured from the previous context build; until
         // then (first batch) the cap is inactive — there is no cache to preserve yet.
-        if (this.contextCostPerEntry > 0) {
+        this.cacheCapApplied = false
+        let costPerEntry = this.contextCostPerEntry
+        if (!(costPerEntry > 0)) {
+            // No context build measured yet: estimate from the upcoming input weights so
+            // early batches are sized consistently with later, measured ones.
+            const sample = weights.slice(startIndex, startIndex + 100)
+            const avgWeight = sample.length ? sample.reduce((sum, w) => sum + w, 0) / sample.length : 0
+            costPerEntry = avgWeight * CONTEXT_COST_PRIOR_MULTIPLIER
+        }
+        if (costPerEntry > 0) {
             const growthBudget = useFullContext / 2 / CACHE_WINDOW_BATCH_CYCLES
-            const cap = Math.max(AUTO_BATCH_MIN, Math.floor(growthBudget / this.contextCostPerEntry))
-            size = Math.min(size, cap)
+            const cap = Math.max(AUTO_BATCH_MIN, Math.floor(growthBudget / costPerEntry))
+            if (cap < size) {
+                size = cap
+                this.cacheCapApplied = this.contextCostPerEntry > 0 ? "measured" : "estimated"
+                this.cacheCapCostPerEntry = costPerEntry
+            }
         }
         return size
     }
@@ -324,8 +343,10 @@ export class Translator extends TranslatorBase {
      */
     applyDynamicBatchSize(lines, index) {
         this.currentBatchSize = this.computeDynamicBatchSize(lines, index, this.dynamicReductionFactor)
-        log.debug(`[${this.constructor.name}]`, "Dynamic batch size:", this.currentBatchSize,
-            this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})` : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`)
+        const sizeReason = this.dynamicReductionFactor > 1 ? `(reduction x${this.dynamicReductionFactor})`
+            : this.cacheCapApplied ? `(cache window cap, ${roundWithPrecision(this.cacheCapCostPerEntry, 1)}${this.cacheCapApplied === "estimated" ? " est." : ""} context tokens/entry)`
+                : `(budget: ${Math.floor(this.options.useFullContext * DYNAMIC_BATCH_BUDGET_FRACTION)} tokens)`
+        log.debug(`[${this.constructor.name}]`, "Dynamic batch size:", this.currentBatchSize, sizeReason)
     }
 
     /**

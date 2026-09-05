@@ -145,12 +145,25 @@ test('dynamic batch cap: engages once context cost per entry is measured', () =>
     assert.ok(capped < uncapped, `expected cap below uncapped size ${uncapped}`);
 });
 
-test('dynamic batch cap: inactive before first context build (cold start)', () => {
+test('dynamic batch cap: cold start estimates cost so early batches are consistent', () => {
     const t = makeTranslator(4000);
     const lines = Array.from({ length: 500 }, (_, i) => `line ${i}`);
-    assert.equal(t.contextCostPerEntry, 0);
-    const size = t.computeDynamicBatchSize(lines, 0);
-    assert.ok(size > 21, `cold-start batch should be uncapped, got ${size}`);
+    // effectively uncapped baseline (negligible per-entry cost)
+    t.contextCostPerEntry = 0.001;
+    const uncapped = t.computeDynamicBatchSize(lines, 0);
+    // cold start: estimated cap must engage, not run at the raw input budget
+    t.contextCostPerEntry = 0;
+    const cold = t.computeDynamicBatchSize(lines, 0);
+    assert.ok(cold < uncapped, `cold-start ${cold} should be capped below uncapped ${uncapped}`);
+    assert.equal(t.cacheCapApplied, 'estimated');
+    // once measured, the cap uses the real value
+    t.contextCostPerEntry = 31;
+    t.computeDynamicBatchSize(lines, 0);
+    assert.equal(t.cacheCapApplied, 'measured');
+    // cold estimate and measured sizes are the same order of magnitude (consistency)
+    const measured = t.computeDynamicBatchSize(lines, 0);
+    assert.ok(cold <= measured * 6 && measured <= cold * 6,
+        `cold ${cold} vs measured ${measured} diverge too far`);
 });
 
 test('dynamic batch cap: no effect when context budget is generous', () => {
