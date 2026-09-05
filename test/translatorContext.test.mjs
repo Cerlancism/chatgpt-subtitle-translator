@@ -36,13 +36,15 @@ test('context window: anchor holds still while history grows, within budget, as 
     assert.ok(new Set(anchors).size < anchors.length / 2, `anchor moved too often: ${anchors}`);
 });
 
-test('context window: overflow trims to the headroom target, keeping an oversized chunk', () => {
+test('context window: overflow trims to at most the headroom target, keeping the latest chunk', () => {
     const t = makeTranslator(1000);
+    const target = 1000 * CONTEXT_HEADROOM_FRACTION;
     const { tokenCount } = t.selectContextChunks(chunks(200, 200, 200, 200, 200, 200));
-    assert.ok(tokenCount <= 1000 && tokenCount >= 1000 * CONTEXT_HEADROOM_FRACTION, `trimmed to ${tokenCount}`);
-    // a chunk larger than the headroom target is kept rather than trimming down to the tail
+    // lands at or below the target, shedding no more chunks than needed to get there
+    assert.ok(tokenCount <= target && tokenCount + 200 > target, `trimmed to ${tokenCount}`);
+    // chunks larger than the target are shed too, down to the most recent chunk
     const coarse = chunks(2900, 2900, 567);
-    assert.deepEqual(makeTranslator(4000).selectContextChunks(coarse), { includedChunks: coarse.slice(1), tokenCount: 3467 });
+    assert.deepEqual(makeTranslator(4000).selectContextChunks(coarse), { includedChunks: coarse.slice(2), tokenCount: 567 });
 });
 
 test('history chunks: one byte-stable pair per batch as sent, flagged entries masked', () => {

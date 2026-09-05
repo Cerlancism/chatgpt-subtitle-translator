@@ -349,10 +349,11 @@ export class TranslatorBase {
         }
 
         if (tokenCount > maxTokens) {
-            // Trim down to the headroom target, always keeping at least the most recent chunk.
-            // A chunk larger than the target itself is kept rather than trimming further.
+            // Trim down to at most the headroom target, always keeping at least the most recent
+            // chunk. Stopping above the target would leave less room to grow than the dynamic
+            // batch sizing assumes and trim again sooner.
             const headroomTarget = Math.floor(maxTokens * CONTEXT_HEADROOM_FRACTION)
-            while (anchor < chunks.length - 1 && (tokenCount > maxTokens || tokenCount - chunks[anchor].tokens >= headroomTarget)) {
+            while (anchor < chunks.length - 1 && tokenCount > headroomTarget) {
                 tokenCount -= chunks[anchor++].tokens
             }
         }
