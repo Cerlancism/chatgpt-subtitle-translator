@@ -51,16 +51,35 @@ test('context window: anchor is stable across growing history (no per-batch slid
     assert.ok(distinct < anchors.length / 2, `anchor moved too often: ${anchors}`);
 });
 
-test('context window: overflow jumps anchor and sheds down to ~half budget', () => {
+test('context window: overflow jumps anchor and lands within [headroom, budget]', () => {
     const t = makeTranslator(1000);
     // 6 chunks of 200 = 1200 > 1000 budget
     const chunks = [200, 200, 200, 200, 200, 200];
     const { includedChunks, tokenCount } = t.selectContextChunks(chunks, cost);
     assert.ok(tokenCount <= 1000, 'budget respected');
-    assert.ok(tokenCount <= 500, 'sheds to headroom target');
+    assert.ok(tokenCount >= 500, 'does not shed below headroom target');
     assert.ok(includedChunks.length >= 1, 'keeps at least most recent chunk');
     // window is a contiguous suffix ending at the latest chunk
     assert.deepEqual(includedChunks, chunks.slice(chunks.length - includedChunks.length));
+});
+
+test('context window: coarse chunks larger than headroom do not collapse the window', () => {
+    // regression: chunk cost > maxTokens/2 must not shed down to the partial chunk only
+    const t = makeTranslator(4000);
+    const chunks = [2900, 2900, 567];
+    const { includedChunks, tokenCount } = t.selectContextChunks(chunks, cost);
+    assert.deepEqual(includedChunks, [2900, 567]);
+    assert.equal(tokenCount, 3467);
+});
+
+test('context window: dynamic-mode context chunk size is constant across batch size changes', () => {
+    const t = makeTranslator(4000); // no batchSizes -> dynamic mode
+    const first = t.contextChunkSize;
+    t.currentBatchSize = 83;
+    assert.equal(t.contextChunkSize, first);
+    t.currentBatchSize = 37;
+    assert.equal(t.contextChunkSize, first);
+    assert.ok(first > 0);
 });
 
 test('context window: never exceeds budget across a long run', () => {
@@ -113,4 +132,50 @@ test('context window: no oscillation after a jump (anchor does not creep back)',
     // immediate re-selection with identical history must not move the anchor
     t.selectContextChunks(chunks, cost);
     assert.equal(t.contextAnchor, afterJump);
+});
+
+test('dynamic batch cap: engages once context cost per entry is measured', () => {
+    const t = makeTranslator(4000);
+    const lines = Array.from({ length: 500 }, (_, i) => `line ${i}`);
+    const uncapped = t.computeDynamicBatchSize(lines, 0);
+    t.contextCostPerEntry = 31; // ~measured per-entry context tokens
+    const capped = t.computeDynamicBatchSize(lines, 0);
+    // growth budget = 4000/2/3 = 666 tokens -> cap = floor(666/31) = 21
+    assert.equal(capped, 21);
+    assert.ok(capped < uncapped, `expected cap below uncapped size ${uncapped}`);
+});
+
+test('dynamic batch cap: inactive before first context build (cold start)', () => {
+    const t = makeTranslator(4000);
+    const lines = Array.from({ length: 500 }, (_, i) => `line ${i}`);
+    assert.equal(t.contextCostPerEntry, 0);
+    const size = t.computeDynamicBatchSize(lines, 0);
+    assert.ok(size > 21, `cold-start batch should be uncapped, got ${size}`);
+});
+
+test('dynamic batch cap: no effect when context budget is generous', () => {
+    const t = makeTranslator(24000);
+    const lines = Array.from({ length: 500 }, (_, i) => `line ${i}`);
+    const uncapped = t.computeDynamicBatchSize(lines, 0);
+    t.contextCostPerEntry = 31; // cap = floor(24000/2/3/31) = 129
+    const capped = t.computeDynamicBatchSize(lines, 0);
+    assert.equal(capped, Math.min(uncapped, 129));
+});
+
+test('dynamic batch cap: never below AUTO_BATCH_MIN', () => {
+    const t = makeTranslator(4000);
+    const lines = Array.from({ length: 500 }, (_, i) => `line ${i}`);
+    t.contextCostPerEntry = 100000; // absurd cost -> raw cap would be 0
+    const size = t.computeDynamicBatchSize(lines, 0);
+    assert.ok(size >= 3, `size ${size} must respect AUTO_BATCH_MIN`);
+});
+
+test('context cost per entry: measured by logContextSelection', () => {
+    const t = makeTranslator(4000);
+    t.logContextSelection(50, 100, 1550);
+    assert.equal(t.contextCostPerEntry, 31);
+    // budget disabled: no measurement
+    const t2 = makeTranslator(0);
+    t2.logContextSelection(50, 100, 1550);
+    assert.equal(t2.contextCostPerEntry, 0);
 });

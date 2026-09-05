@@ -13,6 +13,11 @@ export const AUTO_BATCH_MIN = 3
 export const AUTO_BATCH_REDUCTION = 3
 /** Fraction of the context budget used to size each dynamic batch. */
 export const DYNAMIC_BATCH_BUDGET_FRACTION = 0.15
+/** Minimum number of dynamic batches that should fit within the context window's
+ * growth span (useFullContext/2) before it must slice. Each slice moves the window
+ * anchor and invalidates the server-side prompt prefix cache, so a batch whose
+ * history contribution eats the whole span forces a cache miss on every request. */
+export const CACHE_WINDOW_BATCH_CYCLES = 3
 
 /**
  * Computes an evened-out batch size for the next dynamic batch.
@@ -298,7 +303,18 @@ export class Translator extends TranslatorBase {
             return Math.min(AUTO_BATCH_MIN, lines.length - startIndex)
         }
         const weights = lines.map(l => this.getLineTokenWeight(l))
-        return computeEvenBatchSize(weights, startIndex, budget)
+        let size = computeEvenBatchSize(weights, startIndex, budget)
+        // Cache-aware cap: keep each batch's history contribution small enough that
+        // CACHE_WINDOW_BATCH_CYCLES batches fit in the window growth span, so the
+        // context anchor survives across batches (see selectContextChunks). The
+        // per-entry context cost is measured from the previous context build; until
+        // then (first batch) the cap is inactive — there is no cache to preserve yet.
+        if (this.contextCostPerEntry > 0) {
+            const growthBudget = useFullContext / 2 / CACHE_WINDOW_BATCH_CYCLES
+            const cap = Math.max(AUTO_BATCH_MIN, Math.floor(growthBudget / this.contextCostPerEntry))
+            size = Math.min(size, cap)
+        }
+        return size
     }
 
     /**

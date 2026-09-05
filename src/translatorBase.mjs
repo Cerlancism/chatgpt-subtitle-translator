@@ -2,6 +2,11 @@ import log from "loglevel"
 import { countTokens } from "gpt-tokenizer"
 import { roundWithPrecision, sleep } from './helpers.mjs'
 
+/** Context history chunk size (entries) in dynamic batch mode — fixed so chunk
+ * boundaries stay stable across batches (required for prefix caching) and small
+ * enough for precise window selection. */
+const CONTEXT_CHUNK_ENTRIES = 16
+
 /**
  * Runtime context passed to translation service functions.
  *
@@ -119,6 +124,9 @@ export class TranslatorBase {
         this.contextCompletionTokens = 0
         /** First history chunk index included in the prompt context (stepped window anchor) */
         this.contextAnchor = 0
+        /** Measured prompt-context tokens per history entry, from the last context build.
+         * Feeds the cache-aware dynamic batch cap; 0 until the first context build. */
+        this.contextCostPerEntry = 0
         
         this.isDynamicBatch = !this.options.batchSizes
         this.dynamicReductionFactor = 1
@@ -250,10 +258,14 @@ export class TranslatorBase {
 
     /**
      * History chunk size for context building: the last (largest) fixed batch size,
-     * or the current batch size in dynamic mode.
+     * or a fixed constant in dynamic mode. The size must not change between batches —
+     * chunk boundaries define the prompt context prefix, and reshaping them (as the
+     * per-batch dynamic size would) breaks server-side prefix caching. The constant
+     * also keeps chunks fine-grained so the stepped context window can select
+     * precisely within the token budget.
      */
     get contextChunkSize() {
-        return this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? this.currentBatchSize
+        return this.options.batchSizes?.[this.options.batchSizes.length - 1] ?? CONTEXT_CHUNK_ENTRIES
     }
 
     /**
@@ -265,6 +277,9 @@ export class TranslatorBase {
     logContextSelection(includedEntries, totalEntries, tokenCount) {
         if (this.options.useFullContext <= 0) {
             return
+        }
+        if (includedEntries > 0 && tokenCount > 0) {
+            this.contextCostPerEntry = tokenCount / includedEntries
         }
         const message = includedEntries < totalEntries
             ? `sliced ${totalEntries - includedEntries} entries (${includedEntries}/${totalEntries} kept, ${tokenCount} tokens)`
@@ -308,9 +323,16 @@ export class TranslatorBase {
         }
 
         if (tokenCount > maxTokens) {
-            // Overflow: jump the anchor forward, always keeping at least the most recent chunk
+            // Overflow: jump the anchor forward, always keeping at least the most recent chunk.
+            // Mandatory drops enforce the budget; optional drops add headroom for future growth
+            // but never shed below the headroom target (coarse chunks would otherwise leave
+            // almost no context).
             let drop = 0
-            while (anchor < chunks.length - 1 && tokenCount > headroomTarget) {
+            while (anchor < chunks.length - 1 && tokenCount > maxTokens) {
+                tokenCount -= suffixCosts[drop++]
+                anchor++
+            }
+            while (anchor < chunks.length - 1 && tokenCount - suffixCosts[drop] >= headroomTarget) {
                 tokenCount -= suffixCosts[drop++]
                 anchor++
             }
