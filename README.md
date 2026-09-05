@@ -76,8 +76,6 @@ Options:
   - `-c, --context <tokens>`
     Include translation history up to a token budget to work well with [prompt caching](https://openai.com/index/api-prompt-caching/). Default: `2000`. Set to `0` to include history without a token limit check.
 
-    The history is kept as the user/assistant message pairs of the batches exactly as they were sent. The included window only moves forward when it overflows the budget, trimming back to half of it, so the prompt prefix stays identical across consecutive requests and is served from the cache in between. Token counts are estimated locally with the GPT tokenizer. Note that OpenAI only caches prompts of 1024 tokens or more, so a small budget yields few cache hits.
-
     Recommended value: set `<tokens>` to ~50% of the model's max context length to leave room for the current batch and system prompts. For example, for a `128K` context model: `--context 64000`. When `--batch-sizes` is omitted, the batch size is derived from this budget as well.
   - `-b, --batch-sizes <sizes>`
     Batch sizes of increasing order for translation prompt slices in JSON Array  
@@ -88,7 +86,7 @@ Options:
     Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.  
     However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
 
-    When omitted, batch size is determined automatically per batch from the `--context` token budget: each batch is sized so that three batches of history fit in the half of the context window freed by a trim, keeping the prompt cache warm between trims. The history cost per input token is measured from the translated batches. The size is spread evenly across the remaining lines. On failure, the size is reduced and retried; once it reaches the minimum, translation falls back to single-entry mode. After a reduction, the size eases back up stepwise following consecutive successful batches.
+    When omitted, batch size is determined automatically per batch from the `--context` token budget: each batch is sized so that several batches of history fit in the portion of the context window freed by a trim, keeping the prompt cache warm in between. The history cost per input token is measured from the translated batches. The size is spread evenly across the remaining lines. On failure, the size is reduced and retried; once it reaches the minimum, translation falls back to single-entry mode. After a reduction, the size eases back up stepwise following consecutive successful batches.
   - `-g, --guard-repetition <threshold>`
     Minimum number of pattern repeats before aborting a streaming response (default: `10`). When the model falls into a repetition loop during streaming, the response is aborted and retried with a smaller batch. Set to `0` to disable repetition detection.
   - `--initial-prompts <prompts>`
