@@ -117,6 +117,8 @@ export class TranslatorBase {
         this.promptTokensUsed = 0
         this.promptTokensWasted = 0
         this.cachedTokens = 0
+        /** Cached tokens reported by the most recent request (null/undefined if unsupported) */
+        this.lastCachedTokens = undefined
         this.completionTokensUsed = 0
         this.completionTokensWasted = 0
         this.tokensProcessTimeMs = 0
@@ -250,6 +252,7 @@ export class TranslatorBase {
         if (output.cachedTokens != null) {
             this.cachedTokens = (this.cachedTokens ?? 0) + output.cachedTokens
         }
+        this.lastCachedTokens = output.cachedTokens
         this.contextPromptTokens = output.promptTokens
         this.contextCompletionTokens = output.completionTokens
         this.tokensProcessTimeMs += elapsedMs
@@ -368,6 +371,7 @@ export class TranslatorBase {
         const rate = roundWithPrecision(usedTokens / minutesElapsed, 0)
         const wastedPercent = (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 })
         const cachedTokens = this.cachedTokens
+        const lastCachedTokens = this.lastCachedTokens
         const contextPromptTokens = this.contextPromptTokens
         const contextCompletionTokens = this.contextCompletionTokens
         const contextTokens = contextPromptTokens + contextCompletionTokens
@@ -380,6 +384,7 @@ export class TranslatorBase {
             wastedTokens,
             wastedPercent,
             cachedTokens,
+            lastCachedTokens,
             contextPromptTokens,
             contextCompletionTokens,
             contextTokens,
@@ -403,6 +408,7 @@ export class TranslatorBase {
             wastedTokens,
             wastedPercent,
             cachedTokens,
+            lastCachedTokens,
             contextPromptTokens,
             contextCompletionTokens,
             contextTokens,
@@ -415,7 +421,9 @@ export class TranslatorBase {
             `[Translator] Estimated Usage`,
             "\n\tTokens:", promptTokensUsed, "+", completionTokensUsed, "=", usedTokens,
             "\n\tWasted:", promptTokensWasted, "+", completionTokensWasted, "=", wastedTokens, wastedPercent,
-            "\n\tCached:", cachedTokens >= 0 ? cachedTokens : "-",
+            "\n\tCached:", ...(lastCachedTokens != null && cachedTokens >= 0
+                ? [cachedTokens - lastCachedTokens, "+", lastCachedTokens, "=", cachedTokens]
+                : [cachedTokens > 0 ? cachedTokens : "-"]),
             "\n\tContext:", ...(contextTokens > 0 ? [contextPromptTokens, "+", contextCompletionTokens, "=", contextTokens, "/", this.options.useFullContext, `(${Math.round(contextTokens / this.options.useFullContext * 100)}%)`] : ["-"]),
             "\n\tRate:", promptRate, "+", completionRate, "=", rate, "TPM", this.services.cooler?.rate, "RPM",
         )
