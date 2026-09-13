@@ -4,6 +4,83 @@ import log from "loglevel"
 export const parser = new srtParser2();
 
 /**
+ * Line ending emitted when `SUBTITLE_LINE_ENDING` is unset.
+ * `srt-parser-2` hardcodes CRLF in `toSrt`, and the plain text and progress
+ * writers have always used LF, so the default preserves both behaviours.
+ */
+const DEFAULT_SRT_LINE_ENDING = "\r\n"
+const DEFAULT_TEXT_LINE_ENDING = "\n"
+
+/** @type {Record<string, string>} */
+const LINE_ENDINGS = {
+    crlf: "\r\n",
+    lf: "\n",
+}
+
+/**
+ * Reads the `SUBTITLE_LINE_ENDING` override.
+ *
+ * Returns `undefined` when unset, blank, or set to `auto`, which leaves every
+ * writer on its own existing convention — deliberately inconsistent between
+ * writers (CRLF for SRT, LF for text and CSV), which is why this is `auto`
+ * rather than `native`: no platform ending is ever resolved. Unrecognised
+ * values warn and are ignored rather than throwing, so a typo cannot fail a
+ * long translation run.
+ *
+ * Guarded for the browser bundle, which is statically exported and has no
+ * `process.env`; there the override is never set and callers get the default.
+ *
+ * @returns {string | undefined}
+ */
+export function getLineEndingOverride() {
+    const configured = typeof process !== "undefined" ? process.env?.SUBTITLE_LINE_ENDING : undefined
+
+    if (!configured) {
+        return undefined
+    }
+
+    const key = configured.trim().toLowerCase()
+
+    if (key === "" || key === "auto") {
+        return undefined
+    }
+
+    if (key in LINE_ENDINGS) {
+        return LINE_ENDINGS[key]
+    }
+
+    log.warn("[Subtitle]", `Unrecognised SUBTITLE_LINE_ENDING ${JSON.stringify(configured)}, expected crlf, lf or auto. Ignoring.`)
+    return undefined
+}
+
+/**
+ * Line ending for non-SRT text output (plain text translations, progress CSV).
+ * Defaults to LF.
+ * @returns {string}
+ */
+export function getTextLineEnding() {
+    return getLineEndingOverride() ?? DEFAULT_TEXT_LINE_ENDING
+}
+
+/**
+ * Serialises SRT entries, honouring `SUBTITLE_LINE_ENDING`.
+ *
+ * Wraps `srt-parser-2`'s `toSrt`, which hardcodes CRLF and — because it calls
+ * `String.prototype.replace` with a string pattern — rewrites only the *first*
+ * newline inside a multi-line cue, leaving later ones as bare LF. Normalising
+ * every break here fixes that mixed-ending output as well.
+ *
+ * @param {Parameters<typeof parser.toSrt>[0]} entries
+ * @param {string} [lineEnding] Explicit override, mainly for tests.
+ * @returns {string}
+ */
+export function toSrt(entries, lineEnding = getLineEndingOverride() ?? DEFAULT_SRT_LINE_ENDING) {
+    const serialised = parser.toSrt(entries)
+    // toSrt emits a mix of CRLF and bare LF; collapse to one convention.
+    return serialised.replace(/\r\n|\r|\n/g, lineEnding)
+}
+
+/**
  * @param {string} text
  * @param {string} label
  */
@@ -99,5 +176,5 @@ export function offsetSrt(srtString, seconds) {
         item.endTime = secondsToTimestamp(item.endSeconds)
     }
 
-    return parser.toSrt(srt)
+    return toSrt(srt)
 }

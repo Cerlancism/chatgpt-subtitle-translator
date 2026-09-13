@@ -17,6 +17,8 @@ import {
     createOpenAIClient,
     CooldownContext,
     subtitleParser,
+    toSrt,
+    getTextLineEnding,
     wrapQuotes,
     loadAgentSummary,
     saveAgentSummary
@@ -356,7 +358,7 @@ async function translateTimestampSrt(translator, srtArraySource, outputFile) {
             endSeconds: subtitleParser.timestampToSeconds(srtOut.end),
             text: srtOut.text
         }
-        const outSrt = subtitleParser.toSrt([entry])
+        const outSrt = toSrt([entry])
         log.info(outputId, entry.startTime, "->", entry.endTime, wrapQuotes(entry.text))
         await fs.promises.appendFile(outputFile, outSrt)
         outputId++
@@ -414,11 +416,11 @@ async function writeSrtTranslation(translator, sourceLines, srtArrayWorking, out
         const output = /** @type {import('../src/translatorBase.mjs').LineOutput} */ (out)
         const srtEntry = srtArrayWorking[output.index - 1]
         srtEntry.text = output.finalTransform
-        const outSrt = subtitleParser.toSrt([srtEntry])
+        const outSrt = toSrt([srtEntry])
         log.info(output.index, wrapQuotes(output.source), "->", wrapQuotes(output.finalTransform))
         const writes = [fs.promises.appendFile(outputFile, outSrt)]
         if (progressFile) {
-            const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}\n`
+            const csv = `${output.index}, ${wrapQuotes(output.finalTransform.replaceAll("\n", "\\N"))}${getTextLineEnding()}`
             writes.push(fs.promises.appendFile(progressFile, csv))
         }
         await Promise.all(writes)
@@ -442,7 +444,7 @@ async function translatePlainText(translator, text, outfile) {
             log.info(output.transform)
         }
         if (outfile) {
-            fs.appendFileSync(outfile, output.transform + "\n")
+            fs.appendFileSync(outfile, output.transform + getTextLineEnding())
         }
     }
 }

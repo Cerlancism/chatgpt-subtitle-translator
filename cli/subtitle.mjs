@@ -3,7 +3,7 @@ import url from 'node:url'
 import fs from 'node:fs'
 import { Command } from "commander"
 import path from 'node:path'
-import { offsetSrt, parseTimeOffset, parser } from '../src/subtitle.mjs'
+import { offsetSrt, parseTimeOffset, parser, toSrt } from '../src/subtitle.mjs'
 
 /**
  * @param {readonly string[]} args
@@ -72,7 +72,7 @@ function mergeFiles(files) {
             output.push(item)
         }
     }
-    const outSrt = parser.toSrt(output)
+    const outSrt = toSrt(output)
     const outFilePaths = files.map(x => path.parse(x))
     const outFileName = outFilePaths.map(x => x.name).join("+") + outFilePaths[0].ext
     fs.writeFileSync(path.join(outFilePaths[0].dir, outFileName), outSrt)
