@@ -38,11 +38,11 @@ Reference: <https://github.com/openai/openai-quickstart-node#setup>
   ```bash
   chmod +x cli/translator.mjs
   ```
-- Copy `.example.env` to `.env`
+- Copy `.env.example` to `.env`
   ```bash
   cp .env.example .env
   ```
-- Add your [API key](https://platform.openai.com/account/api-keys) to the newly created `.env` file
+- Add your provider API key to the newly created `.env` file. For a non-OpenAI provider, set `OPENAI_BASE_URL` to its OpenAI-compatible `/v1` endpoint (see the commented examples in `.env.example`).
 
 ## CLI
 ```bash
