@@ -16,6 +16,7 @@ import {
     TranslatorStructuredTimestamp,
     TranslatorAgent,
     createOpenAIClient,
+    sessionHeaders,
     CooldownContext,
     subtitleParser,
     toSrt,
@@ -31,14 +32,27 @@ const openai = createCliOpenAIClient()
 const coolerChatGPTAPI = new CooldownContext(Number(process.env.OPENAI_API_RPM ?? 500), 60000, "ChatGPTAPI")
 const coolerOpenAIModerator = new CooldownContext(Number(process.env.OPENAI_API_MODERATOR_RPM ?? process.env.OPENAI_API_RPM ?? 500), 60000, "OpenAIModerator")
 
+/**
+ * Resolves the session id sent as the `x-session-id` header on every request.
+ * Unset: a random id per CLI run. `off` / `0` / `false`: disabled. Anything else is used verbatim.
+ * @returns {string | undefined}
+ */
+function resolveSessionId() {
+    const value = process.env.OPENAI_SESSION_ID?.trim()
+    if (value === undefined || value === "") return crypto.randomUUID()
+    if (["off", "0", "false", "no"].includes(value.toLowerCase())) return undefined
+    return value
+}
+
 function createCliOpenAIClient() {
     const apiKey = process.env.OPENAI_API_KEY
     const baseURL = process.env.OPENAI_BASE_URL
+    const sessionId = resolveSessionId()
     const httpProxyConfig = process.env.http_proxy ?? process.env.HTTP_PROXY
     const httpsProxyConfig = process.env.https_proxy ?? process.env.HTTPS_PROXY
 
     if (!httpProxyConfig && !httpsProxyConfig) {
-        return createOpenAIClient(apiKey, undefined, baseURL)
+        return createOpenAIClient(apiKey, undefined, baseURL, sessionId)
     }
 
     log.debug("[CLI HTTP/HTTPS PROXY]", "Using HTTP/HTTPS Proxy from ENV Detected", { httpProxyConfig, httpsProxyConfig })
@@ -47,7 +61,7 @@ function createCliOpenAIClient() {
     const dispatcher = new undici.EnvHttpProxyAgent()
     /** @type {typeof globalThis.fetch} */
     const fetch = (input, init) => /** @type {any} */ (undici.fetch)(input, { ...init, dispatcher })
-    return new OpenAI({ apiKey, baseURL, maxRetries: 3, fetch })
+    return new OpenAI({ apiKey, baseURL, maxRetries: 3, fetch, defaultHeaders: sessionHeaders(sessionId) })
 }
 
 /**

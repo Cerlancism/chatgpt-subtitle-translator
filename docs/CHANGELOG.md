@@ -24,6 +24,12 @@ The agent-mode `--skip-refine` flag is renamed to `--no-refine`, aligning it wit
 
 ### New Features
 
+#### Session id header for sticky routing
+
+The CLI now sends an `x-session-id` header on every request, generated once per run. Providers that support it use it as the sticky routing key so consecutive batches reach the same backend and prompt cache, and group the run in their request logs. Other providers ignore the header.
+
+Set `OPENAI_SESSION_ID` to a fixed value to reuse an id across runs, or to `off` to disable it.
+
 #### Evened-out auto batch sizes
 
 When `--batch-sizes` is omitted, batch sizes are now spread evenly across the remaining lines instead of greedily filled to the token budget. Greedy filling left a small remainder batch at the tail (e.g. 100 lines packing 30 per batch produced batches of 30/30/30/10); the same lines now translate as 25/25/25/25, improving context consistency and prompt cache utilization across batches.

@@ -1,4 +1,4 @@
-export { createOpenAIClient } from './openai.mjs'
+export { createOpenAIClient, sessionHeaders } from './openai.mjs'
 export { wrapQuotes } from './helpers.mjs'
 export { CooldownContext } from './cooldown.mjs'
 export { parser as subtitleParser, secondsToTimestamp, toSrt, getLineEndingOverride, getTextLineEnding } from './subtitle.mjs'

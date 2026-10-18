@@ -5,16 +5,31 @@ import { retryWrapper, sleep } from './helpers.mjs';
 
 
 /**
+ * Builds the default headers for a client. `sessionId` is sent as `x-session-id`,
+ * which supporting providers use for sticky routing and request grouping; other
+ * backends ignore the header. Sent as a header rather than a body field because
+ * unknown body fields are rejected by some backends.
+ *
+ * @param {string} [sessionId]
+ * @returns {Record<string, string> | undefined}
+ */
+export function sessionHeaders(sessionId) {
+    return sessionId ? { "x-session-id": sessionId } : undefined
+}
+
+/**
  * @param {string} apiKey
  * @param {boolean} [dangerouslyAllowBrowser]
  * @param {string} [baseURL]
+ * @param {string} [sessionId] sent as the `x-session-id` header, see {@link sessionHeaders}
  */
-export function createOpenAIClient(apiKey, dangerouslyAllowBrowser = undefined, baseURL = undefined) {
+export function createOpenAIClient(apiKey, dangerouslyAllowBrowser = undefined, baseURL = undefined, sessionId = undefined) {
     return new OpenAI({
         apiKey,
         baseURL,
         dangerouslyAllowBrowser: dangerouslyAllowBrowser,
         maxRetries: 3,
+        defaultHeaders: sessionHeaders(sessionId),
     });
 }
 
