@@ -1,6 +1,6 @@
 import log from "loglevel"
 import { countTokens } from "gpt-tokenizer"
-import { roundWithPrecision, sleep } from './helpers.mjs'
+import { roundWithPrecision } from './helpers.mjs'
 
 /** Fraction of the context token budget the history window is trimmed back to when it
  * overflows (see {@link TranslatorBase.selectContextChunks}). The rest of the budget is
@@ -122,11 +122,18 @@ export class TranslatorBase {
         this.promptTokensUsed = 0
         this.promptTokensWasted = 0
         this.cachedTokens = 0
+        /** Prompt tokens that could have been cache hits: each request's prefix shared with the previous prompt */
+        this.cacheableTokens = 0
+        /** Estimated cacheable prefix tokens of the most recently built prompt (see trackCacheablePrefix) */
+        this.cacheablePromptTokens = 0
+        /** @type {string[] | undefined} Serialized messages of the most recently built prompt */
+        this.lastPromptMessages = undefined
         /** Cached tokens reported by the most recent request (null/undefined if unsupported) */
         this.lastCachedTokens = undefined
         this.completionTokensUsed = 0
         this.completionTokensWasted = 0
         this.tokensProcessTimeMs = 0
+        this.requestCount = 0
         this.contextPromptTokens = 0
         this.contextCompletionTokens = 0
         /** First history chunk included in the prompt context (stepped window anchor) */
@@ -202,7 +209,27 @@ export class TranslatorBase {
         if (userContent !== undefined) {
             messages.push({ role: "user", content: userContent })
         }
+        this.trackCacheablePrefix(messages)
         return messages
+    }
+
+    /**
+     * Estimates the prompt tokens that can be prefix cache hits: the leading messages
+     * shared with the previous prompt. Anything after the first differing message (new
+     * batch input, replayed output, a slid context window) has not been seen by the provider.
+     * @param {import('openai').OpenAI.Chat.ChatCompletionMessageParam[]} messages
+     */
+    trackCacheablePrefix(messages) {
+        const serialize = (/** @type {import('openai').OpenAI.Chat.ChatCompletionMessageParam} */ m) => `${m.role}\n${typeof m.content === "string" ? m.content : JSON.stringify(m.content)}`
+        const previous = this.lastPromptMessages ?? []
+        let tokens = 0
+        for (let i = 0; i < messages.length && i < previous.length; i++) {
+            const current = serialize(messages[i])
+            if (current !== previous[i]) break
+            tokens += countTokens(current)
+        }
+        this.cacheablePromptTokens = tokens
+        this.lastPromptMessages = messages.map(serialize)
     }
 
     /**
@@ -260,11 +287,13 @@ export class TranslatorBase {
         this.completionTokensUsed += output.completionTokens
         if (output.cachedTokens != null) {
             this.cachedTokens = (this.cachedTokens ?? 0) + output.cachedTokens
+            this.cacheableTokens += Math.min(output.promptTokens, this.cacheablePromptTokens)
         }
         this.lastCachedTokens = output.cachedTokens
         this.contextPromptTokens = output.promptTokens
         this.contextCompletionTokens = output.completionTokens
         this.tokensProcessTimeMs += elapsedMs
+        this.requestCount++
         return output
     }
 
@@ -373,12 +402,18 @@ export class TranslatorBase {
         const promptRate = roundWithPrecision(promptTokensUsed / minutesElapsed, 0)
         const completionRate = roundWithPrecision(completionTokensUsed / minutesElapsed, 0)
         const rate = roundWithPrecision(usedTokens / minutesElapsed, 0)
+        const promptRatePerSecond = roundWithPrecision(promptTokensUsed / minutesElapsed / 60, 1)
+        const completionRatePerSecond = roundWithPrecision(completionTokensUsed / minutesElapsed / 60, 1)
         const wastedPercent = (wastedTokens / usedTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 })
         const cachedTokens = this.cachedTokens
         const lastCachedTokens = this.lastCachedTokens
+        const cacheableTokens = this.cacheableTokens
+        // Estimated cacheable tokens exclude per-message overhead and hits carried over from earlier runs, cap at 100%
+        const cachedPercent = cacheableTokens > 0 && cachedTokens > 0 ? Math.min(1, cachedTokens / cacheableTokens).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 0 }) : undefined
         const contextPromptTokens = this.contextPromptTokens
         const contextCompletionTokens = this.contextCompletionTokens
         const contextTokens = contextPromptTokens + contextCompletionTokens
+        const requestCount = this.requestCount
         return {
             promptTokensUsed,
             completionTokensUsed,
@@ -389,19 +424,22 @@ export class TranslatorBase {
             wastedPercent,
             cachedTokens,
             lastCachedTokens,
+            cacheableTokens,
+            cachedPercent,
             contextPromptTokens,
             contextCompletionTokens,
             contextTokens,
             promptRate,
             completionRate,
             rate,
+            promptRatePerSecond,
+            completionRatePerSecond,
+            requestCount,
         }
     }
 
-    async printUsage() {
+    printUsage() {
         const usage = this.usage
-
-        await sleep(10)
 
         const {
             promptTokensUsed,
@@ -413,12 +451,15 @@ export class TranslatorBase {
             wastedPercent,
             cachedTokens,
             lastCachedTokens,
+            cachedPercent,
             contextPromptTokens,
             contextCompletionTokens,
             contextTokens,
             promptRate,
             completionRate,
-            rate,
+            promptRatePerSecond,
+            completionRatePerSecond,
+            requestCount,
         } = usage
 
         log.debug(
@@ -428,8 +469,11 @@ export class TranslatorBase {
             "\n\tCached:", ...(lastCachedTokens != null && cachedTokens >= 0
                 ? [cachedTokens - lastCachedTokens, "+", lastCachedTokens, "=", cachedTokens]
                 : [cachedTokens > 0 ? cachedTokens : "-"]),
+            ...(cachedPercent ? [cachedPercent] : []),
             "\n\tContext:", ...(contextTokens > 0 ? [contextPromptTokens, "+", contextCompletionTokens, "=", contextTokens, "/", this.options.useFullContext, `(${Math.round(contextTokens / this.options.useFullContext * 100)}%)`] : ["-"]),
-            "\n\tRate:", promptRate, "+", completionRate, "=", rate, "TPM", this.services.cooler?.rate, "RPM",
+            "\n\tInput Rate:", promptRatePerSecond, "TPS", promptRate, "TPM",
+            "\n\tOutput Rate:", completionRatePerSecond, "TPS", completionRate, "TPM",
+            "\n\tRequests:", requestCount, "total", this.services.cooler?.rate, "RPM",
         )
     }
 

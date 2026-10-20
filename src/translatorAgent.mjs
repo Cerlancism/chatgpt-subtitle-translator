@@ -124,6 +124,7 @@ export class TranslatorAgent {
         this.streamController = undefined
 
         this.planningPromptTokens = 0
+        this.planningRequestCount = 0
         this.planningCompletionTokens = 0
         this.planningElapsedTimeMs = 0
         /** @type {number | undefined} */
@@ -165,6 +166,7 @@ export class TranslatorAgent {
         this._planningLastCallTime = now
         this.planningPromptTokens += promptTokens
         this.planningCompletionTokens += completionTokens
+        this.planningRequestCount++
         const { planningPromptRate, planningCompletionRate, planningRate } = this.usage
         log.debug(
             `[TranslatorAgent]${label ? ` [${label}]` : ""} planning tokens:`,
@@ -218,6 +220,8 @@ export class TranslatorAgent {
         const planningPromptRate = planningMinutesElapsed ? roundWithPrecision(planningPromptTokens / planningMinutesElapsed, 0) : undefined
         const planningCompletionRate = planningMinutesElapsed ? roundWithPrecision(planningCompletionTokens / planningMinutesElapsed, 0) : undefined
         const planningRate = planningMinutesElapsed ? roundWithPrecision((planningPromptTokens + planningCompletionTokens) / planningMinutesElapsed, 0) : undefined
+        const planningPromptRatePerSecond = planningMinutesElapsed ? roundWithPrecision(planningPromptTokens / planningMinutesElapsed / 60, 1) : undefined
+        const planningCompletionRatePerSecond = planningMinutesElapsed ? roundWithPrecision(planningCompletionTokens / planningMinutesElapsed / 60, 1) : undefined
         return {
             ...base,
             planningPromptTokens,
@@ -225,16 +229,23 @@ export class TranslatorAgent {
             planningPromptRate,
             planningCompletionRate,
             planningRate,
+            planningPromptRatePerSecond,
+            planningCompletionRatePerSecond,
+            planningRequestCount: this.planningRequestCount,
         }
     }
 
     printUsage() {
         if (this.planningPromptTokens > 0 || this.planningCompletionTokens > 0) {
-            const { planningPromptTokens, planningCompletionTokens, planningPromptRate, planningCompletionRate, planningRate } = this.usage
+            const { planningPromptTokens, planningCompletionTokens, planningPromptRate, planningCompletionRate, planningRate, planningPromptRatePerSecond, planningCompletionRatePerSecond, planningRequestCount } = this.usage
             log.debug(
                 `[TranslatorAgent] Planning tokens:`,
                 "\n\tTokens:", planningPromptTokens, "+", planningCompletionTokens, "=", planningPromptTokens + planningCompletionTokens,
-                ...(planningRate !== undefined ? ["\n\tRate:", planningPromptRate, "+", planningCompletionRate, "=", planningRate, "TPM", this.services.cooler?.rate, "RPM"] : []),
+                ...(planningRate !== undefined ? [
+                    "\n\tInput Rate:", planningPromptRatePerSecond, "TPS", planningPromptRate, "TPM",
+                    "\n\tOutput Rate:", planningCompletionRatePerSecond, "TPS", planningCompletionRate, "TPM",
+                ] : []),
+                "\n\tRequests:", planningRequestCount, "total", ...(planningRate !== undefined ? [this.services.cooler?.rate, "RPM"] : []),
             )
         }
     }

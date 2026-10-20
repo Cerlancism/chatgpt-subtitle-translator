@@ -488,6 +488,8 @@ export class Translator extends TranslatorBase {
 
             this.printUsage()
         }
+
+        log.info("[Translator]", "Done")
     }
 
     /**
