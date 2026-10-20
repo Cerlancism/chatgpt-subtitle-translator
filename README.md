@@ -69,7 +69,7 @@ Options:
     [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode. (default: `array`, choices: `array`, `object`, `timestamp`, `agent`, `none`)
       - `array` Structures the input and output into an array format.
       - `object` Structures the input and output as a keyed object.
-      - `timestamp` Provides the model with entry timings alongside each entry's text (a batch start offset plus per-entry offset/length in milliseconds), allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and output. Output entry count may differ from input, so progress file resumption is not supported.
+      - `timestamp` Provides the model with entry timings alongside each entry's text (per-entry offset/length in milliseconds, relative to the batch start), allowing it to merge adjacent entries into one. A batch is only retried when the output time span boundaries don't match the input - unlike other modes which retry on any line count mismatch - significantly reducing token wastage from retries. Uses more tokens per batch due to timestamps in input and output. Output entry count may differ from input, so progress file resumption is not supported.
       - `agent` Alias for the `agent` subcommand with default options. Use the dedicated subcommand for full configuration. See [Agent Mode](#agent-mode).
       - `none` Legacy compatibility mode, disables structured output.
 
@@ -500,7 +500,7 @@ Yes, it's very nice weather.
 
 #### `timestamp`
 
-Timestamps are preserved alongside the text. Lines are sent using the compact [Toon format](https://www.npmjs.com/package/@toon-format/toon): each batch carries its absolute start time as a top-level `offset`, and each entry an `offset` (relative to the batch start) and `length` (duration) in milliseconds. This keeps the numbers small regardless of the batch's position in the file - absolute timestamps grow to 7 digits over a feature-length runtime. The model may merge subtitle entries when contextually appropriate.
+Timestamps are preserved alongside the text. Lines are sent using the compact [Toon format](https://www.npmjs.com/package/@toon-format/toon): each entry carries an `offset` (relative to the start of the batch's first entry) and `length` (duration) in milliseconds. This keeps the numbers small regardless of the batch's position in the file - absolute timestamps grow to 7 digits over a feature-length runtime. The model may merge subtitle entries when contextually appropriate.
 
 <table>
 <tr>
@@ -562,7 +562,6 @@ Tokens: `127`
 *(Toon format - compact, not JSON)*
 
 ```yaml
-offset: 0
 inputs[5]{offset,length,text}:
   0,2000,おはようございます。
   2000,3000,お元気ですか？

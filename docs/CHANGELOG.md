@@ -52,10 +52,9 @@ The `timestamp` mode output schema no longer includes the `remarksIfContainedMer
 
 #### Timestamp mode: offset/length wire encoding
 
-The `timestamp` mode wire format now sends each entry as `offset`/`length` (start time and duration) instead of `start`/`end`, and each batch carries its absolute start time as a single top-level `offset` field with entry offsets relative to it:
+The `timestamp` mode wire format now sends each entry as `offset`/`length` (start time and duration) instead of `start`/`end`, with entry offsets relative to the start of the batch's first entry:
 
 ```yaml
-offset: 5400000
 inputs[2]{offset,length,text}:
   0,1500,今日はとてもいい天気ですね。
   1500,2200,桜が満開で、本当に綺麗です。

@@ -43,20 +43,20 @@ const batchTimestampSchema = z.object({
 
 const schemaDescriptions = {
     single: [
-        "The input offset is the batch start time in milliseconds; entry offsets are relative to it.",
-        "outputs: Subtitle entries with offset (relative to the batch offset) and length (duration) in milliseconds",
+        "Entry offsets are relative to the start of the first entry in the batch.",
+        "outputs: Subtitle entries with offset and length (duration) in milliseconds",
     ].join("\n"),
     batch: [
-        "The input offset is the batch start time in milliseconds; entry offsets are relative to it.",
-        "outputs: Subtitle entries with offset (relative to the batch offset) and length (duration) in milliseconds",
+        "Entry offsets are relative to the start of the first entry in the batch.",
+        "outputs: Subtitle entries with offset and length (duration) in milliseconds",
         "Only merge entries if the combined text remains readable as a subtitle (prefer keeping entries separate if the merged text would exceed ~42 characters).",
     ].join("\n"),
 }
 
 /**
  * Timestamp-entry translator: input and yielded output are both {@link TimestampEntry}.
- * On the wire, batches are toon-encoded with a top-level batch `offset` (absolute ms)
- * and per-entry `offset`/`length` relative to it (see {@link toMsEntry} / `fromMsEntry`).
+ * On the wire, batches are toon-encoded with per-entry `offset`/`length` in ms, offsets
+ * relative to the batch's first entry start (see {@link toMsEntry} / `fromMsEntry`).
  * @extends {TranslatorStructuredBase<TimestampEntry, TimestampEntry>}
  */
 export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
@@ -84,7 +84,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
         const schemaAppendix = isSingle ? schemaDescriptions.single : schemaDescriptions.batch
         const systemContent = this.systemInstruction ? `${this.systemInstruction}\n\n# Output Schema\n${schemaAppendix}` : undefined
         const baseMs = timestampToMilliseconds(entries[0].start)
-        const messages = this.buildPromptMessages(encodeToon({ offset: baseMs, inputs: entries.map(e => toMsEntry(e, baseMs)) }), systemContent)
+        const messages = this.buildPromptMessages(encodeToon({ inputs: entries.map(e => toMsEntry(e, baseMs)) }), systemContent)
 
         try {
             this.currentBatchEntries = entries
@@ -136,7 +136,7 @@ export class TranslatorStructuredTimestamp extends TranslatorStructuredBase {
     renderHistoryChunk(start, end) {
         const chunk = this.entryHistory.slice(start, end)
         const baseMs = timestampToMilliseconds(chunk[0].input.start)
-        const userContent = encodeToon({ offset: baseMs, inputs: chunk.map(e => toMsEntry(e.input, baseMs)) })
+        const userContent = encodeToon({ inputs: chunk.map(e => toMsEntry(e.input, baseMs)) })
         const seenStarts = new Set()
         const outputs = chunk.reduce((acc, e) => {
             if (!seenStarts.has(e.output.start)) {
