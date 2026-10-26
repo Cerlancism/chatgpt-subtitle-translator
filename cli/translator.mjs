@@ -91,6 +91,7 @@ function addTranslatorOptions(cmd) {
         .option("--no-prefix-number", "Don't prefix lines with numerical indices")
         .option("--no-line-matching", "Don't enforce one-to-one line quantity input output matching")
         .option("-b, --batch-sizes <sizes>", "Batch sizes for translation prompts in JSON Array. When omitted, batch size is determined automatically based on the context token budget", JSON.parse)
+        .option("--max-batch-size <lines>", "Maximum lines per batch when --batch-sizes is omitted", val => parseInt(val, 10), DefaultOptions.maxBatchSize)
         .option("-g, --guard-repetition <threshold>", "Minimum pattern repeats before aborting a streaming response. Set to 0 to disable", val => parseInt(val, 10), DefaultOptions.guardRepetition)
         .option("-t, --temperature <temperature>", "Sampling temperature to use, should set a low value such as 0 to be more deterministic", parseFloat, DefaultOptions.createChatCompletionRequest.temperature)
         .option("--no-stream", "Disable stream progress output to terminal (streaming is on by default)")
@@ -159,6 +160,7 @@ function buildOptions(opts) {
         ...(opts.prefixNumber !== undefined && { prefixNumber: opts.prefixNumber }),
         ...(opts.lineMatching !== undefined && { lineMatching: opts.lineMatching }),
         ...(opts.batchSizes && { batchSizes: opts.batchSizes }),
+        ...(opts.maxBatchSize !== undefined && { maxBatchSize: opts.maxBatchSize }),
         ...(opts.structured && opts.structured !== "none" && { structuredMode: opts.structured }),
         ...(opts.experimentalMax_token && { max_token: opts.experimentalMax_token }),
         ...(opts.experimentalInputMultiplier && { inputMultiplier: opts.experimentalInputMultiplier }),

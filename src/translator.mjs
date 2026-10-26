@@ -11,9 +11,10 @@ import { TranslationOutput } from './translatorOutput.mjs';
 export { DefaultOptions }
 
 export const AUTO_BATCH_MIN = 3
-/** Maximum entries per dynamic batch, regardless of the token budget. Bounds the output
- * length of one response and the cost of a failed batch on large context windows. */
-export const AUTO_BATCH_MAX = 100
+/** Default maximum entries per dynamic batch, regardless of the token budget. Bounds the output
+ * length of one response and the cost of a failed batch on large context windows.
+ * Overridable with the `maxBatchSize` option. */
+export const AUTO_BATCH_MAX = DefaultOptions.maxBatchSize
 export const AUTO_BATCH_REDUCTION = 3
 /** Number of dynamic batches whose history fits in the context window's growth span
  * (the part of the budget freed when the window is trimmed, see selectContextChunks).
@@ -34,15 +35,16 @@ export const CACHE_WINDOW_BATCH_CYCLES = 3
  *
  * Recomputed each iteration, so per-entry token variance and mid-stream budget
  * reductions self-correct. The hard `budget` is never exceeded, a batch never holds
- * more than `AUTO_BATCH_MAX` entries (the count is evened under the cap too), and the
+ * more than `maxEntries` entries (the count is evened under the cap too), and the
  * result is at least `AUTO_BATCH_MIN` (unless fewer entries remain).
  *
  * @param {number[]} weights - per-entry token counts, indexed globally
  * @param {number} startIndex - index of the first unprocessed entry
  * @param {number} budget - hard per-batch token budget; `<= 0` for no token limit (entry cap only)
+ * @param {number} [maxEntries] - max entries per batch
  * @returns {number} number of entries to include in the next batch
  */
-export function computeEvenBatchSize(weights, startIndex, budget) {
+export function computeEvenBatchSize(weights, startIndex, budget, maxEntries = AUTO_BATCH_MAX) {
     const remaining = weights.length - startIndex
     if (remaining <= 0) return 0
     if (budget <= 0) budget = Infinity
@@ -55,7 +57,7 @@ export function computeEvenBatchSize(weights, startIndex, budget) {
     for (let i = startIndex; i < weights.length; i++) {
         const w = weights[i]
         remainingTokens += w
-        if (batchEntries > 0 && (batchTokens + w > budget || batchEntries >= AUTO_BATCH_MAX)) {
+        if (batchEntries > 0 && (batchTokens + w > budget || batchEntries >= maxEntries)) {
             batchCount++
             batchTokens = 0
             batchEntries = 0
@@ -73,7 +75,7 @@ export function computeEvenBatchSize(weights, startIndex, budget) {
     let count = 0
     for (let i = startIndex; i < weights.length; i++) {
         const w = weights[i]
-        if (count > 0 && (tokensSoFar + w > budget || tokensSoFar + w > targetTokens || count >= AUTO_BATCH_MAX)) break
+        if (count > 0 && (tokensSoFar + w > budget || tokensSoFar + w > targetTokens || count >= maxEntries)) break
         tokensSoFar += w
         count++
     }
@@ -309,13 +311,13 @@ export class Translator extends TranslatorBase {
     computeDynamicBatchSize(lines, startIndex, reductionFactor = 1) {
         const weights = lines.map(l => this.getLineTokenWeight(l))
         if (!this.options.useFullContext) {
-            return computeEvenBatchSize(weights, startIndex, 0)
+            return computeEvenBatchSize(weights, startIndex, 0, this.options.maxBatchSize)
         }
         const budget = Math.floor(this.dynamicBatchBudget / reductionFactor)
         if (budget <= 0) {
             return Math.min(AUTO_BATCH_MIN, lines.length - startIndex)
         }
-        return computeEvenBatchSize(weights, startIndex, budget)
+        return computeEvenBatchSize(weights, startIndex, budget, this.options.maxBatchSize)
     }
 
     /**

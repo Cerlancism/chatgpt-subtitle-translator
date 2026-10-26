@@ -18,6 +18,7 @@ export class TranslatorStructuredObject extends TranslatorStructuredBase {
         }
 
         super(language, services, options)
+        this.options.maxBatchSize = Math.min(this.options.maxBatchSize, 100)
     }
 
     /**

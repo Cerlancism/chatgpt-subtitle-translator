@@ -30,9 +30,9 @@ The CLI now sends an `x-session-id` header on every request, generated once per 
 
 Set `OPENAI_SESSION_ID` to a fixed value to reuse an id across runs, or to `off` to disable it.
 
-#### Auto batch size capped at 100 entries
+#### Auto batch size capped at 200 entries
 
-When `--batch-sizes` is omitted, a batch now holds at most 100 entries regardless of the `--context` token budget. On large context windows the budget alone allowed several hundred cues per batch, which pushed single responses toward model output limits and made a failed batch expensive to retry. The cap takes part in the evening, so the remaining lines are still spread evenly under it (e.g. 250 lines with no token limit translate as 83/83/84, not 100/100/50).
+When `--batch-sizes` is omitted, a batch now holds at most 200 entries (configurable with `--max-batch-size`, or the `maxBatchSize` option in the library API; `object` mode stays limited to 100) regardless of the `--context` token budget. On large context windows the budget alone allowed several hundred cues per batch, which pushed single responses toward model output limits and made a failed batch expensive to retry. The cap takes part in the evening, so the remaining lines are still spread evenly under it (e.g. 500 lines with no token limit translate as 166/167/167, not 200/200/100).
 
 #### Evened-out auto batch sizes
 

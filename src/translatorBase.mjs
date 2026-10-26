@@ -49,6 +49,8 @@ export const HISTORY_COST_RATIO_PRIOR = 3
  *
  * Larger batch sizes generally lead to more efficient token utilization and potentially better contextual translation.
  * However, mismatched output line quantities or exceeding the token limit will cause token wastage, requiring resubmission of the batch with a smaller batch size.
+ * @property {number} maxBatchSize `200`
+ * Maximum number of lines per batch when `batchSizes` is omitted (dynamic batching), regardless of the token budget.
  * @property {"array" | "object" | "none" | "timestamp"} structuredMode `"array"`
  * Structured response format mode
  * @property {boolean} skipRefineInstruction
@@ -78,6 +80,7 @@ export const DefaultOptions = {
     lineMatching: true,
     useFullContext: 2000,
     batchSizes: undefined,
+    maxBatchSize: 200,
     structuredMode: "array",
     guardRepetition: 10,
     max_token: 0,

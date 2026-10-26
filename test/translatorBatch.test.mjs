@@ -26,17 +26,19 @@ test('dynamic batch reduction does not exceed remaining line count', () => {
 });
 
 test('dynamic batch size is capped at AUTO_BATCH_MAX and evened under the cap', () => {
-    const weights = Array(250).fill(10);
+    const weights = Array(500).fill(10);
     // huge token budget: the cap alone bounds the batch, and the remainder is spread evenly
-    assert.equal(computeEvenBatchSize(weights, 0, 1_000_000), 83);
-    assert.equal(computeEvenBatchSize(weights, 83, 1_000_000), 83);
-    assert.equal(computeEvenBatchSize(weights, 166, 1_000_000), 84);
+    assert.equal(computeEvenBatchSize(weights, 0, 1_000_000), 166);
+    assert.equal(computeEvenBatchSize(weights, 166, 1_000_000), 167);
+    assert.equal(computeEvenBatchSize(weights, 333, 1_000_000), 167);
     // no token limit: same cap-only evening
-    assert.equal(computeEvenBatchSize(weights, 0, 0), 83);
+    assert.equal(computeEvenBatchSize(weights, 0, 0), 166);
     // under the cap, a single batch takes everything
-    assert.equal(computeEvenBatchSize(weights, 200, 0), 50);
+    assert.equal(computeEvenBatchSize(weights, 400, 0), 100);
     // the token budget still wins when it is the tighter limit
     assert.equal(computeEvenBatchSize(weights, 0, 500), 50);
+    // an explicit cap overrides the default
+    assert.equal(computeEvenBatchSize(weights, 0, 0, 100), 100);
     // the translator walks the whole file without ever exceeding the cap
     const translator = new Translator({ from: 'English', to: 'Finnish' }, { openai: null }, { useFullContext: 1_000_000 });
     const lines = Array.from({ length: 1000 }, (_, i) => `Subtitle line ${i}`);
@@ -48,8 +50,11 @@ test('dynamic batch size is capped at AUTO_BATCH_MAX and evened under the cap', 
         index += size;
     }
     assert.equal(sizes.reduce((a, b) => a + b, 0), lines.length);
-    assert.ok(sizes.every(s => s === 100), `uneven batches: ${sizes}`);
+    assert.ok(sizes.every(s => s === 200), `uneven batches: ${sizes}`);
     // context budget disabled: still capped
     const unbounded = new Translator({ from: 'English', to: 'Finnish' }, { openai: null }, { useFullContext: 0 });
-    assert.equal(unbounded.computeDynamicBatchSize(lines, 0), 100);
+    assert.equal(unbounded.computeDynamicBatchSize(lines, 0), 200);
+    // maxBatchSize option overrides the default cap
+    const capped = new Translator({ from: 'English', to: 'Finnish' }, { openai: null }, { useFullContext: 0, maxBatchSize: 50 });
+    assert.equal(capped.computeDynamicBatchSize(lines, 0), 50);
 });
