@@ -64,7 +64,7 @@ Options:
   - `-i, --input <file>`  
     Input source text with the content of this file, in `.srt` format or plain text
   - `-o, --output <file>`  
-    Output file name, defaults to be based on input file name
+    Output file name, defaults to be based on input file name. When given, the progress `.csv` file (if applicable) is named `<file>.progress.csv`
   - `-r, --structured <mode>`
     [Structured response](https://openai.com/index/introducing-structured-outputs-in-the-api/) format mode. (default: `array`, choices: `array`, `object`, `timestamp`, `agent`, `none`)
       - `array` Structures the input and output into an array format.

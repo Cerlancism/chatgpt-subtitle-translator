@@ -77,7 +77,7 @@ function addTranslatorOptions(cmd) {
         .option("--moderation-model <model>", "OpenAI moderation model", DefaultOptions.moderationModel)
 
         .option("-i, --input <file>", "Text file name to use as input, .srt or plain text")
-        .option("-o, --output <file>", "Output file name, defaults to be based on input file name")
+        .option("-o, --output <file>", "Output file name, defaults to be based on input file name. When given, the progress .csv file (if applicable) is named <file>.progress.csv")
         .option("-s, --system-instruction <instruction>", "Override the prompt system instruction template `Translate ${from} to ${to}`")
         .option("-p, --plain-text <text>", "Only translate this input plain text. Not supported in timestamp mode, or with the agent subcommand using -r timestamp")
         .addOption(new Option("-r, --structured <mode>", "Structured response format mode").choices(["array", "object", "timestamp", "agent", "none"]).default("array"))
@@ -330,7 +330,7 @@ async function translateSrtFile(translator, opts, options, agentMode, fileTag) {
 
     if (translator instanceof TranslatorStructuredTimestamp) throw new Error("Unexpected TranslatorStructuredTimestamp")
 
-    const progressFile = `${opts.input}.progress_${fileTag}.csv`
+    const progressFile = opts.output ? `${opts.output}.progress.csv` : `${opts.input}.progress_${fileTag}.csv`
     await resumeProgress(translator, sourceLines, progressFile, outputFile)
     await runWithErrorExit(() => writeSrtTranslation(translator, sourceLines, srtArrayWorking, outputFile, progressFile))
 }
